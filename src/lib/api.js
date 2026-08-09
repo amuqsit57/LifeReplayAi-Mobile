@@ -65,6 +65,10 @@ export const api = {
 
   memories: (eventId) => request(`/api/memories?event_id=${eventId}`),
 
+  /** Called once a batch finishes: duplicates can only be grouped as a set. */
+  analyseBatch: (eventId) =>
+    request(`/api/memories/analyse?event_id=${eventId}`, { method: 'POST' }),
+
   summarise: (eventId) =>
     request(`/api/events/${eventId}/summarise`, { method: 'POST', timeoutMs: 120_000 }),
 

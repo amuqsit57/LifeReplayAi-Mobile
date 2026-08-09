@@ -18,6 +18,14 @@ const STATUS_TONE = {
   failed: 'danger',
 };
 
+const STATUS_LABEL = {
+  uploading: 'uploading',
+  uploaded: 'queued',
+  analyzing: 'understanding',
+  ready: 'ready',
+  failed: 'failed',
+};
+
 export default function EventScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -64,6 +72,11 @@ export default function EventScreen() {
       setProgress({ index: 0, total: assets.length, phase: 'starting' });
       const results = await uploadAll(id, assets, setProgress);
       setProgress(null);
+
+      // Analysis is triggered here rather than per file: burst duplicates can only
+      // be identified once the whole batch has landed, and skipping them is what
+      // keeps a 400-photo event from paying for 400 analyses.
+      await api.analyseBatch(id).catch(() => {});
 
       const failures = results.filter((r) => !r.ok);
       if (failures.length) {
@@ -231,7 +244,10 @@ export default function EventScreen() {
                   </View>
                 )}
                 <View style={styles.tileFoot}>
-                  <Pill label={memory.status} tone={STATUS_TONE[memory.status] ?? 'neutral'} />
+                  <Pill
+                    label={STATUS_LABEL[memory.status] ?? memory.status}
+                    tone={STATUS_TONE[memory.status] ?? 'neutral'}
+                  />
                 </View>
               </View>
             ))}
