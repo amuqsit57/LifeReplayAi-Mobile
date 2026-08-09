@@ -1,3 +1,4 @@
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 
 import { api, uploadToSignedUrl } from './api';
@@ -16,9 +17,26 @@ function describe(asset) {
         : 'video/mp4'
       : extension === 'png'
         ? 'image/png'
-        : 'image/jpeg');
+        : extension === 'heic'
+          ? 'image/heic'
+          : 'image/jpeg');
 
   return { kind: isVideo ? 'video' : 'photo', filename: name, contentType: mime };
+}
+
+/**
+ * Give the uploader a real file to stream from.
+ *
+ * Android's picker hands back `content://` URIs for some assets and cached
+ * `file://` paths for others, and the streaming uploader can only read the latter.
+ * Copying into the cache first makes every asset behave the same way.
+ */
+async function ensureLocalFile(uri, filename) {
+  if (uri.startsWith('file://')) return { uri, cleanup: null };
+
+  const target = `${FileSystem.cacheDirectory}upload-${Date.now()}-${filename}`;
+  await FileSystem.copyAsync({ from: uri, to: target });
+  return { uri: target, cleanup: () => FileSystem.deleteAsync(target, { idempotent: true }) };
 }
 
 export async function pickMemories() {
@@ -49,20 +67,27 @@ export async function pickMemories() {
 export async function uploadMemory(eventId, asset, onProgress) {
   const { kind, filename, contentType } = describe(asset);
 
-  onProgress?.('requesting');
-  const ticket = await api.requestUpload({
-    event_id: eventId,
-    filename,
-    content_type: contentType,
-    kind,
-    bytes: asset.fileSize ?? null,
-  });
+  onProgress?.('preparing');
+  const local = await ensureLocalFile(asset.uri, filename);
 
-  onProgress?.('uploading');
-  await uploadToSignedUrl(ticket.upload_url, asset.uri, contentType);
+  try {
+    onProgress?.('requesting');
+    const ticket = await api.requestUpload({
+      event_id: eventId,
+      filename,
+      content_type: contentType,
+      kind,
+      bytes: asset.fileSize ?? null,
+    });
 
-  onProgress?.('finishing');
-  return api.completeUpload(ticket.memory_id);
+    onProgress?.('uploading');
+    await uploadToSignedUrl(ticket.upload_url, local.uri, contentType);
+
+    onProgress?.('finishing');
+    return await api.completeUpload(ticket.memory_id);
+  } finally {
+    await local.cleanup?.().catch(() => {});
+  }
 }
 
 export async function uploadAll(eventId, assets, onEach) {
@@ -74,8 +99,11 @@ export async function uploadAll(eventId, assets, onEach) {
       );
       results.push({ ok: true, memory });
     } catch (error) {
-      // One bad file should not abandon the rest of someone's upload.
-      results.push({ ok: false, error: error.message });
+      // One bad file should not abandon the rest of someone's upload, but the
+      // reason has to survive — a bare count is impossible to act on.
+      const name = asset.fileName || asset.uri.split('/').pop();
+      console.warn(`[upload] ${name} failed:`, error);
+      results.push({ ok: false, error: error.message, file: name });
     }
   }
   return results;

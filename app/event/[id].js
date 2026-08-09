@@ -65,10 +65,14 @@ export default function EventScreen() {
       const results = await uploadAll(id, assets, setProgress);
       setProgress(null);
 
-      const failed = results.filter((r) => !r.ok).length;
-      if (failed) {
-        setProgress({ error: `${failed} of ${assets.length} could not be uploaded` });
-        setTimeout(() => setProgress(null), 4000);
+      const failures = results.filter((r) => !r.ok);
+      if (failures.length) {
+        // The reason matters far more than the count — "5 failed" is impossible to
+        // act on, while the first actual error usually names the problem.
+        setProgress({
+          error: `${failures.length} of ${assets.length} failed.\n${failures[0].file ?? ''}: ${failures[0].error}`,
+        });
+        setTimeout(() => setProgress(null), 12000);
       }
       queryClient.invalidateQueries({ queryKey: ['memories', id] });
     } catch (err) {
@@ -118,7 +122,10 @@ export default function EventScreen() {
 
       {progress ? (
         <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary }}>
-          <Text style={[type.body, { color: progress.error ? colors.danger : colors.text }]}>
+          <Text
+            selectable
+            style={[type.body, { color: progress.error ? colors.danger : colors.text }]}
+          >
             {progress.error
               ? progress.error
               : `Uploading ${progress.index + 1} of ${progress.total} — ${progress.phase}…`}
