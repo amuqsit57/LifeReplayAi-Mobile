@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Life Replay",
+    "slug": "life-replay",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "lifereplay",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1A1626",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "//": "Omit a key to disable it rather than setting it to null — Expo resolves null to {} at runtime, which reads as configured. apiUrl pins the FastAPI backend; without it the host is derived from Metro.",
+      "supabaseUrl": "https://uuyvovmrjuoeonzuqclx.supabase.co",
+      "supabaseAnonKey": "sb_publishable_VEUtMEipRxKyXLcJm-LL8w_JbufoTg_"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Life Replay needs access to your photos so you can add memories to your family's events."
+        }
+      ]
+    ]
+  }
+}
