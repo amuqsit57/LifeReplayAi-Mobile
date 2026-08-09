@@ -28,7 +28,9 @@ export async function pickMemories() {
   }
 
   const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.All,
+    // Array form, not MediaTypeOptions: the enum is deprecated in expo-image-picker
+    // 17 and silently returns images only, so videos never reach the vault.
+    mediaTypes: ['images', 'videos'],
     allowsMultipleSelection: true,
     quality: 0.9,
     // Nobody should have to sort their camera roll before contributing.

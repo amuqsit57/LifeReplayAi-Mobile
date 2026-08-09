@@ -1,3 +1,5 @@
+import * as FileSystem from 'expo-file-system/legacy';
+
 import { resolveApiUrl } from './config';
 import { accessToken } from './supabase';
 
@@ -79,20 +81,20 @@ export const api = {
 /**
  * Upload a file straight to the signed URL.
  *
- * The bytes never touch our backend — it only issues permission — which is what
- * keeps a 200MB video from being proxied through a Python process.
+ * Streams from disk via expo-file-system rather than fetch().blob(): reading a
+ * file into a Blob first holds the whole thing in memory, which fails on large
+ * photos and never survives a video.
+ *
+ * The bytes never touch our backend — it only issues permission.
  */
 export async function uploadToSignedUrl(uploadUrl, uri, contentType) {
-  const file = await fetch(uri);
-  const blob = await file.blob();
-
-  const response = await fetch(uploadUrl, {
-    method: 'PUT',
+  const result = await FileSystem.uploadAsync(uploadUrl, uri, {
+    httpMethod: 'PUT',
+    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
     headers: { 'Content-Type': contentType },
-    body: blob,
   });
 
-  if (!response.ok) {
-    throw new Error(`Upload failed (${response.status})`);
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error(`Upload failed (${result.status})`);
   }
 }
