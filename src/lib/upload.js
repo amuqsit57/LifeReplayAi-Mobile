@@ -24,19 +24,43 @@ function describe(asset) {
   return { kind: isVideo ? 'video' : 'photo', filename: name, contentType: mime };
 }
 
-/**
- * Give the uploader a real file to stream from.
- *
- * Android's picker hands back `content://` URIs for some assets and cached
- * `file://` paths for others, and the streaming uploader can only read the latter.
- * Copying into the cache first makes every asset behave the same way.
- */
-async function ensureLocalFile(uri, filename) {
-  if (uri.startsWith('file://')) return { uri, cleanup: null };
+const STAGING_DIR = `${FileSystem.cacheDirectory}lifereplay-uploads/`;
 
-  const target = `${FileSystem.cacheDirectory}upload-${Date.now()}-${filename}`;
-  await FileSystem.copyAsync({ from: uri, to: target });
-  return { uri: target, cleanup: () => FileSystem.deleteAsync(target, { idempotent: true }) };
+async function ensureStagingDir() {
+  const info = await FileSystem.getInfoAsync(STAGING_DIR);
+  if (!info.exists) {
+    await FileSystem.makeDirectoryAsync(STAGING_DIR, { intermediates: true });
+  }
+}
+
+/**
+ * Copy every picked asset somewhere we control, before uploading any of them.
+ *
+ * The picker stores its results in a cache directory that Android clears while a
+ * long batch is still running — the first files upload, then the rest fail with
+ * "directory doesn't exist" because the originals were deleted underneath us.
+ * Snapshotting up front, while they are all still present, is the only reliable
+ * way to survive a multi-file upload.
+ */
+async function stageAssets(assets) {
+  await ensureStagingDir();
+
+  const staged = [];
+  for (const [index, asset] of assets.entries()) {
+    const { kind, filename, contentType } = describe(asset);
+    const target = `${STAGING_DIR}${Date.now()}-${index}-${filename}`;
+    try {
+      await FileSystem.copyAsync({ from: asset.uri, to: target });
+      staged.push({ asset, uri: target, kind, filename, contentType });
+    } catch (error) {
+      staged.push({ asset, error: `Could not read the file: ${error.message}`, filename });
+    }
+  }
+  return staged;
+}
+
+async function clearStaging() {
+  await FileSystem.deleteAsync(STAGING_DIR, { idempotent: true }).catch(() => {});
 }
 
 export async function pickMemories() {
@@ -64,47 +88,51 @@ export async function pickMemories() {
  * Confirming is a separate call so a failed upload leaves the memory visibly
  * `uploading` rather than silently missing.
  */
-export async function uploadMemory(eventId, asset, onProgress) {
-  const { kind, filename, contentType } = describe(asset);
+async function uploadStaged(eventId, item, onProgress) {
+  onProgress?.('requesting');
+  const ticket = await api.requestUpload({
+    event_id: eventId,
+    filename: item.filename,
+    content_type: item.contentType,
+    kind: item.kind,
+    bytes: item.asset.fileSize ?? null,
+  });
 
-  onProgress?.('preparing');
-  const local = await ensureLocalFile(asset.uri, filename);
+  onProgress?.('uploading');
+  await uploadToSignedUrl(ticket.upload_url, item.uri, item.contentType);
 
-  try {
-    onProgress?.('requesting');
-    const ticket = await api.requestUpload({
-      event_id: eventId,
-      filename,
-      content_type: contentType,
-      kind,
-      bytes: asset.fileSize ?? null,
-    });
-
-    onProgress?.('uploading');
-    await uploadToSignedUrl(ticket.upload_url, local.uri, contentType);
-
-    onProgress?.('finishing');
-    return await api.completeUpload(ticket.memory_id);
-  } finally {
-    await local.cleanup?.().catch(() => {});
-  }
+  onProgress?.('finishing');
+  return api.completeUpload(ticket.memory_id);
 }
 
 export async function uploadAll(eventId, assets, onEach) {
+  onEach?.({ index: 0, total: assets.length, phase: 'preparing' });
+  const staged = await stageAssets(assets);
+
   const results = [];
-  for (const [index, asset] of assets.entries()) {
-    try {
-      const memory = await uploadMemory(eventId, asset, (phase) =>
-        onEach?.({ index, total: assets.length, phase })
-      );
-      results.push({ ok: true, memory });
-    } catch (error) {
-      // One bad file should not abandon the rest of someone's upload, but the
-      // reason has to survive — a bare count is impossible to act on.
-      const name = asset.fileName || asset.uri.split('/').pop();
-      console.warn(`[upload] ${name} failed:`, error);
-      results.push({ ok: false, error: error.message, file: name });
+  try {
+    for (const [index, item] of staged.entries()) {
+      if (item.error) {
+        console.warn(`[upload] ${item.filename} could not be staged: ${item.error}`);
+        results.push({ ok: false, error: item.error, file: item.filename });
+        continue;
+      }
+
+      try {
+        const memory = await uploadStaged(eventId, item, (phase) =>
+          onEach?.({ index, total: staged.length, phase })
+        );
+        results.push({ ok: true, memory });
+      } catch (error) {
+        // One bad file should not abandon the rest of someone's upload, but the
+        // reason has to survive — a bare count is impossible to act on.
+        console.warn(`[upload] ${item.filename} failed:`, error);
+        results.push({ ok: false, error: error.message, file: item.filename });
+      }
     }
+  } finally {
+    await clearStaging();
   }
+
   return results;
 }
