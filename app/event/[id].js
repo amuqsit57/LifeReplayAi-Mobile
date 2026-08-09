@@ -73,10 +73,9 @@ export default function EventScreen() {
       const results = await uploadAll(id, assets, setProgress);
       setProgress(null);
 
-      // Analysis is triggered here rather than per file: burst duplicates can only
-      // be identified once the whole batch has landed, and skipping them is what
-      // keeps a 400-photo event from paying for 400 analyses.
-      await api.analyseBatch(id).catch(() => {});
+      // Each upload analyses itself as it lands. This only sweeps up anything
+      // whose background task died, so a memory never sits unanalysed forever.
+      api.analyseBatch(id).catch(() => {});
 
       const failures = results.filter((r) => !r.ok);
       if (failures.length) {
