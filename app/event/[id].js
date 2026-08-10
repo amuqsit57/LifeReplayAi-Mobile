@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Alert, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { api } from '../../src/lib/api';
 import { getEvent } from '../../src/lib/data';
@@ -31,6 +31,9 @@ export default function EventScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [progress, setProgress] = useState(null);
+  // Which memories are picked for deletion. Empty means normal browsing; the grid
+  // only becomes a selection grid once something is held down.
+  const [selected, setSelected] = useState([]);
 
   const event = useQuery({ queryKey: ['event', id], queryFn: () => getEvent(id) });
 
@@ -52,6 +55,15 @@ export default function EventScreen() {
       const rows = query.state.data ?? [];
       return rows.some((r) => r.status === 'queued' || r.status === 'running') ? 5000 : false;
     },
+  });
+
+  const removeMemories = useMutation({
+    mutationFn: (ids) => api.deleteMemories(ids),
+    onSuccess: () => {
+      setSelected([]);
+      queryClient.invalidateQueries({ queryKey: ['memories', id] });
+    },
+    onError: (error) => Alert.alert('Could not delete', error.message),
   });
 
   const summarise = useMutation({
@@ -96,6 +108,34 @@ export default function EventScreen() {
   const list = memories.data ?? [];
   const ready = list.filter((m) => m.status === 'ready').length;
   const processing = list.filter((m) => m.status !== 'ready' && m.status !== 'failed').length;
+
+  const selecting = selected.length > 0;
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const allSelected = list.length > 0 && selected.length === list.length;
+
+  function toggle(memoryId) {
+    setSelected((current) =>
+      current.includes(memoryId)
+        ? current.filter((value) => value !== memoryId)
+        : [...current, memoryId]
+    );
+  }
+
+  function confirmDelete() {
+    const count = selected.length;
+    Alert.alert(
+      `Delete ${count} ${count === 1 ? 'memory' : 'memories'}?`,
+      'The photos and videos are removed for everyone in the family. This cannot be undone.',
+      [
+        { text: 'Keep them', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => removeMemories.mutate(selected),
+        },
+      ]
+    );
+  }
 
   return (
     <Screen
@@ -221,7 +261,31 @@ export default function EventScreen() {
       ) : null}
 
       <View>
-        <SectionHeader title="Memories" subtitle="Everything the family added" />
+        <SectionHeader
+          title="Memories"
+          subtitle={
+            selecting
+              ? `${selected.length} selected`
+              : 'Everything the family added — hold one to select'
+          }
+        />
+
+        {selecting ? (
+          <View style={styles.selectBar}>
+            <Button
+              label={allSelected ? 'Select none' : 'Select all'}
+              variant="ghost"
+              onPress={() => setSelected(allSelected ? [] : list.map((m) => m.id))}
+            />
+            <Button label="Cancel" variant="ghost" onPress={() => setSelected([])} />
+            <Button
+              label={removeMemories.isPending ? 'Deleting…' : `Delete ${selected.length}`}
+              variant="danger"
+              disabled={removeMemories.isPending}
+              onPress={confirmDelete}
+            />
+          </View>
+        ) : null}
 
         {list.length === 0 && !memories.isLoading ? (
           <Empty
@@ -231,25 +295,53 @@ export default function EventScreen() {
           />
         ) : (
           <View style={styles.grid}>
-            {list.map((memory) => (
-              <View key={memory.id} style={styles.tile}>
-                {memory.url && memory.kind === 'photo' ? (
-                  <Image source={{ uri: memory.url }} style={styles.thumb} contentFit="cover" />
-                ) : (
-                  <View style={[styles.thumb, styles.thumbFallback]}>
-                    <Text style={{ fontSize: 26 }}>
-                      {memory.kind === 'video' ? '🎥' : memory.kind === 'voice' ? '🎙️' : '🖼️'}
-                    </Text>
+            {list.map((memory) => {
+              const picked = selectedSet.has(memory.id);
+              // Never the original: those run to megabytes each and a screenful
+              // of them stalls long enough to look like nothing loaded at all.
+              const preview = memory.thumbnail_url ?? memory.url;
+
+              return (
+                <Pressable
+                  key={memory.id}
+                  style={styles.tile}
+                  onLongPress={() => toggle(memory.id)}
+                  onPress={() => (selecting ? toggle(memory.id) : null)}
+                >
+                  {preview ? (
+                    <Image
+                      source={{ uri: preview }}
+                      style={[styles.thumb, picked && styles.thumbPicked]}
+                      contentFit="cover"
+                      transition={120}
+                    />
+                  ) : (
+                    <View style={[styles.thumb, styles.thumbFallback]}>
+                      <Text style={{ fontSize: 26 }}>
+                        {memory.kind === 'video' ? '🎥' : memory.kind === 'voice' ? '🎙️' : '🖼️'}
+                      </Text>
+                    </View>
+                  )}
+
+                  {memory.kind === 'video' ? (
+                    <Text style={styles.videoMark}>🎥</Text>
+                  ) : null}
+                  {picked ? <Text style={styles.tick}>✓</Text> : null}
+
+                  <View style={styles.tileFoot}>
+                    <Pill
+                      label={STATUS_LABEL[memory.status] ?? memory.status}
+                      tone={STATUS_TONE[memory.status] ?? 'neutral'}
+                    />
                   </View>
-                )}
-                <View style={styles.tileFoot}>
-                  <Pill
-                    label={STATUS_LABEL[memory.status] ?? memory.status}
-                    tone={STATUS_TONE[memory.status] ?? 'neutral'}
-                  />
-                </View>
-              </View>
-            ))}
+                  {memory.tags?.length ? (
+                    <Text numberOfLines={1} style={styles.tags}>
+                      {memory.tags.slice(0, 3).join(' · ')}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              );
+            })}
           </View>
         )}
       </View>
@@ -276,6 +368,25 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     backgroundColor: colors.surfaceAlt,
   },
+  thumbPicked: { opacity: 0.55, borderWidth: 3, borderColor: colors.primary },
   thumbFallback: { alignItems: 'center', justifyContent: 'center' },
   tileFoot: { alignItems: 'flex-start' },
+  tags: { ...type.caption, color: colors.textMuted },
+  // Sits over the top-left of the tile so a clip is identifiable at a glance.
+  videoMark: { position: 'absolute', top: 6, left: 6, fontSize: 14 },
+  tick: {
+    position: 'absolute',
+    top: 4,
+    right: 6,
+    fontSize: 20,
+    color: colors.primary,
+    fontWeight: '800',
+  },
+  selectBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
 });

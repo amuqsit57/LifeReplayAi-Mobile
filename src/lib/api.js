@@ -65,6 +65,15 @@ export const api = {
 
   memories: (eventId) => request(`/api/memories?event_id=${eventId}`),
 
+  // Takes a list: clearing out a bad batch means twenty at once, not twenty
+  // round trips.
+  deleteMemories: (memoryIds) =>
+    request('/api/memories/delete', {
+      method: 'POST',
+      body: JSON.stringify(memoryIds),
+      timeoutMs: 60_000,
+    }),
+
   /** Called once a batch finishes: duplicates can only be grouped as a set. */
   analyseBatch: (eventId) =>
     request(`/api/memories/analyse?event_id=${eventId}`, { method: 'POST' }),
