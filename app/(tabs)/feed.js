@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ResizeMode, Video } from 'expo-av';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
@@ -36,6 +36,14 @@ function Post({ post, liked, onToggleLike }) {
   });
 
   const url = media.data?.url ?? null;
+
+  // One player per post, which is safe because each post is its own component —
+  // the hook could not be called from inside a map.
+  const player = useVideoPlayer(url, (instance) => {
+    instance.loop = true;
+    instance.muted = true;
+  });
+
   const likes = post.replay_likes?.[0]?.count ?? 0;
   const comments = post.replay_comments?.[0]?.count ?? 0;
 
@@ -63,14 +71,11 @@ function Post({ post, liked, onToggleLike }) {
         {url ? (
           // Muted and looping in the feed, the way a social video behaves. Sound
           // and controls belong on the full screen, not four posts at once.
-          <Video
-            source={{ uri: url }}
+          <VideoView
+            player={player}
             style={styles.video}
-            resizeMode={ResizeMode.COVER}
-            isLooping
-            isMuted
-            shouldPlay={false}
-            useNativeControls={false}
+            contentFit="cover"
+            nativeControls={false}
           />
         ) : (
           <View style={[styles.video, styles.stageEmpty]}>

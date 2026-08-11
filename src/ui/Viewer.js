@@ -1,5 +1,5 @@
-import { ResizeMode, Video } from 'expo-av';
 import { Image } from 'expo-image';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -33,6 +33,19 @@ export default function Viewer({ memories = [], startId, visible, onClose, onDel
 
   const current = memories[index];
 
+  // A single player, pointed at whichever video is on screen.
+  //
+  // There is deliberately no player per page: hooks cannot be called from inside
+  // the map, and a dozen players held open at once would keep a dozen videos
+  // decoding for the one being watched. Pages that are not current show their
+  // still instead.
+  const player = useVideoPlayer(
+    current?.kind === 'video' ? current.url : null,
+    (instance) => {
+      instance.loop = true;
+    }
+  );
+
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.root}>
@@ -45,19 +58,26 @@ export default function Viewer({ memories = [], startId, visible, onClose, onDel
             setIndex(Math.round(event.nativeEvent.contentOffset.x / width))
           }
         >
-          {memories.map((memory) => (
+          {memories.map((memory, position) => (
             <View key={memory.id} style={styles.page}>
-              {memory.kind === 'video' ? (
-                <Video
-                  source={{ uri: memory.url }}
+              {memory.kind === 'video' && position === index ? (
+                <VideoView
+                  player={player}
                   style={styles.media}
-                  resizeMode={ResizeMode.CONTAIN}
-                  useNativeControls
-                  isLooping
+                  contentFit="contain"
+                  nativeControls
                 />
               ) : (
                 <Image
-                  source={{ uri: memory.url ?? memory.thumbnail_url }}
+                  // A photo shows its original — full screen is the one place
+                  // worth paying for it. A video that is not the current page
+                  // shows its poster, since an Image cannot render an mp4.
+                  source={{
+                    uri:
+                      memory.kind === 'video'
+                        ? memory.thumbnail_url
+                        : memory.url ?? memory.thumbnail_url,
+                  }}
                   style={styles.media}
                   contentFit="contain"
                   transition={140}

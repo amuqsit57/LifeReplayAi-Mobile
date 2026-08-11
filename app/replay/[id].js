@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { ResizeMode, Video } from 'expo-av';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef } from 'react';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { ActivityIndicator, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { api } from '../../src/lib/api';
@@ -13,7 +12,6 @@ import Comments from '../../src/ui/Comments';
 export default function ReplayScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const video = useRef(null);
 
   const replay = useQuery({
     queryKey: ['replay', id],
@@ -30,6 +28,11 @@ export default function ReplayScreen() {
 
   const data = replay.data;
   const meta = STYLE_META[data?.style] ?? {};
+
+  // Null until the render finishes; the player picks the source up when it lands.
+  const player = useVideoPlayer(data?.url ?? null, (instance) => {
+    instance.loop = true;
+  });
   const plan = data?.editing_plan ?? {};
 
   return (
@@ -49,13 +52,12 @@ export default function ReplayScreen() {
 
       {data?.status === 'succeeded' && data.url ? (
         <>
-          <Video
-            ref={video}
-            source={{ uri: data.url }}
+          <VideoView
+            player={player}
             style={styles.player}
-            useNativeControls
-            resizeMode={ResizeMode.CONTAIN}
-            isLooping
+            contentFit="contain"
+            nativeControls
+            allowsFullscreen
           />
           <Button
             label="Share this Replay"
