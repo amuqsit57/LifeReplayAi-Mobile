@@ -12,6 +12,7 @@ import { Empty } from '../../src/ui';
 import { Wordmark } from '../../src/ui/brand';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
 import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
+import { FeedSkeleton } from '../../src/ui/Skeleton';
 import { ActionCount, Avatar } from '../../src/ui/social';
 
 function when(iso) {
@@ -218,7 +219,9 @@ export default function FeedScreen() {
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={{ height: spacing.xl }} />}
         ListEmptyComponent={
-          posts.isLoading ? null : query ? (
+          posts.isLoading ? (
+            <FeedSkeleton count={2} />
+          ) : query ? (
             <Empty icon="🔍" title="Nothing matches" body={`No films for “${query}”.`} />
           ) : (
             <Empty
@@ -251,9 +254,12 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
   headActions: { flexDirection: 'row', gap: spacing.sm },
 
+  // Square-ish rather than heavily rounded. A large radius on a full-width card
+  // leaves four visible corner gaps against the poster inside it, which is what
+  // made the posts look cut out rather than composed.
   post: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     overflow: 'hidden',

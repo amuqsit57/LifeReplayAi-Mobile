@@ -11,6 +11,7 @@ import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
 import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
+import { RowSkeleton } from '../../src/ui/Skeleton';
 
 function EventCard({ event, onPress }) {
   const count = event.memories?.[0]?.count ?? 0;
@@ -119,7 +120,9 @@ export default function EventsScreen() {
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListEmptyComponent={
-          events.isLoading ? null : (
+          events.isLoading ? (
+            <RowSkeleton count={5} />
+          ) : (
             <Empty
               icon="▦"
               title="No events yet"

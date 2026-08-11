@@ -1,31 +1,58 @@
 import { Feather } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../theme';
 
-/** Roughly a second and a half of rendering per shot, measured on real films. */
-const SECONDS_PER_SHOT = 1.6;
+/**
+ * How long is left, measured rather than assumed.
+ *
+ * The first version multiplied a guessed seconds-per-shot, and divided total
+ * elapsed by progress — both wrong. The constant was invented, and elapsed
+ * counted from when the card appeared, so opening an event halfway through a
+ * render made it think the whole thing had taken four seconds.
+ *
+ * This watches how fast progress actually moves while being looked at, which
+ * needs no constant and is right whenever you arrive.
+ */
+function useRemaining(replay) {
+  const first = useRef(null);
+  const [, tick] = useState(0);
+  const busy = replay?.status === 'queued' || replay?.status === 'running';
+  const progress = replay?.progress ?? 0;
 
-function remaining(replay, elapsed) {
-  const shots = replay?.shot_count || 0;
-  const progress = replay?.progress || 0;
+  useEffect(() => {
+    if (!busy) {
+      first.current = null;
+      return undefined;
+    }
+    const timer = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(timer);
+  }, [busy, replay?.id]);
 
-  // Once there is real progress, the machine in front of us is a better guide
-  // than any average — a slow phone-video-heavy event is nothing like a
-  // photo-only one.
-  if (progress > 0.05 && elapsed > 5) {
-    const total = elapsed / progress;
-    return Math.max(0, Math.round(total - elapsed));
+  if (!busy) return null;
+
+  const now = Date.now();
+  if (!first.current || first.current.id !== replay?.id) {
+    first.current = { id: replay?.id, at: now, progress };
+    return null;
   }
-  if (shots) return Math.round(shots * SECONDS_PER_SHOT);
-  return null;
+
+  const movedBy = progress - first.current.progress;
+  const overSeconds = (now - first.current.at) / 1000;
+
+  // Needs a real change to divide by; before that, saying nothing beats guessing.
+  if (movedBy <= 0.01 || overSeconds < 4) return null;
+
+  const rate = movedBy / overSeconds;
+  return Math.max(0, Math.round((1 - progress) / rate));
 }
 
 function clock(seconds) {
   if (seconds == null) return null;
-  if (seconds < 60) return `about ${Math.max(5, Math.round(seconds / 5) * 5)}s left`;
-  return `about ${Math.ceil(seconds / 60)} min left`;
+  if (seconds < 45) return 'nearly there';
+  if (seconds < 90) return 'about a minute left';
+  return `about ${Math.round(seconds / 60)} min left`;
 }
 
 /**
@@ -44,19 +71,8 @@ export default function FilmCard({ style, replay, onGenerate, onOpen }) {
   const done = status === 'succeeded';
   const failed = status === 'failed';
 
-  const [elapsed, setElapsed] = useState(0);
   const width = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!busy) {
-      setElapsed(0);
-      return undefined;
-    }
-    const started = Date.now();
-    const timer = setInterval(() => setElapsed((Date.now() - started) / 1000), 1000);
-    return () => clearInterval(timer);
-  }, [busy, replay?.id]);
-
+  const left = clock(useRemaining(replay));
   const progress = replay?.progress ?? 0;
 
   useEffect(() => {
@@ -68,11 +84,10 @@ export default function FilmCard({ style, replay, onGenerate, onOpen }) {
   }, [progress, width]);
 
   if (busy) {
-    const left = clock(remaining(replay, elapsed));
     return (
       <View style={[styles.card, styles.cardBusy]}>
         <View style={styles.row}>
-          <View style={[styles.dot, { backgroundColor: meta.tint }]} />
+          <ActivityIndicator size="small" color={meta.tint ?? colors.primary} />
           <Text style={styles.label}>{meta.label}</Text>
           <View style={{ flex: 1 }} />
           <Text style={styles.percent}>

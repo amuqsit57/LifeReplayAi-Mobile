@@ -9,6 +9,7 @@ import { api } from '../../src/lib/api';
 import { supabase } from '../../src/lib/supabase';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import { ScreenHeader, SearchBar } from '../../src/ui/Header';
+import { RowSkeleton } from '../../src/ui/Skeleton';
 
 /** Every album you can reach, across every event. Row level security scopes it. */
 async function allAlbums() {
@@ -88,14 +89,12 @@ export default function AlbumsScreen() {
         title="Albums"
         subtitle={`${all.length} across your events`}
       >
-        {all.length > 3 ? (
-          <SearchBar
-            value={query}
-            onChangeText={setQuery}
-            onClear={() => setQuery('')}
-            placeholder="Search albums"
-          />
-        ) : null}
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          onClear={() => setQuery('')}
+          placeholder="Search albums or events"
+        />
       </ScreenHeader>
 
       <FlatList
@@ -107,7 +106,9 @@ export default function AlbumsScreen() {
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListEmptyComponent={
-          albums.isLoading ? null : (
+          albums.isLoading ? (
+            <RowSkeleton count={4} />
+          ) : (
             <View style={styles.blank}>
               <View style={styles.blankIcon}>
                 <Feather name="folder-plus" size={24} color={colors.primary} />

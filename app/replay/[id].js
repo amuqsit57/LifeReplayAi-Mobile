@@ -16,6 +16,7 @@ import { api } from '../../src/lib/api';
 import { myProfile } from '../../src/lib/data';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import Comments from '../../src/ui/Comments';
+import FilmCard from '../../src/ui/FilmCard';
 import { RoundButton, ScreenHeader } from '../../src/ui/Header';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -100,17 +101,14 @@ export default function ReplayScreen() {
             </View>
           </View>
         ) : (
+          // The same card the event page uses, so a film being made looks the
+          // same wherever you meet it — with the real stage and progress rather
+          // than the word "Queued" and a spinner.
           <View style={styles.gutter}>
-            <View style={styles.card}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.cardTitle}>
-                {data?.status === 'running' ? 'Cutting your film…' : 'Queued…'}
-              </Text>
-              <Text style={styles.cardBody}>
-                Choosing the moments and rendering them takes a few minutes. You can leave and come
-                back.
-              </Text>
-            </View>
+            <FilmCard style={data?.style ?? 'highlights'} replay={data} onGenerate={() => {}} />
+            <Text style={styles.leaveHint}>
+              You can leave this screen — it keeps going, and lands in the feed when it is done.
+            </Text>
           </View>
         )}
 
@@ -180,6 +178,12 @@ const styles = StyleSheet.create({
   },
   cardTitle: { ...type.bodyStrong, color: colors.text },
   cardBody: { ...type.caption, color: colors.textMuted, textAlign: 'center' },
+  leaveHint: {
+    ...type.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.md,
+  },
 
   facts: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   fact: {

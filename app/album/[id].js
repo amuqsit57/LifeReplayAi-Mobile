@@ -126,8 +126,8 @@ export default function AlbumScreen() {
           <View style={styles.heroBar}>
             <RoundButton name="chevron-left" label="Back" onPress={() => router.back()} />
             <RoundButton
-              name="trash-2"
-              label="Delete album"
+              name="more-horizontal"
+              label="Album options"
               onPress={() =>
                 Alert.alert('Delete this album?', 'The photos and videos stay in the event.', [
                   { text: 'Keep', style: 'cancel' },

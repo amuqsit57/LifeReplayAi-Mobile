@@ -23,6 +23,8 @@ import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/the
 import { Empty } from '../../src/ui';
 import { Segmented } from '../../src/ui/brand';
 import FilmCard from '../../src/ui/FilmCard';
+import { GridSkeleton } from '../../src/ui/Skeleton';
+import UploadSheet from '../../src/ui/UploadSheet';
 import { RoundButton } from '../../src/ui/Header';
 import InviteSheet from '../../src/ui/InviteSheet';
 import { Avatar, AvatarRow, MediaTile } from '../../src/ui/social';
@@ -72,6 +74,7 @@ export default function EventScreen() {
   const [viewing, setViewing] = useState(null);
   const [inviting, setInviting] = useState(false);
   const [showingPeople, setShowingPeople] = useState(false);
+  const [uploaded, setUploaded] = useState(null);
   const [albumSheet, setAlbumSheet] = useState(false);
   const [albumTitle, setAlbumTitle] = useState('');
 
@@ -160,14 +163,12 @@ export default function EventScreen() {
     setProgress(null);
 
     const failed = results.filter((r) => !r.ok);
-    if (failed.length) {
-      Alert.alert(
-        `${failed.length} could not be added`,
-        failed.slice(0, 3).map((f) => `${f.file}: ${f.error}`).join('\n\n')
-      );
-    }
     api.analyseBatch(id).catch(() => {});
     queryClient.invalidateQueries({ queryKey: ['memories', id] });
+
+    // The moment after an upload is when making a film makes sense to somebody,
+    // so the offer goes here rather than as a note on a tab they may never open.
+    setUploaded({ added: results.length - failed.length, failed: failed.length });
   }
 
   const info = event.data;
@@ -256,7 +257,11 @@ export default function EventScreen() {
 
         {/* ---------------------------------------------------------- gallery */}
         {tab === 'gallery' ? (
-          list.length === 0 && !memories.isLoading ? (
+          memories.isLoading ? (
+            <View style={styles.gutter}>
+              <GridSkeleton count={9} />
+            </View>
+          ) : list.length === 0 ? (
             <Empty icon="📸" title="Nothing here yet" body="Add photos and videos — no need to sort them first." />
           ) : (
             <>
@@ -323,14 +328,6 @@ export default function EventScreen() {
         {/* ------------------------------------------------------------ films */}
         {tab === 'films' ? (
           <View style={styles.styleGrid}>
-            <View style={styles.explain}>
-              <Feather name="info" size={14} color={colors.textSoft} />
-              <Text style={styles.explainText}>
-                Films are not made automatically — pick a style and it cuts one from everything in
-                this event. You can make all four, and remake any of them later.
-              </Text>
-            </View>
-
             {list.length === 0 ? (
               <View style={styles.explainWarn}>
                 <Feather name="image" size={14} color={colors.warning} />
@@ -416,11 +413,21 @@ export default function EventScreen() {
               )
             }
           >
-            <Feather name="trash-2" size={17} color={colors.danger} />
-            <Text style={[styles.selectActionText, { color: colors.danger }]}>Delete</Text>
+            <Feather name="x-circle" size={17} color={colors.danger} />
+            <Text style={[styles.selectActionText, { color: colors.danger }]}>Remove</Text>
           </Pressable>
         </View>
       ) : null}
+
+      <UploadSheet
+        progress={progress}
+        done={uploaded}
+        onClose={() => setUploaded(null)}
+        onGenerate={() => {
+          setUploaded(null);
+          setTab('films');
+        }}
+      />
 
       <InviteSheet visible={inviting} onClose={() => setInviting(false)} event={info} />
 
