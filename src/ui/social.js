@@ -1,5 +1,6 @@
 /** Pieces the feed and the gallery share: people, counts, and media tiles. */
 
+import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -66,18 +67,21 @@ export function AvatarRow({ people = [], max = 4, size = 'sm' }) {
   );
 }
 
-/** A tappable count with an icon — likes, comments, shares. */
+/** A tappable count with a drawn icon — likes, comments, shares. */
 export function ActionCount({ icon, count, label, active, onPress, tint }) {
+  const colour = active ? tint ?? colors.accent : colors.textSoft;
   return (
     <Pressable
       onPress={onPress}
-      hitSlop={8}
+      hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [styles.action, pressed && { opacity: 0.6 }]}
+      style={({ pressed }) => [styles.action, pressed && { opacity: 0.55 }]}
     >
-      <Text style={[styles.actionIcon, active && { color: tint ?? colors.accent }]}>{icon}</Text>
-      {count > 0 ? <Text style={styles.actionCount}>{count}</Text> : null}
+      <Feather name={icon} size={19} color={colour} />
+      {count > 0 ? (
+        <Text style={[styles.actionCount, active && { color: colour }]}>{count}</Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -116,10 +120,12 @@ export function MediaTile({
 
       {kind === 'video' ? (
         <View style={styles.kindMark}>
-          <Text style={styles.kindMarkText}>▶</Text>
+          <Feather name="play" size={9} color="#fff" />
         </View>
       ) : null}
 
+      {/* Only ever a problem or a wait — a tile that is fine says nothing, which
+          is why "ready" no longer sits under every photo in the grid. */}
       {badge ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText} numberOfLines={1}>

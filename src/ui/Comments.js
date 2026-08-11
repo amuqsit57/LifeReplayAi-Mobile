@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -51,11 +52,16 @@ export default function Comments({ replayId, myId }) {
 
   const list = comments.data ?? [];
 
+  const canSend = draft.trim().length > 0 && !post.isPending;
+
   return (
     <View style={styles.root}>
-      <Text style={styles.heading}>
-        {list.length ? `${list.length} ${list.length === 1 ? 'comment' : 'comments'}` : 'Comments'}
-      </Text>
+      <View style={styles.headRow}>
+        <Feather name="message-circle" size={16} color={colors.textSoft} />
+        <Text style={styles.heading}>
+          {list.length ? `${list.length} ${list.length === 1 ? 'comment' : 'comments'}` : 'Comments'}
+        </Text>
+      </View>
 
       {list.map((comment) => (
         <Pressable
@@ -69,16 +75,16 @@ export default function Comments({ replayId, myId }) {
           }}
           style={styles.comment}
         >
-          <Avatar
-            url={comment.profiles?.avatar_url}
-            name={comment.profiles?.full_name}
-            size="sm"
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.who}>
-              {comment.profiles?.full_name ?? 'Someone'}{' '}
+          <Avatar url={comment.profiles?.avatar_url} name={comment.profiles?.full_name} size="sm" />
+          {/* The bubble carries the name and the words together, so a thread reads
+              as people talking rather than as a table of rows. */}
+          <View style={styles.bubble}>
+            <View style={styles.bubbleHead}>
+              <Text style={styles.who} numberOfLines={1}>
+                {comment.profiles?.full_name ?? 'Someone'}
+              </Text>
               <Text style={styles.ago}>{when(comment.created_at)}</Text>
-            </Text>
+            </View>
             <Text style={styles.body}>{comment.body}</Text>
           </View>
         </Pressable>
@@ -100,13 +106,11 @@ export default function Comments({ replayId, myId }) {
         />
         <Pressable
           onPress={() => post.mutate()}
-          disabled={!draft.trim() || post.isPending}
+          disabled={!canSend}
           hitSlop={8}
-          style={styles.send}
+          style={[styles.send, !canSend && styles.sendOff]}
         >
-          <Text style={[styles.sendText, (!draft.trim() || post.isPending) && styles.sendOff]}>
-            {post.isPending ? '…' : 'Post'}
-          </Text>
+          <Feather name="arrow-up" size={17} color={canSend ? '#fff' : colors.textMuted} />
         </Pressable>
       </View>
     </View>
@@ -115,10 +119,22 @@ export default function Comments({ replayId, myId }) {
 
 const styles = StyleSheet.create({
   root: { gap: spacing.md },
+  headRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   heading: { ...type.heading, color: colors.text },
+
   comment: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
-  who: { ...type.label, color: colors.text },
-  ago: { ...type.caption, color: colors.textMuted },
+  bubble: {
+    flex: 1,
+    gap: 2,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderTopLeftRadius: 4,
+    backgroundColor: colors.surfaceAlt,
+  },
+  bubbleHead: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
+  who: { ...type.label, color: colors.text, flexShrink: 1 },
+  ago: { ...type.tiny, color: colors.textMuted },
   body: { ...type.body, color: colors.textSoft },
   none: { ...type.caption, color: colors.textMuted },
 
@@ -126,12 +142,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radius.md,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.xs,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
     backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
-  input: { ...type.body, flex: 1, color: colors.text, maxHeight: 110, paddingVertical: 4 },
-  send: { paddingHorizontal: spacing.sm, paddingVertical: 6 },
-  sendText: { ...type.label, color: colors.primary },
-  sendOff: { color: colors.textMuted },
+  input: { ...type.body, flex: 1, color: colors.text, maxHeight: 110, paddingVertical: 8 },
+  send: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendOff: { backgroundColor: colors.surfaceSunk },
 });

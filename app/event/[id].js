@@ -1,6 +1,5 @@
 import { Feather } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -10,22 +9,27 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../src/lib/api';
 import { createAlbum, eventPeople, getEvent, listAlbums } from '../../src/lib/data';
 import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
-import { IconButton, Segmented } from '../../src/ui/brand';
+import { Segmented } from '../../src/ui/brand';
+import { RoundButton } from '../../src/ui/Header';
+import InviteSheet from '../../src/ui/InviteSheet';
 import { AvatarRow, MediaTile } from '../../src/ui/social';
 import Viewer from '../../src/ui/Viewer';
 
+// Only shown while something is still happening, or has gone wrong. A photo that
+// is simply fine says nothing — "ready" under every tile was noise on a grid
+// where being ready is the normal state.
 const STATUS_LABEL = {
   uploading: 'uploading',
   uploaded: 'queued',
@@ -39,10 +43,12 @@ export default function EventScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState('gallery');
   const [progress, setProgress] = useState(null);
   const [selected, setSelected] = useState([]);
   const [viewing, setViewing] = useState(null);
+  const [inviting, setInviting] = useState(false);
   const [albumSheet, setAlbumSheet] = useState(false);
   const [albumTitle, setAlbumTitle] = useState('');
 
@@ -153,25 +159,15 @@ export default function EventScreen() {
         }
       >
         {/* ----------------------------------------------------------- header */}
-        <View style={styles.hero}>
+        <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
           {cover ? (
             <Image source={{ uri: cover }} style={styles.heroImage} contentFit="cover" blurRadius={28} />
           ) : null}
           <View style={styles.heroVeil} />
 
           <View style={styles.heroBar}>
-            <IconButton name="chevron-left" label="Back" onPress={() => router.back()} />
-            <IconButton
-              name="user-plus"
-              label="Invite"
-              onPress={() => {
-                if (!info?.invite_code) return;
-                Clipboard.setStringAsync(info.invite_code);
-                Share.share({
-                  message: `Join "${info.title}" on Life Replay with code ${info.invite_code}`,
-                }).catch(() => {});
-              }}
-            />
+            <RoundButton name="chevron-left" label="Back" onPress={() => router.back()} />
+            <RoundButton name="user-plus" label="Invite" onPress={() => setInviting(true)} />
           </View>
 
           <View style={styles.heroText}>
@@ -188,26 +184,42 @@ export default function EventScreen() {
           </View>
         </View>
 
-        <Pressable
-          style={styles.addBar}
-          onPress={addMemories}
-          disabled={Boolean(progress)}
-        >
-          <Feather name="plus-circle" size={18} color="#fff" />
-          <Text style={styles.addBarText}>
-            {progress ? `Adding ${progress.index + 1} of ${progress.total}…` : 'Add photos & videos'}
-          </Text>
-        </Pressable>
+        <View style={styles.gutter}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.addBar,
+              progress && styles.addBarBusy,
+              pressed && { opacity: 0.9 },
+            ]}
+            onPress={addMemories}
+            disabled={Boolean(progress)}
+          >
+            <View style={styles.addIcon}>
+              <Feather name={progress ? 'upload-cloud' : 'plus'} size={17} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.addBarText}>
+                {progress ? `Adding ${progress.index + 1} of ${progress.total}` : 'Add photos & videos'}
+              </Text>
+              <Text style={styles.addBarSub}>
+                {progress ? progress.phase : 'Everyone in this event can add theirs'}
+              </Text>
+            </View>
+            {!progress ? <Feather name="chevron-right" size={18} color={colors.textMuted} /> : null}
+          </Pressable>
+        </View>
 
-        <Segmented
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'gallery', label: 'Gallery', icon: 'image', count: list.length },
-            { value: 'films', label: 'Films', icon: 'film', count: eventFilms.length || null },
-            { value: 'albums', label: 'Albums', icon: 'folder', count: albumList.length || null },
-          ]}
-        />
+        <View style={styles.gutter}>
+          <Segmented
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'gallery', label: 'Gallery', icon: 'image', count: list.length },
+              { value: 'films', label: 'Films', icon: 'film', count: eventFilms.length || null },
+              { value: 'albums', label: 'Albums', icon: 'folder', count: albumList.length || null },
+            ]}
+          />
+        </View>
 
         {/* ---------------------------------------------------------- gallery */}
         {tab === 'gallery' ? (
@@ -225,7 +237,7 @@ export default function EventScreen() {
                     uri={memory.thumbnail_url ?? memory.url}
                     kind={memory.kind}
                     selected={selectedSet.has(memory.id)}
-                    badge={STATUS_LABEL[memory.status] ?? memory.status}
+                    badge={memory.status === 'ready' ? null : STATUS_LABEL[memory.status]}
                     uploader={people.data?.length > 1 ? peopleById.get(memory.uploaded_by) : null}
                     style={{ width: '31.5%' }}
                     onPress={() => (selecting ? toggle(memory.id) : setViewing(memory.id))}
@@ -339,6 +351,8 @@ export default function EventScreen() {
         </View>
       ) : null}
 
+      <InviteSheet visible={inviting} onClose={() => setInviting(false)} event={info} />
+
       <Viewer
         memories={list}
         startId={viewing}
@@ -397,17 +411,32 @@ const styles = StyleSheet.create({
   heroMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   metaText: { ...type.caption, color: colors.textSoft },
 
+  // One gutter value, applied by wrapping sections rather than repeated on each
+  // child — that repetition is how the padding drifted between them before.
+  gutter: { paddingHorizontal: spacing.lg },
+
   addBar: {
-    marginHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primary + '2E',
+    ...shadow.card,
   },
-  addBarText: { ...type.bodyStrong, color: '#fff' },
+  addBarBusy: { borderColor: colors.border },
+  addIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addBarText: { ...type.bodyStrong, color: colors.text },
+  addBarSub: { ...type.caption, color: colors.textMuted },
 
   hint: { ...type.caption, color: colors.textMuted, paddingHorizontal: spacing.lg },
   grid: {

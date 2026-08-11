@@ -1,140 +1,195 @@
+import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEventListener } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { ActivityIndicator, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { api } from '../../src/lib/api';
 import { myProfile } from '../../src/lib/data';
-import { STYLE_META, colors, radius, spacing, type } from '../../src/theme';
-import { Button, Card, Screen } from '../../src/ui';
+import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import Comments from '../../src/ui/Comments';
+import { RoundButton, ScreenHeader } from '../../src/ui/Header';
 
 export default function ReplayScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const [playing, setPlaying] = useState(false);
 
   const replay = useQuery({
     queryKey: ['replay', id],
     queryFn: () => api.replay(id),
-    // Poll while the render is still in flight; stop once it settles either way.
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status === 'queued' || status === 'running' ? 4000 : false;
     },
   });
 
-  // Needed only so someone can long-press their own comment to remove it.
   const me = useQuery({ queryKey: ['myProfile'], queryFn: myProfile });
 
   const data = replay.data;
   const meta = STYLE_META[data?.style] ?? {};
-
-  // Null until the render finishes; the player picks the source up when it lands.
-  const player = useVideoPlayer(data?.url ?? null, (instance) => {
-    instance.loop = true;
-  });
   const plan = data?.editing_plan ?? {};
 
+  // Starts on its own once the file is there. Opening a film and being shown a
+  // still with no controls is the thing people read as "stuck".
+  const player = useVideoPlayer(data?.url ?? null, (instance) => {
+    instance.loop = true;
+    instance.play();
+  });
+
+  useEventListener(player, 'playingChange', ({ isPlaying }) => setPlaying(isPlaying));
+
+  const ready = data?.status === 'succeeded' && data.url;
+
   return (
-    <Screen contentStyle={{ gap: spacing.lg }}>
-      <Pressable onPress={() => router.back()} hitSlop={10}>
-        <Text style={[type.label, { color: colors.primary }]}>‹ Back</Text>
-      </Pressable>
+    <View style={styles.screen}>
+      <ScreenHeader
+        compact
+        title={
+          <View>
+            <Text style={styles.eyebrow}>{meta.label ?? 'Film'}</Text>
+            <Text style={styles.title} numberOfLines={1}>
+              {plan.title ?? 'Your film'}
+            </Text>
+          </View>
+        }
+        left={<RoundButton name="chevron-left" label="Back" onPress={() => router.back()} />}
+        right={
+          ready ? (
+            <RoundButton
+              name="share-2"
+              label="Share"
+              onPress={() =>
+                Share.share({ message: `Watch our Life Replay film: ${data.url}` }).catch(() => {})
+              }
+            />
+          ) : null
+        }
+      />
 
-      <View>
-        <Text style={[type.label, { color: meta.tint ?? colors.accent }]}>
-          {meta.emoji} {meta.label?.toUpperCase() ?? 'REPLAY'}
-        </Text>
-        <Text style={[type.display, { color: colors.text, marginTop: 2 }]}>
-          {plan.title ?? 'Your Replay'}
-        </Text>
-      </View>
-
-      {data?.status === 'succeeded' && data.url ? (
-        <>
-          <VideoView
-            player={player}
-            style={styles.player}
-            contentFit="contain"
-            nativeControls
-            allowsFullscreen
-          />
-          <Button
-            label="Share this Replay"
-            icon="📤"
-            onPress={() =>
-              Share.share({ message: `Watch our Life Replay: ${data.url}` }).catch(() => {})
-            }
-          />
-        </>
-      ) : data?.status === 'failed' ? (
-        <Card style={{ borderColor: colors.danger, gap: spacing.sm }}>
-          <Text style={[type.bodyStrong, { color: colors.danger }]}>Rendering failed</Text>
-          <Text style={[type.body, { color: colors.textMuted }]}>
-            {data.error ?? 'Something went wrong while cutting the film.'}
-          </Text>
-        </Card>
-      ) : (
-        <Card style={styles.working}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[type.bodyStrong, { color: colors.text }]}>
-            {data?.status === 'running' ? 'Cutting your film…' : 'Queued…'}
-          </Text>
-          <Text style={[type.caption, { color: colors.textMuted, textAlign: 'center' }]}>
-            AI is choosing the moments and rendering them. This takes a few minutes —
-            you can leave and come back.
-          </Text>
-        </Card>
-      )}
-
-      {data?.status === 'succeeded' ? (
-        <Comments replayId={id} myId={me.data?.id} />
-      ) : null}
-
-      {(plan.clips ?? []).length ? (
-        <View>
-          <Text style={[type.heading, { color: colors.text, marginBottom: spacing.md }]}>
-            How AI cut it
-          </Text>
-          <Card padded={false} style={{ paddingVertical: spacing.xs }}>
-            {plan.clips.map((clip, index) => (
-              <View
-                key={`${clip.memory_id}-${index}`}
-                style={[styles.row, index < plan.clips.length - 1 && styles.divider]}
-              >
-                <Text style={[type.caption, { color: colors.textMuted, width: 26 }]}>
-                  {index + 1}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[type.body, { color: colors.text }]}>
-                    {clip.caption || clip.reason || 'Moment'}
-                  </Text>
-                  <Text style={[type.caption, { color: colors.textMuted }]}>
-                    {clip.seconds}s · {clip.transition}
-                  </Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        {ready ? (
+          <View style={styles.playerWrap}>
+            <VideoView
+              player={player}
+              style={styles.player}
+              contentFit="contain"
+              nativeControls
+              allowsFullscreen
+            />
+            {!playing ? (
+              <Pressable style={styles.tapToPlay} onPress={() => player.play()}>
+                <View style={styles.playCircle}>
+                  <Feather name="play" size={26} color="#fff" style={{ marginLeft: 4 }} />
                 </View>
-              </View>
-            ))}
-          </Card>
-        </View>
-      ) : null}
-    </Screen>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : data?.status === 'failed' ? (
+          <View style={[styles.card, { borderColor: colors.danger }]}>
+            <Feather name="alert-circle" size={20} color={colors.danger} />
+            <Text style={styles.cardTitle}>Could not make this film</Text>
+            <Text style={styles.cardBody}>
+              {data.error ?? 'Something went wrong while cutting it.'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.card}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.cardTitle}>
+              {data?.status === 'running' ? 'Cutting your film…' : 'Queued…'}
+            </Text>
+            <Text style={styles.cardBody}>
+              Choosing the moments and rendering them takes a few minutes. You can leave and come
+              back.
+            </Text>
+          </View>
+        )}
+
+        {ready ? (
+          <View style={styles.facts}>
+            {plan.clips?.length ? (
+              <Fact icon="scissors" label={`${plan.clips.length} shots`} />
+            ) : null}
+            {data.duration_seconds ? (
+              <Fact
+                icon="clock"
+                label={`${Math.floor(data.duration_seconds / 60)}:${String(
+                  Math.round(data.duration_seconds % 60)
+                ).padStart(2, '0')}`}
+              />
+            ) : null}
+            <Fact icon="music" label="Original score" />
+          </View>
+        ) : null}
+
+        {ready ? <Comments replayId={id} myId={me.data?.id} /> : null}
+      </ScrollView>
+    </View>
+  );
+}
+
+function Fact({ icon, label }) {
+  return (
+    <View style={styles.fact}>
+      <Feather name={icon} size={13} color={colors.textSoft} />
+      <Text style={styles.factText}>{label}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  player: {
-    width: '100%',
-    aspectRatio: 9 / 16,
-    borderRadius: radius.md,
-    backgroundColor: '#000',
+  screen: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.lg, paddingTop: 0, gap: spacing.lg, paddingBottom: spacing.xxxl },
+
+  eyebrow: { ...type.tiny, color: colors.primary, textTransform: 'uppercase' },
+  title: { ...type.title, color: colors.text },
+
+  playerWrap: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#000', ...shadow.card },
+  player: { width: '100%', aspectRatio: 9 / 16 },
+  tapToPlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  playCircle: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: 'rgba(16,12,26,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.55)',
   },
-  working: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xxl },
-  row: {
+
+  card: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.xl,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cardTitle: { ...type.bodyStrong, color: colors.text },
+  cardBody: { ...type.caption, color: colors.textMuted, textAlign: 'center' },
+
+  facts: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  fact: {
     flexDirection: 'row',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
   },
-  divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  factText: { ...type.caption, color: colors.textSoft },
 });

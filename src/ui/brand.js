@@ -56,26 +56,6 @@ export function Wordmark({ size = 'lg' }) {
   );
 }
 
-/** A circular icon control. Used for the one action a screen actually has. */
-export function IconButton({ name, onPress, tone = 'plain', size = 20, label }) {
-  const filled = tone === 'filled';
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={10}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={({ pressed }) => [
-        styles.iconButton,
-        filled && styles.iconButtonFilled,
-        pressed && { opacity: 0.7 },
-      ]}
-    >
-      <Feather name={name} size={size} color={filled ? '#fff' : colors.text} />
-    </Pressable>
-  );
-}
-
 /** A row of choices that behaves like one control rather than several buttons. */
 export function Segmented({ options, value, onChange }) {
   return (
@@ -113,16 +93,6 @@ const styles = StyleSheet.create({
   frame: { position: 'absolute' },
   nameLg: { ...type.title, color: colors.text, letterSpacing: -0.6 },
   nameSm: { ...type.heading, color: colors.text, letterSpacing: -0.4 },
-
-  iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceAlt,
-  },
-  iconButtonFilled: { backgroundColor: colors.primary, ...shadow.card },
 
   segmented: {
     flexDirection: 'row',

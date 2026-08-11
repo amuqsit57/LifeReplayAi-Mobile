@@ -1,26 +1,26 @@
+import { Feather } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
 
-import { Feather } from '@expo/vector-icons';
-
 import { api } from '../../src/lib/api';
 import { feed, myLikes, setLike } from '../../src/lib/data';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
-import { IconButton, Wordmark } from '../../src/ui/brand';
+import { Wordmark } from '../../src/ui/brand';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
+import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
 import { ActionCount, Avatar } from '../../src/ui/social';
 
 function when(iso) {
   if (!iso) return '';
   const seconds = (Date.now() - new Date(iso).getTime()) / 1000;
   if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604_800) return `${Math.floor(seconds / 86_400)}d ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h`;
+  if (seconds < 604_800) return `${Math.floor(seconds / 86_400)}d`;
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
@@ -29,14 +29,6 @@ function runtime(seconds) {
   return `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
 }
 
-/**
- * A post shows a poster, never a player.
- *
- * Every post used to open a real video player as soon as it mounted. With eighty
- * finished films averaging sixteen megabytes, a single pull of the feed asked the
- * phone to buffer close to a gigabyte at once — which is what made everything
- * crawl. A film plays when you tap it and not before.
- */
 function Post({ post, media, liked, onToggleLike }) {
   const router = useRouter();
   const style = STYLE_META[post.style] ?? {};
@@ -49,24 +41,19 @@ function Post({ post, media, liked, onToggleLike }) {
 
   return (
     <View style={styles.post}>
-      <Pressable style={styles.head} onPress={() => router.push(`/event/${event.id}`)}>
+      <View style={styles.head}>
         <Avatar url={author.avatar_url} name={author.full_name} size="md" />
-        <View style={{ flex: 1 }}>
+        <Pressable style={{ flex: 1 }} onPress={() => router.push(`/event/${event.id}`)}>
           <Text style={styles.author} numberOfLines={1}>
             {author.full_name ?? 'Someone'}
           </Text>
           <Text style={styles.sub} numberOfLines={1}>
             {event.title ?? 'An event'}
-            {post.albums?.title ? ` · ${post.albums.title}` : ''} ·{' '}
-            {when(post.completed_at ?? post.created_at)}
+            {post.albums?.title ? ` · ${post.albums.title}` : ''}
           </Text>
-        </View>
-        <View style={[styles.styleChip, { backgroundColor: (style.tint ?? colors.primary) + '18' }]}>
-          <Text style={[styles.styleChipText, { color: style.tint ?? colors.primary }]}>
-            {style.emoji} {style.label ?? post.style}
-          </Text>
-        </View>
-      </Pressable>
+        </Pressable>
+        <Text style={styles.time}>{when(post.completed_at ?? post.created_at)}</Text>
+      </View>
 
       <Pressable onPress={() => router.push(`/replay/${post.id}`)} style={styles.stage}>
         {media?.thumbnail_url ? (
@@ -79,13 +66,20 @@ function Post({ post, media, liked, onToggleLike }) {
           />
         ) : (
           <View style={[styles.poster, styles.posterEmpty]}>
-            <Text style={{ fontSize: 30 }}>{style.emoji ?? '🎬'}</Text>
+            <Feather name="film" size={26} color={colors.textMuted} />
           </View>
         )}
 
         <View style={styles.play}>
-          <Text style={styles.playIcon}>▶</Text>
+          <Feather name="play" size={22} color="#fff" style={{ marginLeft: 3 }} />
         </View>
+
+        <View style={styles.overlayTop}>
+          <View style={[styles.styleChip, { backgroundColor: (style.tint ?? colors.primary) }]}>
+            <Text style={styles.styleChipText}>{style.label ?? post.style}</Text>
+          </View>
+        </View>
+
         {length ? (
           <View style={styles.length}>
             <Text style={styles.lengthText}>{length}</Text>
@@ -95,7 +89,7 @@ function Post({ post, media, liked, onToggleLike }) {
 
       <View style={styles.actions}>
         <ActionCount
-          icon={liked ? '♥' : '♡'}
+          icon="heart"
           count={likes}
           label="Like"
           active={liked}
@@ -103,13 +97,13 @@ function Post({ post, media, liked, onToggleLike }) {
           onPress={() => onToggleLike(post.id, !liked)}
         />
         <ActionCount
-          icon="💬"
+          icon="message-circle"
           count={comments}
           label="Comments"
           onPress={() => router.push(`/replay/${post.id}`)}
         />
         <ActionCount
-          icon="↗"
+          icon="share-2"
           label="Share"
           onPress={() =>
             Share.share({
@@ -126,15 +120,27 @@ function Post({ post, media, liked, onToggleLike }) {
 
 export default function FeedScreen() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [optimistic, setOptimistic] = useState({});
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
 
   const posts = useQuery({ queryKey: ['feed'], queryFn: feed });
-  const list = posts.data ?? [];
-  const ids = useMemo(() => list.map((p) => p.id), [list]);
+  const all = posts.data ?? [];
+
+  const list = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return all;
+    return all.filter((post) =>
+      [post.events?.title, post.albums?.title, post.profiles?.full_name, STYLE_META[post.style]?.label]
+        .filter(Boolean)
+        .some((field) => field.toLowerCase().includes(needle))
+    );
+  }, [all, query]);
+
+  const ids = useMemo(() => all.map((p) => p.id), [all]);
   const idKey = ids.join(',');
 
-  // One request for every poster in the feed, rather than one per post.
   const media = useQuery({
     queryKey: ['feedMedia', idKey],
     queryFn: () => api.replayMedia(ids),
@@ -150,10 +156,18 @@ export default function FeedScreen() {
 
   const likedSet = useMemo(() => new Set(liked.data ?? []), [liked.data]);
 
+  // Anything finished in the last day counts as something you have not seen yet.
+  const fresh = useMemo(
+    () =>
+      all.filter((post) => {
+        const stamp = post.completed_at ?? post.created_at;
+        return stamp && Date.now() - new Date(stamp).getTime() < 86_400_000;
+      }).length,
+    [all]
+  );
+
   const toggle = useMutation({
     mutationFn: ({ id, next }) => setLike(id, next),
-    // The heart has to answer instantly; correcting it afterwards is fine,
-    // waiting a round trip to fill it in is not.
     onMutate: ({ id, next }) => setOptimistic((current) => ({ ...current, [id]: next })),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
@@ -174,62 +188,68 @@ export default function FeedScreen() {
   );
 
   return (
-    <>
-    <FlatList
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      data={list}
-      keyExtractor={(item) => item.id}
-      renderItem={renderItem}
-      ListHeaderComponent={
-        <View style={styles.masthead}>
-          <Wordmark />
-          <IconButton
-            name="plus"
-            tone="filled"
-            label="New event"
-            onPress={() => setCreating(true)}
-          />
-        </View>
-      }
-      ListEmptyComponent={
-        posts.isLoading ? null : (
-          <Empty
-            icon="🎬"
-            title="No films yet"
-            body="Make an event, add photos and videos, then generate a film. It will show up here for everyone you invited."
-          />
-        )
-      }
-      ItemSeparatorComponent={() => <View style={{ height: spacing.xl }} />}
-      // Only what is on screen stays mounted. Without this every post in the feed
-      // renders at once, which is fine for ten and not for eighty.
-      initialNumToRender={3}
-      maxToRenderPerBatch={4}
-      windowSize={5}
-      removeClippedSubviews
-      refreshControl={
-        <RefreshControl
-          refreshing={posts.isFetching}
-          onRefresh={posts.refetch}
-          tintColor={colors.primary}
+    <View style={styles.screen}>
+      <ScreenHeader
+        title={<Wordmark />}
+        right={
+          <View style={styles.headActions}>
+            <RoundButton
+              name="bell"
+              label="Recent"
+              badge={fresh || null}
+              onPress={() => router.push('/(tabs)/events')}
+            />
+            <RoundButton name="plus" tone="filled" label="New event" onPress={() => setCreating(true)} />
+          </View>
+        }
+      >
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          onClear={() => setQuery('')}
+          placeholder="Search films, events, people"
         />
-      }
-    />
-    <CreateEventSheet visible={creating} onClose={() => setCreating(false)} />
-    </>
+      </ScreenHeader>
+
+      <FlatList
+        contentContainerStyle={styles.content}
+        data={list}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.xl }} />}
+        ListEmptyComponent={
+          posts.isLoading ? null : query ? (
+            <Empty icon="🔍" title="Nothing matches" body={`No films for “${query}”.`} />
+          ) : (
+            <Empty
+              icon="🎬"
+              title="No films yet"
+              body="Make an event, add photos and videos, then generate a film. It shows up here for everyone you invited."
+            />
+          )
+        }
+        initialNumToRender={3}
+        maxToRenderPerBatch={4}
+        windowSize={5}
+        removeClippedSubviews
+        refreshControl={
+          <RefreshControl
+            refreshing={posts.isFetching}
+            onRefresh={posts.refetch}
+            tintColor={colors.primary}
+          />
+        }
+      />
+
+      <CreateEventSheet visible={creating} onClose={() => setCreating(false)} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.lg },
-  masthead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  headActions: { flexDirection: 'row', gap: spacing.sm },
 
   post: {
     backgroundColor: colors.surface,
@@ -242,8 +262,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
   author: { ...type.bodyStrong, color: colors.text },
   sub: { ...type.caption, color: colors.textMuted },
-  styleChip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.pill },
-  styleChipText: { ...type.tiny },
+  time: { ...type.caption, color: colors.textMuted },
 
   stage: { backgroundColor: colors.mediaPlaceholder },
   poster: { width: '100%', aspectRatio: 4 / 5, backgroundColor: colors.mediaPlaceholder },
@@ -252,15 +271,20 @@ const styles = StyleSheet.create({
   play: {
     position: 'absolute',
     alignSelf: 'center',
-    top: '42%',
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: colors.scrim,
+    top: '43%',
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: 'rgba(16,12,26,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.5)',
   },
-  playIcon: { color: '#fff', fontSize: 20, marginLeft: 3 },
+
+  overlayTop: { position: 'absolute', top: spacing.md, left: spacing.md },
+  styleChip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.pill },
+  styleChipText: { ...type.tiny, color: '#fff' },
 
   length: {
     position: 'absolute',
@@ -269,15 +293,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: radius.sm,
-    backgroundColor: colors.scrim,
+    backgroundColor: 'rgba(16,12,26,0.65)',
   },
   lengthText: { ...type.tiny, color: '#fff' },
 
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
-    paddingHorizontal: spacing.md,
+    gap: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
 });

@@ -2,15 +2,15 @@ import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { api } from '../../src/lib/api';
 import { listEvents } from '../../src/lib/data';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
-import { IconButton } from '../../src/ui/brand';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
+import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
 
 function EventCard({ event, onPress }) {
   const count = event.memories?.[0]?.count ?? 0;
@@ -77,13 +77,40 @@ function EventCard({ event, onPress }) {
 export default function EventsScreen() {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
   const events = useQuery({ queryKey: ['events'], queryFn: listEvents });
-  const list = events.data ?? [];
+  const all = events.data ?? [];
+
+  const list = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return all;
+    return all.filter((event) =>
+      [event.title, event.location, event.invite_code]
+        .filter(Boolean)
+        .some((field) => field.toLowerCase().includes(needle))
+    );
+  }, [all, query]);
 
   return (
-    <>
+    <View style={styles.screen}>
+      <ScreenHeader
+        title="Events"
+        subtitle={`${all.length} ${all.length === 1 ? 'event' : 'events'} you can add to`}
+        right={
+          <RoundButton name="plus" tone="filled" label="New event" onPress={() => setCreating(true)} />
+        }
+      >
+        {all.length > 3 ? (
+          <SearchBar
+            value={query}
+            onChangeText={setQuery}
+            onClear={() => setQuery('')}
+            placeholder="Search events or codes"
+          />
+        ) : null}
+      </ScreenHeader>
+
       <FlatList
-        style={styles.screen}
         contentContainerStyle={styles.content}
         data={list}
         keyExtractor={(item) => item.id}
@@ -91,17 +118,6 @@ export default function EventsScreen() {
           <EventCard event={item} onPress={() => router.push(`/event/${item.id}`)} />
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
-        ListHeaderComponent={
-          <View style={styles.head}>
-            <View>
-              <Text style={styles.screenTitle}>Events</Text>
-              <Text style={styles.screenSub}>
-                {list.length} {list.length === 1 ? 'event' : 'events'} you can add to
-              </Text>
-            </View>
-            <IconButton name="plus" tone="filled" label="New event" onPress={() => setCreating(true)} />
-          </View>
-        }
         ListEmptyComponent={
           events.isLoading ? null : (
             <Empty
@@ -122,21 +138,13 @@ export default function EventsScreen() {
         }
       />
       <CreateEventSheet visible={creating} onClose={() => setCreating(false)} />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  head: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  screenTitle: { ...type.display, color: colors.text },
-  screenSub: { ...type.caption, color: colors.textMuted, marginTop: 2 },
 
   card: {
     flexDirection: 'row',

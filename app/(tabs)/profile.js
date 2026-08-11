@@ -1,23 +1,44 @@
+import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { feed, myProfile, signOut } from '../../src/lib/data';
-import { colors, radius, spacing, type } from '../../src/theme';
-import { Button } from '../../src/ui';
-import { Avatar, MediaTile } from '../../src/ui/social';
 import { api } from '../../src/lib/api';
+import { feed, listEvents, myProfile, signOut } from '../../src/lib/data';
+import { colors, radius, shadow, spacing, type } from '../../src/theme';
+import { RoundButton, ScreenHeader } from '../../src/ui/Header';
+import { Avatar, MediaTile } from '../../src/ui/social';
+
+function Row({ icon, label, value, onPress, danger, last }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, !last && styles.rowDivider, pressed && { opacity: 0.6 }]}
+    >
+      <View style={[styles.rowIcon, danger && { backgroundColor: colors.dangerSoft }]}>
+        <Feather name={icon} size={16} color={danger ? colors.danger : colors.textSoft} />
+      </View>
+      <Text style={[styles.rowLabel, danger && { color: colors.danger }]}>{label}</Text>
+      <View style={{ flex: 1 }} />
+      {value ? <Text style={styles.rowValue}>{value}</Text> : null}
+      {onPress ? <Feather name="chevron-right" size={17} color={colors.textMuted} /> : null}
+    </Pressable>
+  );
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const [tab, setTab] = useState('films');
+
   const profile = useQuery({ queryKey: ['myProfile'], queryFn: myProfile });
   const posts = useQuery({ queryKey: ['feed'], queryFn: feed });
+  const events = useQuery({ queryKey: ['events'], queryFn: listEvents });
 
   const me = profile.data;
   const mine = (posts.data ?? []).filter((post) => post.requested_by === me?.id);
-
-  // One call for every poster, not one per tile.
   const ids = mine.map((post) => post.id);
+
   const media = useQuery({
     queryKey: ['feedMedia', ids.join(',')],
     queryFn: () => api.replayMedia(ids),
@@ -25,53 +46,137 @@ export default function ProfileScreen() {
     staleTime: 45 * 60 * 1000,
   });
 
+  const liked = (posts.data ?? []).reduce(
+    (sum, post) => sum + (post.replay_likes?.[0]?.count ?? 0),
+    0
+  );
+
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={profile.isFetching}
-          onRefresh={() => {
-            profile.refetch();
-            posts.refetch();
-          }}
-          tintColor={colors.primary}
-        />
-      }
-    >
-      <View style={styles.head}>
-        <Avatar url={me?.avatar_url} name={me?.full_name} size="lg" />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{me?.full_name ?? 'You'}</Text>
-          <Text style={styles.email}>{me?.email ?? ''}</Text>
-        </View>
-      </View>
+    <View style={styles.screen}>
+      <ScreenHeader
+        title="You"
+        right={<RoundButton name="settings" label="Settings" onPress={() => setTab('settings')} />}
+      />
 
-      <View style={styles.stats}>
-        <Stat value={mine.length} label="Films" />
-        <Stat value={(posts.data ?? []).length} label="Visible to you" />
-      </View>
-
-      <Text style={styles.section}>Films you made</Text>
-      <View style={styles.grid}>
-        {mine.map((post) => (
-          <MediaTile
-            key={post.id}
-            uri={media.data?.[post.id]?.thumbnail_url ?? null}
-            kind="video"
-            badge={post.events?.title}
-            style={{ width: '31.5%' }}
-            onPress={() => router.push(`/replay/${post.id}`)}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={profile.isFetching}
+            onRefresh={() => {
+              profile.refetch();
+              posts.refetch();
+            }}
+            tintColor={colors.primary}
           />
-        ))}
-        {mine.length === 0 ? (
-          <Text style={styles.none}>Nothing yet. Generate a film from an event or an album.</Text>
-        ) : null}
-      </View>
+        }
+      >
+        <View style={styles.identity}>
+          <Avatar url={me?.avatar_url} name={me?.full_name} size="lg" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{me?.full_name ?? 'You'}</Text>
+            <Text style={styles.email} numberOfLines={1}>
+              {me?.email ?? ''}
+            </Text>
+          </View>
+        </View>
 
-      <Button label="Sign out" variant="ghost" onPress={signOut} />
-    </ScrollView>
+        <View style={styles.stats}>
+          <Stat value={mine.length} label="Films made" />
+          <Stat value={(events.data ?? []).length} label="Events" />
+          <Stat value={liked} label="Likes received" />
+        </View>
+
+        <View style={styles.switcher}>
+          {[
+            { key: 'films', label: 'Your films', icon: 'film' },
+            { key: 'settings', label: 'Settings', icon: 'settings' },
+          ].map((option) => (
+            <Pressable
+              key={option.key}
+              onPress={() => setTab(option.key)}
+              style={[styles.switch, tab === option.key && styles.switchOn]}
+            >
+              <Feather
+                name={option.icon}
+                size={14}
+                color={tab === option.key ? colors.text : colors.textMuted}
+              />
+              <Text style={[styles.switchText, tab === option.key && styles.switchTextOn]}>
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {tab === 'films' ? (
+          mine.length === 0 ? (
+            <View style={styles.blank}>
+              <Feather name="film" size={26} color={colors.textMuted} />
+              <Text style={styles.blankTitle}>No films yet</Text>
+              <Text style={styles.blankBody}>
+                Open an event or an album and generate one — it will appear here and in everyone's
+                feed.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.grid}>
+              {mine.map((post) => (
+                <MediaTile
+                  key={post.id}
+                  uri={media.data?.[post.id]?.thumbnail_url ?? null}
+                  kind="video"
+                  badge={post.events?.title}
+                  style={{ width: '31.5%' }}
+                  onPress={() => router.push(`/replay/${post.id}`)}
+                />
+              ))}
+            </View>
+          )
+        ) : (
+          <View style={styles.card}>
+            <Row icon="user" label="Name" value={me?.full_name ?? '—'} />
+            <Row icon="mail" label="Email" value={me?.email ?? '—'} />
+            <Row
+              icon="hash"
+              label="Join an event"
+              onPress={() => router.push('/join')}
+            />
+            <Row
+              icon="bell"
+              label="Notifications"
+              value="On"
+              onPress={() =>
+                Alert.alert('Notifications', 'Push notifications are not set up yet.')
+              }
+            />
+            <Row
+              icon="shield"
+              label="Who can see my films"
+              value="Event members"
+              onPress={() =>
+                Alert.alert(
+                  'Who can see my films',
+                  'Only people you invited to an event can see the films made from it. This is enforced in the database, not just in the app.'
+                )
+              }
+            />
+            <Row
+              icon="log-out"
+              label="Sign out"
+              danger
+              last
+              onPress={() =>
+                Alert.alert('Sign out?', '', [
+                  { text: 'Stay', style: 'cancel' },
+                  { text: 'Sign out', style: 'destructive', onPress: signOut },
+                ])
+              }
+            />
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -86,22 +191,66 @@ function Stat({ value, label }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxxl },
-  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  content: { padding: spacing.lg, paddingTop: 0, gap: spacing.lg, paddingBottom: spacing.xxxl },
+
+  identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   name: { ...type.title, color: colors.text },
   email: { ...type.caption, color: colors.textMuted },
 
-  stats: { flexDirection: 'row', gap: spacing.md },
+  stats: { flexDirection: 'row', gap: spacing.sm },
   stat: {
     flex: 1,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceAlt,
   },
   statValue: { ...type.title, color: colors.text },
   statLabel: { ...type.caption, color: colors.textMuted },
 
-  section: { ...type.heading, color: colors.text },
+  switcher: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSunk,
+    gap: 2,
+  },
+  switch: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: radius.sm,
+  },
+  switchOn: { backgroundColor: colors.surface, ...shadow.card },
+  switchText: { ...type.label, color: colors.textMuted },
+  switchTextOn: { color: colors.text },
+
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  none: { ...type.caption, color: colors.textMuted },
+
+  card: {
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
+  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  rowIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowLabel: { ...type.body, color: colors.text },
+  rowValue: { ...type.caption, color: colors.textMuted, maxWidth: 150 },
+
+  blank: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xxl },
+  blankTitle: { ...type.heading, color: colors.text },
+  blankBody: { ...type.caption, color: colors.textMuted, textAlign: 'center', maxWidth: 280 },
 });
