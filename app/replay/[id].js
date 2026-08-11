@@ -1,18 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEventListener } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
 import { api } from '../../src/lib/api';
 import { myProfile } from '../../src/lib/data';
@@ -23,7 +13,6 @@ import { RoundButton, ScreenHeader } from '../../src/ui/Header';
 export default function ReplayScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const [playing, setPlaying] = useState(false);
 
   const replay = useQuery({
     queryKey: ['replay', id],
@@ -46,8 +35,6 @@ export default function ReplayScreen() {
     instance.loop = true;
     instance.play();
   });
-
-  useEventListener(player, 'playingChange', ({ isPlaying }) => setPlaying(isPlaying));
 
   const ready = data?.status === 'succeeded' && data.url;
 
@@ -79,26 +66,17 @@ export default function ReplayScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         {ready ? (
+          // Deliberately plain: no rounded corners clipping it, no elevation, and
+          // nothing laid over the top. Every one of those has been a cause of a
+          // black picture with working sound on Android, so the player is being
+          // kept bare until it is known to work, and styled back afterwards.
           <View style={styles.playerWrap}>
             <VideoView
               player={player}
               style={styles.player}
               contentFit="contain"
               nativeControls
-              allowsFullscreen
-              // On Android the default surfaceView is punched through the view
-              // hierarchy and cannot be clipped, so the rounded corners on the
-              // wrapper composited the picture away entirely — sound played over
-              // a black rectangle. A textureView draws into the tree and clips.
-              surfaceType="textureView"
             />
-            {!playing ? (
-              <Pressable style={styles.tapToPlay} onPress={() => player.play()}>
-                <View style={styles.playCircle}>
-                  <Feather name="play" size={26} color="#fff" style={{ marginLeft: 4 }} />
-                </View>
-              </Pressable>
-            ) : null}
           </View>
         ) : data?.status === 'failed' ? (
           <View style={[styles.card, { borderColor: colors.danger }]}>
@@ -160,19 +138,8 @@ const styles = StyleSheet.create({
   eyebrow: { ...type.tiny, color: colors.primary, textTransform: 'uppercase' },
   title: { ...type.title, color: colors.text },
 
-  playerWrap: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#000', ...shadow.card },
-  player: { width: '100%', aspectRatio: 9 / 16 },
-  tapToPlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  playCircle: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    backgroundColor: 'rgba(16,12,26,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.55)',
-  },
+  playerWrap: { backgroundColor: '#000' },
+  player: { width: '100%', height: 460 },
 
   card: {
     alignItems: 'center',
