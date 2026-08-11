@@ -78,7 +78,13 @@ export async function listEvents() {
   return unwrap(
     await supabase
       .from('events')
-      .select('*, memories(count)')
+      // The foreign key has to be named. There are two paths between these tables
+      // — memories belonging to an event, and the single memory an event uses as
+      // its cover — so an unqualified embed is ambiguous and PostgREST refuses the
+      // whole request rather than guessing. That failed the query outright, which
+      // is why the home screen showed no events at all while every one of them sat
+      // in the database.
+      .select('*, memories!memories_event_id_fkey(count)')
       .order('event_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
   );
