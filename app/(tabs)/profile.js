@@ -16,6 +16,15 @@ export default function ProfileScreen() {
   const me = profile.data;
   const mine = (posts.data ?? []).filter((post) => post.requested_by === me?.id);
 
+  // One call for every poster, not one per tile.
+  const ids = mine.map((post) => post.id);
+  const media = useQuery({
+    queryKey: ['feedMedia', ids.join(',')],
+    queryFn: () => api.replayMedia(ids),
+    enabled: ids.length > 0,
+    staleTime: 45 * 60 * 1000,
+  });
+
   return (
     <ScrollView
       style={styles.screen}
@@ -47,7 +56,14 @@ export default function ProfileScreen() {
       <Text style={styles.section}>Films you made</Text>
       <View style={styles.grid}>
         {mine.map((post) => (
-          <FilmTile key={post.id} post={post} onPress={() => router.push(`/replay/${post.id}`)} />
+          <MediaTile
+            key={post.id}
+            uri={media.data?.[post.id]?.thumbnail_url ?? null}
+            kind="video"
+            badge={post.events?.title}
+            style={{ width: '31.5%' }}
+            onPress={() => router.push(`/replay/${post.id}`)}
+          />
         ))}
         {mine.length === 0 ? (
           <Text style={styles.none}>Nothing yet. Generate a film from an event or an album.</Text>
@@ -56,24 +72,6 @@ export default function ProfileScreen() {
 
       <Button label="Sign out" variant="ghost" onPress={signOut} />
     </ScrollView>
-  );
-}
-
-function FilmTile({ post, onPress }) {
-  const media = useQuery({
-    queryKey: ['replayMedia', post.id],
-    queryFn: () => api.replay(post.id),
-    staleTime: 45 * 60 * 1000,
-  });
-
-  return (
-    <MediaTile
-      uri={media.data?.thumbnail_url ?? null}
-      kind="video"
-      badge={post.events?.title}
-      onPress={onPress}
-      style={{ width: '31.5%' }}
-    />
   );
 }
 

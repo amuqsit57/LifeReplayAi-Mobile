@@ -88,6 +88,14 @@ export const api = {
     }),
 
   replay: (replayId) => request(`/api/replays/${replayId}`),
+
+  // Signed URLs for a whole feed in one call. Asking per post was sixty round
+  // trips before anything appeared.
+  replayMedia: (replayIds) =>
+    request('/api/replays/media', {
+      method: 'POST',
+      body: JSON.stringify(replayIds),
+    }),
   eventReplays: (eventId) => request(`/api/events/${eventId}/replays`),
 };
 

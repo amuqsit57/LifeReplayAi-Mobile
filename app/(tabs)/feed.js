@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
 
 import { api } from '../../src/lib/api';
 import { feed, myLikes, setLike } from '../../src/lib/data';
@@ -21,31 +20,28 @@ function when(iso) {
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
-function Post({ post, liked, onToggleLike }) {
+function runtime(seconds) {
+  if (!seconds) return null;
+  return `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
+}
+
+/**
+ * A post shows a poster, never a player.
+ *
+ * Every post used to open a real video player as soon as it mounted. With eighty
+ * finished films averaging sixteen megabytes, a single pull of the feed asked the
+ * phone to buffer close to a gigabyte at once — which is what made everything
+ * crawl. A film plays when you tap it and not before.
+ */
+function Post({ post, media, liked, onToggleLike }) {
   const router = useRouter();
   const style = STYLE_META[post.style] ?? {};
   const author = post.profiles ?? {};
   const event = post.events ?? {};
 
-  // Only the finished film is shared — never the originals. Signed on demand so a
-  // link cannot be passed on to anyone outside the event.
-  const media = useQuery({
-    queryKey: ['replayMedia', post.id],
-    queryFn: () => api.replay(post.id),
-    staleTime: 45 * 60 * 1000,
-  });
-
-  const url = media.data?.url ?? null;
-
-  // One player per post, which is safe because each post is its own component —
-  // the hook could not be called from inside a map.
-  const player = useVideoPlayer(url, (instance) => {
-    instance.loop = true;
-    instance.muted = true;
-  });
-
   const likes = post.replay_likes?.[0]?.count ?? 0;
   const comments = post.replay_comments?.[0]?.count ?? 0;
+  const length = runtime(post.duration_seconds);
 
   return (
     <View style={styles.post}>
@@ -57,7 +53,8 @@ function Post({ post, liked, onToggleLike }) {
           </Text>
           <Text style={styles.sub} numberOfLines={1}>
             {event.title ?? 'An event'}
-            {post.albums?.title ? ` · ${post.albums.title}` : ''} · {when(post.completed_at ?? post.created_at)}
+            {post.albums?.title ? ` · ${post.albums.title}` : ''} ·{' '}
+            {when(post.completed_at ?? post.created_at)}
           </Text>
         </View>
         <View style={[styles.styleChip, { backgroundColor: (style.tint ?? colors.primary) + '18' }]}>
@@ -68,31 +65,28 @@ function Post({ post, liked, onToggleLike }) {
       </Pressable>
 
       <Pressable onPress={() => router.push(`/replay/${post.id}`)} style={styles.stage}>
-        {url ? (
-          // Muted and looping in the feed, the way a social video behaves. Sound
-          // and controls belong on the full screen, not four posts at once.
-          <VideoView
-            player={player}
-            style={styles.video}
+        {media?.thumbnail_url ? (
+          <Image
+            source={{ uri: media.thumbnail_url }}
+            style={styles.poster}
             contentFit="cover"
-            nativeControls={false}
+            transition={140}
+            recyclingKey={post.id}
           />
         ) : (
-          <View style={[styles.video, styles.stageEmpty]}>
-            {media.data?.thumbnail_url ? (
-              <Image
-                source={{ uri: media.data.thumbnail_url }}
-                style={styles.video}
-                contentFit="cover"
-              />
-            ) : (
-              <Text style={{ fontSize: 30 }}>{style.emoji ?? '🎬'}</Text>
-            )}
+          <View style={[styles.poster, styles.posterEmpty]}>
+            <Text style={{ fontSize: 30 }}>{style.emoji ?? '🎬'}</Text>
           </View>
         )}
-        <View style={styles.playHint}>
-          <Text style={styles.playHintText}>▶ Tap to watch</Text>
+
+        <View style={styles.play}>
+          <Text style={styles.playIcon}>▶</Text>
         </View>
+        {length ? (
+          <View style={styles.length}>
+            <Text style={styles.lengthText}>{length}</Text>
+          </View>
+        ) : null}
       </Pressable>
 
       <View style={styles.actions}>
@@ -115,17 +109,12 @@ function Post({ post, liked, onToggleLike }) {
           label="Share"
           onPress={() =>
             Share.share({
-              message: `${author.full_name ?? 'Someone'} made a film from ${event.title ?? 'an event'} on Life Replay.`,
-            })
+              message: `${author.full_name ?? 'Someone'} made a film from ${
+                event.title ?? 'an event'
+              } on Life Replay.`,
+            }).catch(() => {})
           }
         />
-        <View style={{ flex: 1 }} />
-        {post.duration_seconds ? (
-          <Text style={styles.duration}>
-            {Math.floor(post.duration_seconds / 60)}:
-            {String(Math.round(post.duration_seconds % 60)).padStart(2, '0')}
-          </Text>
-        ) : null}
       </View>
     </View>
   );
@@ -136,10 +125,20 @@ export default function FeedScreen() {
   const [optimistic, setOptimistic] = useState({});
 
   const posts = useQuery({ queryKey: ['feed'], queryFn: feed });
-  const ids = useMemo(() => (posts.data ?? []).map((p) => p.id), [posts.data]);
+  const list = posts.data ?? [];
+  const ids = useMemo(() => list.map((p) => p.id), [list]);
+  const idKey = ids.join(',');
+
+  // One request for every poster in the feed, rather than one per post.
+  const media = useQuery({
+    queryKey: ['feedMedia', idKey],
+    queryFn: () => api.replayMedia(ids),
+    enabled: ids.length > 0,
+    staleTime: 45 * 60 * 1000,
+  });
 
   const liked = useQuery({
-    queryKey: ['myLikes', ids.length],
+    queryKey: ['myLikes', idKey],
     queryFn: () => myLikes(ids),
     enabled: ids.length > 0,
   });
@@ -148,8 +147,8 @@ export default function FeedScreen() {
 
   const toggle = useMutation({
     mutationFn: ({ id, next }) => setLike(id, next),
-    // The heart has to answer instantly; correcting it afterwards is fine, waiting
-    // a round trip to fill it in is not.
+    // The heart has to answer instantly; correcting it afterwards is fine,
+    // waiting a round trip to fill it in is not.
     onMutate: ({ id, next }) => setOptimistic((current) => ({ ...current, [id]: next })),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
@@ -157,12 +156,42 @@ export default function FeedScreen() {
     },
   });
 
-  const list = posts.data ?? [];
+  const renderItem = useCallback(
+    ({ item }) => (
+      <Post
+        post={item}
+        media={media.data?.[item.id]}
+        liked={optimistic[item.id] ?? likedSet.has(item.id)}
+        onToggleLike={(id, next) => toggle.mutate({ id, next })}
+      />
+    ),
+    [media.data, optimistic, likedSet, toggle]
+  );
 
   return (
-    <ScrollView
+    <FlatList
       style={styles.screen}
       contentContainerStyle={styles.content}
+      data={list}
+      keyExtractor={(item) => item.id}
+      renderItem={renderItem}
+      ListHeaderComponent={<Text style={styles.masthead}>Life Replay</Text>}
+      ListEmptyComponent={
+        posts.isLoading ? null : (
+          <Empty
+            icon="🎬"
+            title="No films yet"
+            body="Make an event, add photos and videos, then generate a film. It will show up here for everyone you invited."
+          />
+        )
+      }
+      ItemSeparatorComponent={() => <View style={{ height: spacing.xl }} />}
+      // Only what is on screen stays mounted. Without this every post in the feed
+      // renders at once, which is fine for ten and not for eighty.
+      initialNumToRender={3}
+      maxToRenderPerBatch={4}
+      windowSize={5}
+      removeClippedSubviews
       refreshControl={
         <RefreshControl
           refreshing={posts.isFetching}
@@ -170,33 +199,14 @@ export default function FeedScreen() {
           tintColor={colors.primary}
         />
       }
-    >
-      <Text style={styles.masthead}>Life Replay</Text>
-
-      {list.length === 0 && !posts.isLoading ? (
-        <Empty
-          icon="🎬"
-          title="No films yet"
-          body="Make an event, add photos and videos, then generate a film. It will show up here for everyone you invited."
-        />
-      ) : (
-        list.map((post) => (
-          <Post
-            key={post.id}
-            post={post}
-            liked={optimistic[post.id] ?? likedSet.has(post.id)}
-            onToggleLike={(id, next) => toggle.mutate({ id, next })}
-          />
-        ))
-      )}
-    </ScrollView>
+    />
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.xxxl },
-  masthead: { ...type.display, color: colors.text },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.lg },
+  masthead: { ...type.display, color: colors.text, marginBottom: spacing.lg },
 
   post: {
     backgroundColor: colors.surface,
@@ -206,32 +216,39 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadow.card,
   },
-  head: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-  },
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
   author: { ...type.bodyStrong, color: colors.text },
   sub: { ...type.caption, color: colors.textMuted },
   styleChip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.pill },
   styleChipText: { ...type.tiny },
 
   stage: { backgroundColor: colors.mediaPlaceholder },
-  // Portrait films, shown tall enough to feel like the phone footage they are
-  // without taking a whole screen each.
-  video: { width: '100%', aspectRatio: 4 / 5, backgroundColor: colors.mediaPlaceholder },
-  stageEmpty: { alignItems: 'center', justifyContent: 'center' },
-  playHint: {
+  poster: { width: '100%', aspectRatio: 4 / 5, backgroundColor: colors.mediaPlaceholder },
+  posterEmpty: { alignItems: 'center', justifyContent: 'center' },
+
+  play: {
     position: 'absolute',
-    left: spacing.md,
+    alignSelf: 'center',
+    top: '42%',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: colors.scrim,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playIcon: { color: '#fff', fontSize: 20, marginLeft: 3 },
+
+  length: {
+    position: 'absolute',
+    right: spacing.md,
     bottom: spacing.md,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
     backgroundColor: colors.scrim,
   },
-  playHintText: { ...type.tiny, color: '#fff' },
+  lengthText: { ...type.tiny, color: '#fff' },
 
   actions: {
     flexDirection: 'row',
@@ -240,5 +257,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
-  duration: { ...type.caption, color: colors.textMuted },
 });
