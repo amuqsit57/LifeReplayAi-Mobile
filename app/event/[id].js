@@ -216,32 +216,32 @@ export default function EventScreen() {
               <Feather name="chevron-right" size={14} color={colors.textMuted} />
             </Pressable>
           </View>
-        </View>
 
-        {/* Add sits beside the tabs rather than above them as a full-width bar.
-            It is one action among the ways of looking at an event, not a banner
-            over the top of them. */}
-        <View style={[styles.gutter, styles.tabRow]}>
+          {/* Anchored to the bottom corner of the title block and hanging over
+              its edge, so adding reads as belonging to this event rather than to
+              whichever tab happens to be open. */}
           <Pressable
             onPress={addMemories}
             disabled={Boolean(progress)}
             accessibilityLabel="Add photos and videos"
             style={({ pressed }) => [styles.addRound, pressed && { opacity: 0.85 }]}
           >
-            <Feather name={progress ? 'upload-cloud' : 'plus'} size={20} color="#fff" />
+            <Feather name={progress ? 'upload-cloud' : 'plus'} size={22} color="#fff" />
           </Pressable>
+        </View>
 
-          <View style={{ flex: 1 }}>
-            <Segmented
-              value={tab}
-              onChange={setTab}
-              options={[
-                { value: 'gallery', label: 'Gallery', icon: 'image', count: list.length },
-                { value: 'films', label: 'Films', icon: 'film', count: eventFilms.length || null },
-                { value: 'albums', label: 'Albums', icon: 'folder', count: albumList.length || null },
-              ]}
-            />
-          </View>
+        <View style={styles.heroSpacer} />
+
+        <View style={styles.gutter}>
+          <Segmented
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'gallery', label: 'Gallery', icon: 'image', count: list.length },
+              { value: 'films', label: 'Films', icon: 'film', count: eventFilms.length || null },
+              { value: 'albums', label: 'Albums', icon: 'folder', count: albumList.length || null },
+            ]}
+          />
         </View>
 
         {/* ---------------------------------------------------------- gallery */}
@@ -518,6 +518,9 @@ const styles = StyleSheet.create({
   // The cover, blurred, behind the title — the event's own photograph carrying
   // its header rather than a flat coloured band.
   hero: { paddingTop: 52, paddingBottom: spacing.lg, paddingHorizontal: spacing.lg, gap: spacing.lg },
+  // Room under the title block for the add button that hangs over its edge, so
+  // it never collides with the tabs beneath.
+  heroSpacer: { height: spacing.xl },
   heroImage: { ...StyleSheet.absoluteFillObject },
   heroVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.82)' },
   heroBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -530,15 +533,21 @@ const styles = StyleSheet.create({
   // child — that repetition is how the padding drifted between them before.
   gutter: { paddingHorizontal: spacing.lg },
 
-  tabRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   addRound: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
+    position: 'absolute',
+    right: spacing.lg,
+    // Half outside the title block, which is what ties the two together rather
+    // than leaving it floating in the space below.
+    bottom: -24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadow.card,
+    borderWidth: 3,
+    borderColor: colors.background,
+    ...shadow.raised,
   },
 
   filterRow: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: 2 },
