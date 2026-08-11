@@ -2,13 +2,23 @@ import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Dimensions,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { api } from '../../src/lib/api';
 import { myProfile } from '../../src/lib/data';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import Comments from '../../src/ui/Comments';
 import { RoundButton, ScreenHeader } from '../../src/ui/Header';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default function ReplayScreen() {
   const { id } = useLocalSearchParams();
@@ -66,41 +76,46 @@ export default function ReplayScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         {ready ? (
-          // Deliberately plain: no rounded corners clipping it, no elevation, and
-          // nothing laid over the top. Every one of those has been a cause of a
-          // black picture with working sound on Android, so the player is being
-          // kept bare until it is known to work, and styled back afterwards.
-          <View style={styles.playerWrap}>
-            <VideoView
-              player={player}
-              style={styles.player}
-              contentFit="contain"
-              nativeControls
-            />
-          </View>
+          // Full bleed, and sized to the film's own shape so `contain` has
+          // nothing to letterbox. The bars were the 9:16 film sitting inside a
+          // box that was neither its width nor its ratio.
+          //
+          // Still deliberately plain — no rounded corners, no elevation, nothing
+          // laid over it. One of those was what blacked the picture out, and the
+          // player is staying bare until it is worth finding out which.
+          <VideoView
+            player={player}
+            style={styles.player}
+            contentFit="contain"
+            nativeControls
+          />
         ) : data?.status === 'failed' ? (
-          <View style={[styles.card, { borderColor: colors.danger }]}>
-            <Feather name="alert-circle" size={20} color={colors.danger} />
-            <Text style={styles.cardTitle}>Could not make this film</Text>
-            <Text style={styles.cardBody}>
-              {data.error ?? 'Something went wrong while cutting it.'}
-            </Text>
+          <View style={styles.gutter}>
+            <View style={[styles.card, { borderColor: colors.danger }]}>
+              <Feather name="alert-circle" size={20} color={colors.danger} />
+              <Text style={styles.cardTitle}>Could not make this film</Text>
+              <Text style={styles.cardBody}>
+                {data.error ?? 'Something went wrong while cutting it.'}
+              </Text>
+            </View>
           </View>
         ) : (
-          <View style={styles.card}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.cardTitle}>
-              {data?.status === 'running' ? 'Cutting your film…' : 'Queued…'}
-            </Text>
-            <Text style={styles.cardBody}>
-              Choosing the moments and rendering them takes a few minutes. You can leave and come
-              back.
-            </Text>
+          <View style={styles.gutter}>
+            <View style={styles.card}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.cardTitle}>
+                {data?.status === 'running' ? 'Cutting your film…' : 'Queued…'}
+              </Text>
+              <Text style={styles.cardBody}>
+                Choosing the moments and rendering them takes a few minutes. You can leave and come
+                back.
+              </Text>
+            </View>
           </View>
         )}
 
         {ready ? (
-          <View style={styles.facts}>
+          <View style={[styles.gutter, styles.facts]}>
             {plan.clips?.length ? (
               <Fact icon="scissors" label={`${plan.clips.length} shots`} />
             ) : null}
@@ -116,7 +131,11 @@ export default function ReplayScreen() {
           </View>
         ) : null}
 
-        {ready ? <Comments replayId={id} myId={me.data?.id} /> : null}
+        {ready ? (
+          <View style={styles.gutter}>
+            <Comments replayId={id} myId={me.data?.id} />
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -133,13 +152,21 @@ function Fact({ icon, label }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingTop: 0, gap: spacing.lg, paddingBottom: spacing.xxxl },
+  // No horizontal padding here: the player is full bleed, so the gutter is
+  // applied by the sections that want it rather than to everything.
+  content: { paddingTop: 0, gap: spacing.lg, paddingBottom: spacing.xxxl },
+  gutter: { paddingHorizontal: spacing.lg },
 
   eyebrow: { ...type.tiny, color: colors.primary, textTransform: 'uppercase' },
   title: { ...type.title, color: colors.text },
 
-  playerWrap: { backgroundColor: '#000' },
-  player: { width: '100%', height: 460 },
+  // The films are rendered 1080x1920, so the height follows the screen width at
+  // that ratio. Measured rather than guessed at, which is why there are no bars.
+  player: {
+    width: SCREEN_WIDTH,
+    height: Math.round((SCREEN_WIDTH * 16) / 9),
+    backgroundColor: '#000',
+  },
 
   card: {
     alignItems: 'center',
