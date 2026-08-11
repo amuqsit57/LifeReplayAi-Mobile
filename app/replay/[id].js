@@ -86,6 +86,11 @@ export default function ReplayScreen() {
               contentFit="contain"
               nativeControls
               allowsFullscreen
+              // On Android the default surfaceView is punched through the view
+              // hierarchy and cannot be clipped, so the rounded corners on the
+              // wrapper composited the picture away entirely — sound played over
+              // a black rectangle. A textureView draws into the tree and clips.
+              surfaceType="textureView"
             />
             {!playing ? (
               <Pressable style={styles.tapToPlay} onPress={() => player.play()}>

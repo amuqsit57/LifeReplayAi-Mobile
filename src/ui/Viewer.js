@@ -66,6 +66,10 @@ export default function Viewer({ memories = [], startId, visible, onClose, onDel
                   style={styles.media}
                   contentFit="contain"
                   nativeControls
+                  allowsFullscreen
+                  // Same reason as the replay screen: a surfaceView cannot be
+                  // clipped or composited normally on Android.
+                  surfaceType="textureView"
                 />
               ) : (
                 <Image
