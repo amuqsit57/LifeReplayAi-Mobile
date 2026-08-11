@@ -4,10 +4,14 @@ import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
 
+import { Feather } from '@expo/vector-icons';
+
 import { api } from '../../src/lib/api';
 import { feed, myLikes, setLike } from '../../src/lib/data';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
+import { IconButton, Wordmark } from '../../src/ui/brand';
+import CreateEventSheet from '../../src/ui/CreateEventSheet';
 import { ActionCount, Avatar } from '../../src/ui/social';
 
 function when(iso) {
@@ -123,6 +127,7 @@ function Post({ post, media, liked, onToggleLike }) {
 export default function FeedScreen() {
   const queryClient = useQueryClient();
   const [optimistic, setOptimistic] = useState({});
+  const [creating, setCreating] = useState(false);
 
   const posts = useQuery({ queryKey: ['feed'], queryFn: feed });
   const list = posts.data ?? [];
@@ -169,13 +174,24 @@ export default function FeedScreen() {
   );
 
   return (
+    <>
     <FlatList
       style={styles.screen}
       contentContainerStyle={styles.content}
       data={list}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
-      ListHeaderComponent={<Text style={styles.masthead}>Life Replay</Text>}
+      ListHeaderComponent={
+        <View style={styles.masthead}>
+          <Wordmark />
+          <IconButton
+            name="plus"
+            tone="filled"
+            label="New event"
+            onPress={() => setCreating(true)}
+          />
+        </View>
+      }
       ListEmptyComponent={
         posts.isLoading ? null : (
           <Empty
@@ -200,13 +216,20 @@ export default function FeedScreen() {
         />
       }
     />
+    <CreateEventSheet visible={creating} onClose={() => setCreating(false)} />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.lg },
-  masthead: { ...type.display, color: colors.text, marginBottom: spacing.lg },
+  masthead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
 
   post: {
     backgroundColor: colors.surface,

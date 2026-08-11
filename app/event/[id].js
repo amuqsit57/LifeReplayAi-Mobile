@@ -1,5 +1,7 @@
+import { Feather } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
@@ -19,7 +21,8 @@ import { api } from '../../src/lib/api';
 import { createAlbum, eventPeople, getEvent, listAlbums } from '../../src/lib/data';
 import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
-import { Button, Empty } from '../../src/ui';
+import { Empty } from '../../src/ui';
+import { IconButton, Segmented } from '../../src/ui/brand';
 import { AvatarRow, MediaTile } from '../../src/ui/social';
 import Viewer from '../../src/ui/Viewer';
 
@@ -36,6 +39,7 @@ export default function EventScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const [tab, setTab] = useState('gallery');
   const [progress, setProgress] = useState(null);
   const [selected, setSelected] = useState([]);
   const [viewing, setViewing] = useState(null);
@@ -65,6 +69,8 @@ export default function EventScreen() {
   });
 
   const list = memories.data ?? [];
+  const albumList = albums.data ?? [];
+  const eventFilms = (replays.data ?? []).filter((r) => !r.album_id);
   const selecting = selected.length > 0;
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const peopleById = useMemo(
@@ -126,19 +132,8 @@ export default function EventScreen() {
     queryClient.invalidateQueries({ queryKey: ['memories', id] });
   }
 
-  function confirmDelete() {
-    Alert.alert(
-      `Delete ${selected.length}?`,
-      'They are removed for everyone in this event. This cannot be undone.',
-      [
-        { text: 'Keep', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => remove.mutate(selected) },
-      ]
-    );
-  }
-
   const info = event.data;
-  const finished = (replays.data ?? []).filter((r) => r.status === 'succeeded');
+  const cover = list.find((m) => m.thumbnail_url)?.thumbnail_url ?? null;
 
   return (
     <>
@@ -157,146 +152,190 @@ export default function EventScreen() {
           />
         }
       >
-        <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Text style={styles.back}>‹ Back</Text>
+        {/* ----------------------------------------------------------- header */}
+        <View style={styles.hero}>
+          {cover ? (
+            <Image source={{ uri: cover }} style={styles.heroImage} contentFit="cover" blurRadius={28} />
+          ) : null}
+          <View style={styles.heroVeil} />
+
+          <View style={styles.heroBar}>
+            <IconButton name="chevron-left" label="Back" onPress={() => router.back()} />
+            <IconButton
+              name="user-plus"
+              label="Invite"
+              onPress={() => {
+                if (!info?.invite_code) return;
+                Clipboard.setStringAsync(info.invite_code);
+                Share.share({
+                  message: `Join "${info.title}" on Life Replay with code ${info.invite_code}`,
+                }).catch(() => {});
+              }}
+            />
+          </View>
+
+          <View style={styles.heroText}>
+            <Text style={styles.title} numberOfLines={2}>
+              {info?.title ?? 'Event'}
+            </Text>
+            <View style={styles.heroMeta}>
+              <AvatarRow people={people.data ?? []} />
+              <Text style={styles.metaText}>
+                {(people.data ?? []).length} {(people.data ?? []).length === 1 ? 'person' : 'people'}
+                {info?.location ? ` · ${info.location}` : ''}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <Pressable
+          style={styles.addBar}
+          onPress={addMemories}
+          disabled={Boolean(progress)}
+        >
+          <Feather name="plus-circle" size={18} color="#fff" />
+          <Text style={styles.addBarText}>
+            {progress ? `Adding ${progress.index + 1} of ${progress.total}…` : 'Add photos & videos'}
+          </Text>
         </Pressable>
 
-        <Text style={styles.title}>{info?.title ?? 'Event'}</Text>
-        <View style={styles.metaRow}>
-          <AvatarRow people={people.data ?? []} />
-          <Text style={styles.meta}>
-            {(people.data ?? []).length} {(people.data ?? []).length === 1 ? 'person' : 'people'} ·{' '}
-            {list.length} {list.length === 1 ? 'item' : 'items'}
-          </Text>
-        </View>
-
-        {info?.invite_code ? (
-          <Pressable
-            style={styles.invite}
-            onPress={() => {
-              Clipboard.setStringAsync(info.invite_code);
-              Share.share({
-                message: `Join "${info.title}" on Life Replay with code ${info.invite_code}`,
-              });
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.inviteLabel}>Invite code</Text>
-              <Text style={styles.inviteCode}>{info.invite_code}</Text>
-            </View>
-            <Text style={styles.inviteAction}>Share ↗</Text>
-          </Pressable>
-        ) : null}
-
-        <View style={styles.rowButtons}>
-          <Button
-            label={progress ? `Adding ${progress.index + 1}/${progress.total}…` : 'Add photos & videos'}
-            onPress={addMemories}
-            disabled={Boolean(progress)}
-          />
-        </View>
-
-        {/* ---------------------------------------------------------- albums */}
-        <View style={styles.sectionHead}>
-          <Text style={styles.section}>Albums</Text>
-          <Text style={styles.hint}>Select items below to make one</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.albumRow}>
-          {(albums.data ?? []).map((album) => (
-            <Pressable
-              key={album.id}
-              style={styles.albumCard}
-              onPress={() => router.push(`/album/${album.id}`)}
-            >
-              <Text style={styles.albumTitle} numberOfLines={2}>
-                {album.title}
-              </Text>
-              <Text style={styles.albumCount}>
-                {album.album_memories?.[0]?.count ?? 0} items
-              </Text>
-            </Pressable>
-          ))}
-          {(albums.data ?? []).length === 0 ? (
-            <Text style={styles.hint}>No albums yet.</Text>
-          ) : null}
-        </ScrollView>
-
-        {/* ---------------------------------------------------------- films */}
-        <Text style={styles.section}>Films</Text>
-        <View style={styles.styleGrid}>
-          {Object.entries(STYLE_META).map(([style, meta]) => {
-            const existing = (replays.data ?? []).find((r) => r.style === style && !r.album_id);
-            const busy = existing?.status === 'queued' || existing?.status === 'running';
-            return (
-              <Pressable
-                key={style}
-                style={[styles.styleCard, { borderColor: meta.tint + '55' }]}
-                onPress={() =>
-                  existing?.status === 'succeeded'
-                    ? router.push(`/replay/${existing.id}`)
-                    : generate.mutate(style)
-                }
-              >
-                <Text style={styles.styleEmoji}>{meta.emoji}</Text>
-                <Text style={styles.styleLabel}>{meta.label}</Text>
-                <Text style={[styles.styleState, { color: meta.tint }]}>
-                  {busy ? 'making…' : existing?.status === 'succeeded' ? 'watch' : 'generate'}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <Segmented
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'gallery', label: 'Gallery', icon: 'image', count: list.length },
+            { value: 'films', label: 'Films', icon: 'film', count: eventFilms.length || null },
+            { value: 'albums', label: 'Albums', icon: 'folder', count: albumList.length || null },
+          ]}
+        />
 
         {/* ---------------------------------------------------------- gallery */}
-        <View style={styles.sectionHead}>
-          <Text style={styles.section}>Everything added</Text>
-          {selecting ? (
-            <Pressable onPress={() => setSelected(list.map((m) => m.id))}>
-              <Text style={styles.hintAction}>Select all</Text>
-            </Pressable>
+        {tab === 'gallery' ? (
+          list.length === 0 && !memories.isLoading ? (
+            <Empty icon="📸" title="Nothing here yet" body="Add photos and videos — no need to sort them first." />
           ) : (
-            <Text style={styles.hint}>Hold to select</Text>
-          )}
-        </View>
+            <>
+              <Text style={styles.hint}>
+                {selecting ? `${selected.length} selected` : 'Tap to open · hold to select'}
+              </Text>
+              <View style={styles.grid}>
+                {list.map((memory) => (
+                  <MediaTile
+                    key={memory.id}
+                    uri={memory.thumbnail_url ?? memory.url}
+                    kind={memory.kind}
+                    selected={selectedSet.has(memory.id)}
+                    badge={STATUS_LABEL[memory.status] ?? memory.status}
+                    uploader={people.data?.length > 1 ? peopleById.get(memory.uploaded_by) : null}
+                    style={{ width: '31.5%' }}
+                    onPress={() => (selecting ? toggle(memory.id) : setViewing(memory.id))}
+                    onLongPress={() => toggle(memory.id)}
+                  />
+                ))}
+              </View>
+            </>
+          )
+        ) : null}
 
-        {list.length === 0 && !memories.isLoading ? (
-          <Empty icon="📸" title="Nothing here yet" body="Add photos and videos — no need to sort them first." />
-        ) : (
-          <View style={styles.grid}>
-            {list.map((memory) => (
-              <MediaTile
-                key={memory.id}
-                uri={memory.thumbnail_url ?? memory.url}
-                kind={memory.kind}
-                selected={selectedSet.has(memory.id)}
-                badge={STATUS_LABEL[memory.status] ?? memory.status}
-                // Only worth showing once more than one person has contributed —
-                // in a solo event every face would be your own.
-                uploader={people.data?.length > 1 ? peopleById.get(memory.uploaded_by) : null}
-                style={{ width: '31.5%' }}
-                onPress={() => (selecting ? toggle(memory.id) : setViewing(memory.id))}
-                onLongPress={() => toggle(memory.id)}
-              />
-            ))}
+        {/* ------------------------------------------------------------ films */}
+        {tab === 'films' ? (
+          <View style={styles.styleGrid}>
+            {Object.entries(STYLE_META).map(([style, meta]) => {
+              const existing = eventFilms.find((r) => r.style === style);
+              const busy = existing?.status === 'queued' || existing?.status === 'running';
+              const done = existing?.status === 'succeeded';
+              return (
+                <Pressable
+                  key={style}
+                  style={styles.filmCard}
+                  onPress={() =>
+                    done ? router.push(`/replay/${existing.id}`) : generate.mutate(style)
+                  }
+                >
+                  <View style={[styles.filmDot, { backgroundColor: meta.tint }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.filmLabel}>{meta.label}</Text>
+                    <Text style={styles.filmState}>
+                      {busy ? 'making…' : done ? 'ready to watch' : 'not made yet'}
+                    </Text>
+                  </View>
+                  <Feather
+                    name={busy ? 'loader' : done ? 'play-circle' : 'zap'}
+                    size={19}
+                    color={done ? meta.tint : colors.textMuted}
+                  />
+                </Pressable>
+              );
+            })}
           </View>
-        )}
+        ) : null}
+
+        {/* ----------------------------------------------------------- albums */}
+        {tab === 'albums' ? (
+          albumList.length === 0 ? (
+            <Empty
+              icon="❏"
+              title="No albums yet"
+              body="Select photos in the gallery and choose Make album. Each album gets its own films."
+            />
+          ) : (
+            <View style={{ gap: spacing.sm }}>
+              {albumList.map((album) => (
+                <Pressable
+                  key={album.id}
+                  style={styles.albumRow}
+                  onPress={() => router.push(`/album/${album.id}`)}
+                >
+                  <View style={styles.albumIcon}>
+                    <Feather name="folder" size={17} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.albumTitle} numberOfLines={1}>
+                      {album.title}
+                    </Text>
+                    <Text style={styles.hint}>
+                      {album.album_memories?.[0]?.count ?? 0} items
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={18} color={colors.textMuted} />
+                </Pressable>
+              ))}
+            </View>
+          )
+        ) : null}
       </ScrollView>
 
-      {/* Selection bar, over the content so the grid does not jump when it appears. */}
       {selecting ? (
         <View style={styles.selectBar}>
           <Pressable onPress={() => setSelected([])} hitSlop={8}>
-            <Text style={styles.selectCancel}>Cancel</Text>
+            <Feather name="x" size={19} color={colors.textMuted} />
           </Pressable>
-          <Text style={styles.selectCount}>{selected.length} selected</Text>
+          <Text style={styles.selectCount}>{selected.length}</Text>
+          <Pressable onPress={() => setSelected(list.map((m) => m.id))} hitSlop={8}>
+            <Text style={styles.selectAll}>All</Text>
+          </Pressable>
           <View style={{ flex: 1 }} />
-          <Button label="Make album" variant="secondary" onPress={() => setAlbumSheet(true)} />
-          <Button
-            label={remove.isPending ? '…' : 'Delete'}
-            variant="danger"
-            onPress={confirmDelete}
+          <Pressable style={styles.selectAction} onPress={() => setAlbumSheet(true)}>
+            <Feather name="folder-plus" size={17} color={colors.primary} />
+            <Text style={styles.selectActionText}>Album</Text>
+          </Pressable>
+          <Pressable
+            style={styles.selectAction}
             disabled={remove.isPending}
-          />
+            onPress={() =>
+              Alert.alert(
+                `Delete ${selected.length}?`,
+                'Removed for everyone in this event. This cannot be undone.',
+                [
+                  { text: 'Keep', style: 'cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: () => remove.mutate(selected) },
+                ]
+              )
+            }
+          >
+            <Feather name="trash-2" size={17} color={colors.danger} />
+            <Text style={[styles.selectActionText, { color: colors.danger }]}>Delete</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -315,9 +354,9 @@ export default function EventScreen() {
         <Pressable style={styles.sheetBack} onPress={() => setAlbumSheet(false)}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.sheetTitle}>Name the album</Text>
-            <Text style={styles.sheetBlurb}>
-              {selected.length} {selected.length === 1 ? 'item' : 'items'} will go in it. You can
-              generate a separate film from an album.
+            <Text style={styles.sheetHint}>
+              {selected.length} {selected.length === 1 ? 'item' : 'items'} go in it. An album can have
+              its own films.
             </Text>
             <TextInput
               value={albumTitle}
@@ -327,16 +366,15 @@ export default function EventScreen() {
               style={styles.sheetInput}
               autoFocus
             />
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Button label="Cancel" variant="ghost" onPress={() => setAlbumSheet(false)} />
-              <View style={{ flex: 1 }}>
-                <Button
-                  label={makeAlbum.isPending ? 'Making…' : 'Make album'}
-                  onPress={() => makeAlbum.mutate()}
-                  disabled={!albumTitle.trim() || makeAlbum.isPending}
-                />
-              </View>
-            </View>
+            <Pressable
+              onPress={() => makeAlbum.mutate()}
+              disabled={!albumTitle.trim() || makeAlbum.isPending}
+              style={[styles.cta, (!albumTitle.trim() || makeAlbum.isPending) && styles.ctaOff]}
+            >
+              <Text style={styles.ctaText}>
+                {makeAlbum.isPending ? 'Making…' : 'Make album'}
+              </Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -346,61 +384,75 @@ export default function EventScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 120 },
-  back: { ...type.label, color: colors.primary },
-  title: { ...type.display, color: colors.text },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  meta: { ...type.caption, color: colors.textMuted },
+  content: { paddingBottom: 120, gap: spacing.lg },
 
-  invite: {
+  // The cover, blurred, behind the title — the event's own photograph carrying
+  // its header rather than a flat coloured band.
+  hero: { paddingTop: 52, paddingBottom: spacing.lg, paddingHorizontal: spacing.lg, gap: spacing.lg },
+  heroImage: { ...StyleSheet.absoluteFillObject },
+  heroVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.82)' },
+  heroBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heroText: { gap: spacing.sm },
+  title: { ...type.display, color: colors.text },
+  heroMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  metaText: { ...type.caption, color: colors.textSoft },
+
+  addBar: {
+    marginHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.primary,
   },
-  inviteLabel: { ...type.tiny, color: colors.textSoft },
-  inviteCode: { ...type.title, color: colors.primary, letterSpacing: 2 },
-  inviteAction: { ...type.label, color: colors.primary },
+  addBarText: { ...type.bodyStrong, color: '#fff' },
 
-  rowButtons: { gap: spacing.sm },
-  sectionHead: {
+  hint: { ...type.caption, color: colors.textMuted, paddingHorizontal: spacing.lg },
+  grid: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
-  section: { ...type.heading, color: colors.text },
-  hint: { ...type.caption, color: colors.textMuted },
-  hintAction: { ...type.caption, color: colors.primary },
 
-  albumRow: { gap: spacing.sm, paddingVertical: spacing.xs },
-  albumCard: {
-    width: 132,
-    padding: spacing.md,
+  styleGrid: { gap: spacing.sm, paddingHorizontal: spacing.lg },
+  filmCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
     borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
-    gap: 4,
-  },
-  albumTitle: { ...type.bodyStrong, color: colors.text },
-  albumCount: { ...type.caption, color: colors.textMuted },
-
-  styleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  styleCard: {
-    flexGrow: 1,
-    flexBasis: '45%',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
     backgroundColor: colors.surface,
-    gap: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
-  styleEmoji: { fontSize: 20 },
-  styleLabel: { ...type.bodyStrong, color: colors.text },
-  styleState: { ...type.tiny },
+  filmDot: { width: 8, height: 8, borderRadius: 4 },
+  filmLabel: { ...type.bodyStrong, color: colors.text },
+  filmState: { ...type.caption, color: colors.textMuted },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  albumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    marginHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  albumIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  albumTitle: { ...type.bodyStrong, color: colors.text },
 
   selectBar: {
     position: 'absolute',
@@ -409,23 +461,21 @@ const styles = StyleSheet.create({
     bottom: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.sm,
-    paddingLeft: spacing.md,
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     ...shadow.raised,
   },
-  selectCancel: { ...type.label, color: colors.textMuted },
-  selectCount: { ...type.label, color: colors.text },
+  selectCount: { ...type.bodyStrong, color: colors.text },
+  selectAll: { ...type.label, color: colors.primary },
+  selectAction: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  selectActionText: { ...type.label, color: colors.primary },
 
-  sheetBack: {
-    flex: 1,
-    backgroundColor: colors.scrim,
-    justifyContent: 'flex-end',
-  },
+  sheetBack: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.xl,
@@ -434,7 +484,9 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   sheetTitle: { ...type.title, color: colors.text },
-  sheetBlurb: { ...type.caption, color: colors.textMuted },
+  // The gallery hint is inset to the screen gutter; inside a sheet that padding
+  // would double up on the sheet's own.
+  sheetHint: { ...type.caption, color: colors.textMuted },
   sheetInput: {
     ...type.body,
     color: colors.text,
@@ -445,4 +497,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     backgroundColor: colors.surfaceAlt,
   },
+  cta: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  ctaOff: { backgroundColor: colors.borderStrong },
+  ctaText: { ...type.bodyStrong, color: '#fff' },
 });

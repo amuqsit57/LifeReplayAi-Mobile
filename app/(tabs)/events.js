@@ -1,93 +1,171 @@
+import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
+import { api } from '../../src/lib/api';
 import { listEvents } from '../../src/lib/data';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
-import { Button, Empty } from '../../src/ui';
+import { Empty } from '../../src/ui';
+import { IconButton } from '../../src/ui/brand';
+import CreateEventSheet from '../../src/ui/CreateEventSheet';
+
+function EventCard({ event, onPress }) {
+  const count = event.memories?.[0]?.count ?? 0;
+
+  // A cover is worth one small request per card; without it every event looks
+  // the same and the list stops being scannable.
+  const cover = useQuery({
+    queryKey: ['cover', event.id],
+    queryFn: async () => {
+      const rows = await api.memories(event.id);
+      const first = rows.find((m) => m.thumbnail_url) ?? null;
+      return first?.thumbnail_url ?? null;
+    },
+    enabled: count > 0,
+    staleTime: 30 * 60 * 1000,
+  });
+
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}>
+      <View style={styles.coverWrap}>
+        {cover.data ? (
+          <Image source={{ uri: cover.data }} style={styles.cover} contentFit="cover" transition={140} />
+        ) : (
+          <View style={[styles.cover, styles.coverEmpty]}>
+            <Feather name="image" size={20} color={colors.textMuted} />
+          </View>
+        )}
+      </View>
+
+      <View style={styles.body}>
+        <Text style={styles.title} numberOfLines={1}>
+          {event.title}
+        </Text>
+
+        <View style={styles.metaRow}>
+          <Feather name="layers" size={12} color={colors.textMuted} />
+          <Text style={styles.meta}>
+            {count} {count === 1 ? 'item' : 'items'}
+          </Text>
+          {event.location ? (
+            <>
+              <Text style={styles.dot}>·</Text>
+              <Feather name="map-pin" size={12} color={colors.textMuted} />
+              <Text style={styles.meta} numberOfLines={1}>
+                {event.location}
+              </Text>
+            </>
+          ) : null}
+        </View>
+
+        {event.invite_code ? (
+          <View style={styles.code}>
+            <Feather name="hash" size={11} color={colors.primary} />
+            <Text style={styles.codeText}>{event.invite_code}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <Feather name="chevron-right" size={18} color={colors.textMuted} />
+    </Pressable>
+  );
+}
 
 export default function EventsScreen() {
   const router = useRouter();
+  const [creating, setCreating] = useState(false);
   const events = useQuery({ queryKey: ['events'], queryFn: listEvents });
   const list = events.data ?? [];
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={events.isFetching}
-          onRefresh={events.refetch}
-          tintColor={colors.primary}
-        />
-      }
-    >
-      <View style={styles.head}>
-        <Text style={styles.title}>Events</Text>
-        <Button label="Join with code" variant="ghost" onPress={() => router.push('/join')} />
-      </View>
-
-      {list.length === 0 && !events.isLoading ? (
-        <Empty
-          icon="▦"
-          title="No events yet"
-          body="Create one for a wedding, a trip, a birthday — then invite the people who were there."
-        />
-      ) : (
-        list.map((event) => {
-          const count = event.memories?.[0]?.count ?? 0;
-          return (
-            <Pressable
-              key={event.id}
-              style={styles.card}
-              onPress={() => router.push(`/event/${event.id}`)}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.eventTitle} numberOfLines={1}>
-                  {event.title}
-                </Text>
-                <Text style={styles.meta} numberOfLines={1}>
-                  {count} {count === 1 ? 'memory' : 'memories'}
-                  {event.event_date ? ` · ${new Date(event.event_date).toLocaleDateString()}` : ''}
-                  {event.location ? ` · ${event.location}` : ''}
-                </Text>
-              </View>
-              {event.invite_code ? (
-                <View style={styles.code}>
-                  <Text style={styles.codeText}>{event.invite_code}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-          );
-        })
-      )}
-    </ScrollView>
+    <>
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={list}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <EventCard event={item} onPress={() => router.push(`/event/${item.id}`)} />
+        )}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+        ListHeaderComponent={
+          <View style={styles.head}>
+            <View>
+              <Text style={styles.screenTitle}>Events</Text>
+              <Text style={styles.screenSub}>
+                {list.length} {list.length === 1 ? 'event' : 'events'} you can add to
+              </Text>
+            </View>
+            <IconButton name="plus" tone="filled" label="New event" onPress={() => setCreating(true)} />
+          </View>
+        }
+        ListEmptyComponent={
+          events.isLoading ? null : (
+            <Empty
+              icon="▦"
+              title="No events yet"
+              body="Create one for a wedding, a trip, a birthday — then share the code with everyone who was there."
+            />
+          )
+        }
+        initialNumToRender={6}
+        windowSize={7}
+        refreshControl={
+          <RefreshControl
+            refreshing={events.isFetching}
+            onRefresh={events.refetch}
+            tintColor={colors.primary}
+          />
+        }
+      />
+      <CreateEventSheet visible={creating} onClose={() => setCreating(false)} />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { ...type.display, color: colors.text },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
+  screenTitle: { ...type.display, color: colors.text },
+  screenSub: { ...type.caption, color: colors.textMuted, marginTop: 2 },
 
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     ...shadow.card,
   },
-  eventTitle: { ...type.heading, color: colors.text },
-  meta: { ...type.caption, color: colors.textMuted, marginTop: 2 },
+  coverWrap: { borderRadius: radius.md, overflow: 'hidden' },
+  cover: { width: 62, height: 62, backgroundColor: colors.mediaPlaceholder },
+  coverEmpty: { alignItems: 'center', justifyContent: 'center' },
+
+  body: { flex: 1, gap: 4 },
+  title: { ...type.heading, color: colors.text },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  meta: { ...type.caption, color: colors.textMuted, flexShrink: 1 },
+  dot: { ...type.caption, color: colors.borderStrong, marginHorizontal: 2 },
+
   code: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: radius.sm,
     backgroundColor: colors.primarySoft,
   },

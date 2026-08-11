@@ -1,45 +1,21 @@
+import { Feather } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../../src/store';
-import { colors, radius, type } from '../../src/theme';
+import { colors, type } from '../../src/theme';
 
 /**
- * Three destinations and one action.
- *
- * Feed first, because the films other people made are the reason to open the app
- * at all. Create sits in the middle as a raised button rather than a tab — it is
- * something you do, not somewhere you go, and putting it under the thumb is the
- * one piece of social-app grammar worth copying wholesale.
+ * Four places to be. Creating an event is not one of them — it lives as an icon
+ * button in each screen's header, where an action belongs, rather than pretending
+ * to be a destination.
  */
 const TABS = [
-  { name: 'feed', title: 'Feed', icon: '◉' },
-  { name: 'events', title: 'Events', icon: '▦' },
-  { name: 'create', title: 'Create', icon: '＋', action: true },
-  { name: 'albums', title: 'Albums', icon: '❏' },
-  { name: 'profile', title: 'You', icon: '☺' },
+  { name: 'feed', title: 'Feed', icon: 'film' },
+  { name: 'events', title: 'Events', icon: 'grid' },
+  { name: 'albums', title: 'Albums', icon: 'folder' },
+  { name: 'profile', title: 'You', icon: 'user' },
 ];
-
-function TabIcon({ icon, label, focused, action }) {
-  if (action) {
-    return (
-      <View style={styles.actionWrap}>
-        <View style={styles.action}>
-          <Text style={styles.actionIcon}>{icon}</Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.item}>
-      <Text style={[styles.icon, focused && styles.iconOn]}>{icon}</Text>
-      <Text style={[styles.label, focused && styles.labelOn]} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
 
 export default function TabsLayout() {
   const session = useAuth((s) => s.session);
@@ -53,7 +29,6 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: styles.bar,
-        tabBarItemStyle: { paddingTop: 8 },
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
@@ -64,11 +39,20 @@ export default function TabsLayout() {
           options={{
             title: tab.title,
             tabBarIcon: ({ focused }) => (
-              <TabIcon icon={tab.icon} label={tab.title} focused={focused} action={tab.action} />
+              <View style={styles.item}>
+                <Feather
+                  name={tab.icon}
+                  size={20}
+                  color={focused ? colors.primary : colors.textMuted}
+                />
+                <Text style={[styles.label, focused && styles.labelOn]}>{tab.title}</Text>
+              </View>
             ),
           }}
         />
       ))}
+      {/* Reachable by code but never shown as a tab. */}
+      <Tabs.Screen name="create" options={{ href: null }} />
     </Tabs>
   );
 }
@@ -78,26 +62,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopColor: colors.border,
     borderTopWidth: StyleSheet.hairlineWidth,
-    height: Platform.OS === 'ios' ? 86 : 68,
-    paddingBottom: Platform.OS === 'ios' ? 26 : 10,
+    height: Platform.OS === 'ios' ? 84 : 64,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 26 : 8,
   },
-  item: { alignItems: 'center', gap: 2, width: 68 },
-  icon: { fontSize: 19, color: colors.textMuted },
-  iconOn: { color: colors.primary },
+  item: { alignItems: 'center', gap: 3, width: 72 },
   label: { ...type.tiny, color: colors.textMuted },
   labelOn: { color: colors.primary },
-
-  // Lifted out of the bar so it reads as the primary action rather than a
-  // fourth place to be.
-  actionWrap: { width: 68, alignItems: 'center' },
-  action: {
-    width: 48,
-    height: 40,
-    marginTop: -10,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionIcon: { color: colors.textOnAccent, fontSize: 22, fontWeight: '700', marginTop: -2 },
 });
