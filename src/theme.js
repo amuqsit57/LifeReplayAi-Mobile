@@ -78,8 +78,28 @@ export const shadow = {
 
 /** Each replay style gets an identity so the picker reads at a glance. */
 export const STYLE_META = {
-  highlights: { emoji: '⚡', label: 'Highlights', tint: '#C2820B' },
-  celebration: { emoji: '🎉', label: 'Celebration', tint: '#F0562D' },
-  cinematic: { emoji: '🎬', label: 'Cinematic', tint: '#6B4EE6' },
-  family_story: { emoji: '❤️', label: 'Family Story', tint: '#1F9D5B' },
+  highlights: {
+    emoji: '⚡',
+    label: 'Highlights',
+    tint: '#C2820B',
+    blurb: 'Short and quick — the best bits only',
+  },
+  celebration: {
+    emoji: '🎉',
+    label: 'Celebration',
+    tint: '#F0562D',
+    blurb: 'Upbeat, for a party or a night out',
+  },
+  cinematic: {
+    emoji: '🎬',
+    label: 'Cinematic',
+    tint: '#6B4EE6',
+    blurb: 'Slow and unhurried, long holds',
+  },
+  family_story: {
+    emoji: '❤️',
+    label: 'Family Story',
+    tint: '#1F9D5B',
+    blurb: 'The whole day, nothing left out',
+  },
 };

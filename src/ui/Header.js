@@ -81,7 +81,9 @@ export function SearchBar({ value, onChangeText, placeholder, onClear }) {
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    // Enough that a title never sits flush against whatever follows it — on the
+    // replay screen the heading was touching the top of the video.
+    paddingBottom: spacing.lg,
     gap: spacing.md,
     backgroundColor: colors.background,
   },

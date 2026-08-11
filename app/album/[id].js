@@ -13,6 +13,7 @@ import {
 } from '../../src/lib/data';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Button, Empty } from '../../src/ui';
+import FilmCard from '../../src/ui/FilmCard';
 import { MediaTile } from '../../src/ui/social';
 import Viewer from '../../src/ui/Viewer';
 
@@ -41,7 +42,7 @@ export default function AlbumScreen() {
     enabled: Boolean(eventId),
     refetchInterval: (query) => {
       const rows = query.state.data ?? [];
-      return rows.some((r) => r.status === 'queued' || r.status === 'running') ? 5000 : false;
+      return rows.some((r) => r.status === 'queued' || r.status === 'running') ? 1800 : false;
     },
   });
 
@@ -149,25 +150,16 @@ export default function AlbumScreen() {
 
         <Text style={styles.section}>Films from this album</Text>
         <View style={styles.styleGrid}>
-          {Object.entries(STYLE_META).map(([style, meta]) => {
+          {Object.keys(STYLE_META).map((style) => {
             const existing = albumReplays.find((r) => r.style === style);
-            const busy = existing?.status === 'queued' || existing?.status === 'running';
             return (
-              <Pressable
+              <FilmCard
                 key={style}
-                style={[styles.styleCard, { borderColor: meta.tint + '55' }]}
-                onPress={() =>
-                  existing?.status === 'succeeded'
-                    ? router.push(`/replay/${existing.id}`)
-                    : generate.mutate(style)
-                }
-              >
-                <Text style={styles.styleEmoji}>{meta.emoji}</Text>
-                <Text style={styles.styleLabel}>{meta.label}</Text>
-                <Text style={[styles.styleState, { color: meta.tint }]}>
-                  {busy ? 'making…' : existing?.status === 'succeeded' ? 'watch' : 'generate'}
-                </Text>
-              </Pressable>
+                style={style}
+                replay={existing}
+                onGenerate={() => contents.length && generate.mutate(style)}
+                onOpen={() => router.push(`/replay/${existing.id}`)}
+              />
             );
           })}
         </View>

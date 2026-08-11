@@ -22,9 +22,10 @@ import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
 import { Segmented } from '../../src/ui/brand';
+import FilmCard from '../../src/ui/FilmCard';
 import { RoundButton } from '../../src/ui/Header';
 import InviteSheet from '../../src/ui/InviteSheet';
-import { AvatarRow, MediaTile } from '../../src/ui/social';
+import { Avatar, AvatarRow, MediaTile } from '../../src/ui/social';
 import Viewer from '../../src/ui/Viewer';
 
 // Only shown while something is still happening, or has gone wrong. A photo that
@@ -49,6 +50,7 @@ export default function EventScreen() {
   const [selected, setSelected] = useState([]);
   const [viewing, setViewing] = useState(null);
   const [inviting, setInviting] = useState(false);
+  const [showingPeople, setShowingPeople] = useState(false);
   const [albumSheet, setAlbumSheet] = useState(false);
   const [albumTitle, setAlbumTitle] = useState('');
 
@@ -68,9 +70,11 @@ export default function EventScreen() {
   const replays = useQuery({
     queryKey: ['replays', id],
     queryFn: () => api.eventReplays(id),
+    // Faster while something is rendering, so the progress bar actually moves
+    // rather than jumping in five-second steps.
     refetchInterval: (query) => {
       const rows = query.state.data ?? [];
-      return rows.some((r) => r.status === 'queued' || r.status === 'running') ? 5000 : false;
+      return rows.some((r) => r.status === 'queued' || r.status === 'running') ? 1800 : false;
     },
   });
 
@@ -174,13 +178,14 @@ export default function EventScreen() {
             <Text style={styles.title} numberOfLines={2}>
               {info?.title ?? 'Event'}
             </Text>
-            <View style={styles.heroMeta}>
+            <Pressable style={styles.heroMeta} onPress={() => setShowingPeople(true)}>
               <AvatarRow people={people.data ?? []} />
               <Text style={styles.metaText}>
                 {(people.data ?? []).length} {(people.data ?? []).length === 1 ? 'person' : 'people'}
                 {info?.location ? ` · ${info.location}` : ''}
               </Text>
-            </View>
+              <Feather name="chevron-right" size={14} color={colors.textMuted} />
+            </Pressable>
           </View>
         </View>
 
@@ -252,31 +257,31 @@ export default function EventScreen() {
         {/* ------------------------------------------------------------ films */}
         {tab === 'films' ? (
           <View style={styles.styleGrid}>
-            {Object.entries(STYLE_META).map(([style, meta]) => {
+            <View style={styles.explain}>
+              <Feather name="info" size={14} color={colors.textSoft} />
+              <Text style={styles.explainText}>
+                Films are not made automatically — pick a style and it cuts one from everything in
+                this event. You can make all four, and remake any of them later.
+              </Text>
+            </View>
+
+            {list.length === 0 ? (
+              <View style={styles.explainWarn}>
+                <Feather name="image" size={14} color={colors.warning} />
+                <Text style={styles.explainText}>Add some photos or videos first.</Text>
+              </View>
+            ) : null}
+
+            {Object.keys(STYLE_META).map((style) => {
               const existing = eventFilms.find((r) => r.style === style);
-              const busy = existing?.status === 'queued' || existing?.status === 'running';
-              const done = existing?.status === 'succeeded';
               return (
-                <Pressable
+                <FilmCard
                   key={style}
-                  style={styles.filmCard}
-                  onPress={() =>
-                    done ? router.push(`/replay/${existing.id}`) : generate.mutate(style)
-                  }
-                >
-                  <View style={[styles.filmDot, { backgroundColor: meta.tint }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.filmLabel}>{meta.label}</Text>
-                    <Text style={styles.filmState}>
-                      {busy ? 'making…' : done ? 'ready to watch' : 'not made yet'}
-                    </Text>
-                  </View>
-                  <Feather
-                    name={busy ? 'loader' : done ? 'play-circle' : 'zap'}
-                    size={19}
-                    color={done ? meta.tint : colors.textMuted}
-                  />
-                </Pressable>
+                  style={style}
+                  replay={existing}
+                  onGenerate={() => list.length && generate.mutate(style)}
+                  onOpen={() => router.push(`/replay/${existing.id}`)}
+                />
               );
             })}
           </View>
@@ -352,6 +357,54 @@ export default function EventScreen() {
       ) : null}
 
       <InviteSheet visible={inviting} onClose={() => setInviting(false)} event={info} />
+
+      <Modal
+        visible={showingPeople}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowingPeople(false)}
+      >
+        <Pressable style={styles.sheetBack} onPress={() => setShowingPeople(false)}>
+          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.sheetTitle}>In this event</Text>
+            <Text style={styles.sheetHint}>
+              Everyone here can add photos and make films. Counts are what each person contributed.
+            </Text>
+
+            <ScrollView style={{ maxHeight: 340 }}>
+              {(people.data ?? []).map((person) => {
+                const added = list.filter((m) => m.uploaded_by === person.user_id).length;
+                return (
+                  <View key={person.user_id} style={styles.person}>
+                    <Avatar url={person.avatar_url} name={person.full_name} size="md" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.personName}>{person.full_name ?? 'Someone'}</Text>
+                      <Text style={styles.sheetHint}>
+                        {added} {added === 1 ? 'item' : 'items'} added
+                      </Text>
+                    </View>
+                    {person.role === 'owner' ? (
+                      <View style={styles.ownerChip}>
+                        <Text style={styles.ownerChipText}>Owner</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </ScrollView>
+
+            <Pressable
+              style={styles.cta}
+              onPress={() => {
+                setShowingPeople(false);
+                setInviting(true);
+              }}
+            >
+              <Text style={styles.ctaText}>Invite someone</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Viewer
         memories={list}
@@ -447,20 +500,23 @@ const styles = StyleSheet.create({
   },
 
   styleGrid: { gap: spacing.sm, paddingHorizontal: spacing.lg },
-  filmCard: {
+  explain: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+    marginBottom: spacing.xs,
+  },
+  explainWarn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.lg,
+    gap: spacing.sm,
+    padding: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    ...shadow.card,
+    backgroundColor: colors.warningSoft,
   },
-  filmDot: { width: 8, height: 8, borderRadius: 4 },
-  filmLabel: { ...type.bodyStrong, color: colors.text },
-  filmState: { ...type.caption, color: colors.textMuted },
+  explainText: { ...type.caption, color: colors.textSoft, flex: 1 },
 
   albumRow: {
     flexDirection: 'row',
@@ -516,6 +572,15 @@ const styles = StyleSheet.create({
   // The gallery hint is inset to the screen gutter; inside a sheet that padding
   // would double up on the sheet's own.
   sheetHint: { ...type.caption, color: colors.textMuted },
+  person: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  personName: { ...type.bodyStrong, color: colors.text },
+  ownerChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primarySoft,
+  },
+  ownerChipText: { ...type.tiny, color: colors.primary },
   sheetInput: {
     ...type.body,
     color: colors.text,

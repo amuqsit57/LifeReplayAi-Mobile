@@ -153,8 +153,9 @@ function Fact({ icon, label }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   // No horizontal padding here: the player is full bleed, so the gutter is
-  // applied by the sections that want it rather than to everything.
-  content: { paddingTop: 0, gap: spacing.lg, paddingBottom: spacing.xxxl },
+  // applied by the sections that want it rather than to everything. The top
+  // space keeps the title off the picture — they were touching.
+  content: { paddingTop: spacing.sm, gap: spacing.xl, paddingBottom: spacing.xxxl },
   gutter: { paddingHorizontal: spacing.lg },
 
   eyebrow: { ...type.tiny, color: colors.primary, textTransform: 'uppercase' },
