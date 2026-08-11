@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../src/lib/api';
-import { createAlbum, eventPeople, getEvent, listAlbums } from '../../src/lib/data';
+import { createAlbum, eventPeople, getEvent, listAlbums, myProfile } from '../../src/lib/data';
 import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
@@ -27,6 +27,26 @@ import { RoundButton } from '../../src/ui/Header';
 import InviteSheet from '../../src/ui/InviteSheet';
 import { Avatar, AvatarRow, MediaTile } from '../../src/ui/social';
 import Viewer from '../../src/ui/Viewer';
+
+/**
+ * Ways to narrow a large gallery.
+ *
+ * "Best" uses the grade the analyser gave each memory rather than a score, since
+ * the grades are the thing that actually separates them — the numbers underneath
+ * were nearly all identical.
+ */
+const FILTERS = [
+  { value: 'all', label: 'All', icon: 'grid', match: () => true },
+  {
+    value: 'best',
+    label: 'Best',
+    icon: 'star',
+    match: (m) => ['essential', 'strong'].includes(m.significance),
+  },
+  { value: 'photo', label: 'Photos', icon: 'image', match: (m) => m.kind === 'photo' },
+  { value: 'video', label: 'Videos', icon: 'video', match: (m) => m.kind === 'video' },
+  { value: 'mine', label: 'Mine', icon: 'user', match: (m, meId) => m.uploaded_by === meId },
+];
 
 // Only shown while something is still happening, or has gone wrong. A photo that
 // is simply fine says nothing — "ready" under every tile was noise on a grid
@@ -46,6 +66,7 @@ export default function EventScreen() {
 
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState('gallery');
+  const [filter, setFilter] = useState('all');
   const [progress, setProgress] = useState(null);
   const [selected, setSelected] = useState([]);
   const [viewing, setViewing] = useState(null);
@@ -79,6 +100,13 @@ export default function EventScreen() {
   });
 
   const list = memories.data ?? [];
+  const me = useQuery({ queryKey: ['myProfile'], queryFn: myProfile });
+
+  const shown = useMemo(() => {
+    const option = FILTERS.find((f) => f.value === filter) ?? FILTERS[0];
+    return list.filter((memory) => option.match(memory, me.data?.id));
+  }, [list, filter, me.data?.id]);
+
   const albumList = albums.data ?? [];
   const eventFilms = (replays.data ?? []).filter((r) => !r.album_id);
   const selecting = selected.length > 0;
@@ -232,11 +260,49 @@ export default function EventScreen() {
             <Empty icon="📸" title="Nothing here yet" body="Add photos and videos — no need to sort them first." />
           ) : (
             <>
+              {/* Filters appear only once there is enough to warrant sorting
+                  through. Below that they are three controls over nine photos. */}
+              {list.length > 8 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.filterRow}
+                >
+                  {FILTERS.map((option) => {
+                    const active = filter === option.value;
+                    const count =
+                      option.value === 'all'
+                        ? list.length
+                        : list.filter(option.match).length;
+                    if (!count && option.value !== 'all') return null;
+                    return (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => setFilter(option.value)}
+                        style={[styles.filterChip, active && styles.filterChipOn]}
+                      >
+                        <Feather
+                          name={option.icon}
+                          size={12}
+                          color={active ? '#fff' : colors.textSoft}
+                        />
+                        <Text style={[styles.filterText, active && styles.filterTextOn]}>
+                          {option.label}
+                        </Text>
+                        <Text style={[styles.filterCount, active && styles.filterTextOn]}>
+                          {count}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              ) : null}
+
               <Text style={styles.hint}>
                 {selecting ? `${selected.length} selected` : 'Tap to open · hold to select'}
               </Text>
               <View style={styles.grid}>
-                {list.map((memory) => (
+                {shown.map((memory) => (
                   <MediaTile
                     key={memory.id}
                     uri={memory.thumbnail_url ?? memory.url}
@@ -490,6 +556,21 @@ const styles = StyleSheet.create({
   },
   addBarText: { ...type.bodyStrong, color: colors.text },
   addBarSub: { ...type.caption, color: colors.textMuted },
+
+  filterRow: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: 2 },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+  },
+  filterChipOn: { backgroundColor: colors.primary },
+  filterText: { ...type.label, color: colors.textSoft },
+  filterTextOn: { color: '#fff' },
+  filterCount: { ...type.tiny, color: colors.textMuted },
 
   hint: { ...type.caption, color: colors.textMuted, paddingHorizontal: spacing.lg },
   grid: {
