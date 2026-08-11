@@ -254,14 +254,13 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
   headActions: { flexDirection: 'row', gap: spacing.sm },
 
-  // Square corners, but still a card: inset from the edge, bordered all round,
-  // and lifted. A radius left visible gaps against the poster inside it; the
-  // shadow does the separating instead.
   post: {
     backgroundColor: colors.surface,
-    borderRadius: 0,
+    borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
+    // Clips the poster to the card's corners, so the rounding reads as one
+    // shape rather than a rounded frame around a square picture.
     overflow: 'hidden',
     ...shadow.card,
   },

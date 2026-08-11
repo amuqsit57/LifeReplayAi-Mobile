@@ -83,10 +83,9 @@ export function GridSkeleton({ count = 9 }) {
 const styles = StyleSheet.create({
   block: { backgroundColor: colors.surfaceSunk, borderRadius: radius.sm },
 
-  // Matches the real post exactly — square, bordered — so nothing shifts when
-  // the content replaces it.
+  // Matches the real post exactly, so nothing shifts when content replaces it.
   post: {
-    borderRadius: 0,
+    borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     overflow: 'hidden',
