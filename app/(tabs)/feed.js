@@ -220,9 +220,7 @@ export default function FeedScreen() {
         ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
         ListEmptyComponent={
           posts.isLoading ? (
-            <View style={{ padding: spacing.lg }}>
-              <FeedSkeleton count={2} />
-            </View>
+            <FeedSkeleton count={2} />
           ) : query ? (
             <Empty icon="🔍" title="Nothing matches" body={`No films for “${query}”.`} />
           ) : (
@@ -253,20 +251,19 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  // Posts run edge to edge now that they are square, so the gutter is off the
-  // list and on the header instead.
-  content: { paddingBottom: spacing.xxxl },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
   headActions: { flexDirection: 'row', gap: spacing.sm },
 
-  // Square. A radius on a full-width card leaves visible corner gaps against the
-  // poster inside it, and the poster is the thing worth looking at.
+  // Square corners, but still a card: inset from the edge, bordered all round,
+  // and lifted. A radius left visible gaps against the poster inside it; the
+  // shadow does the separating instead.
   post: {
     backgroundColor: colors.surface,
     borderRadius: 0,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     overflow: 'hidden',
+    ...shadow.card,
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
   author: { ...type.bodyStrong, color: colors.text },
