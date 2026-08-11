@@ -217,10 +217,12 @@ export default function FeedScreen() {
         data={list}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.xl }} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
         ListEmptyComponent={
           posts.isLoading ? (
-            <FeedSkeleton count={2} />
+            <View style={{ padding: spacing.lg }}>
+              <FeedSkeleton count={2} />
+            </View>
           ) : query ? (
             <Empty icon="🔍" title="Nothing matches" body={`No films for “${query}”.`} />
           ) : (
@@ -251,19 +253,20 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  // Posts run edge to edge now that they are square, so the gutter is off the
+  // list and on the header instead.
+  content: { paddingBottom: spacing.xxxl },
   headActions: { flexDirection: 'row', gap: spacing.sm },
 
-  // Square-ish rather than heavily rounded. A large radius on a full-width card
-  // leaves four visible corner gaps against the poster inside it, which is what
-  // made the posts look cut out rather than composed.
+  // Square. A radius on a full-width card leaves visible corner gaps against the
+  // poster inside it, and the poster is the thing worth looking at.
   post: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     overflow: 'hidden',
-    ...shadow.card,
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
   author: { ...type.bodyStrong, color: colors.text },

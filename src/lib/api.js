@@ -65,6 +65,14 @@ export const api = {
 
   memories: (eventId) => request(`/api/memories?event_id=${eventId}`),
 
+  // One thumbnail per event for a whole list, rather than a full memory listing
+  // per card.
+  eventCovers: (eventIds) =>
+    request('/api/memories/covers', {
+      method: 'POST',
+      body: JSON.stringify(eventIds),
+    }),
+
   // Takes a list: clearing out a bad batch means twenty at once, not twenty
   // round trips.
   deleteMemories: (memoryIds) =>

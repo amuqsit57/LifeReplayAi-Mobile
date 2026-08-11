@@ -71,20 +71,24 @@ export default function ProfileScreen() {
           />
         }
       >
+        {/* Centred rather than a row: a profile is about the person, and the
+            stats read as one block underneath instead of competing beside them. */}
         <View style={styles.identity}>
-          <Avatar url={me?.avatar_url} name={me?.full_name} size="lg" />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{me?.full_name ?? 'You'}</Text>
-            <Text style={styles.email} numberOfLines={1}>
-              {me?.email ?? ''}
-            </Text>
+          <View style={styles.avatarRing}>
+            <Avatar url={me?.avatar_url} name={me?.full_name} size="lg" />
           </View>
+          <Text style={styles.name}>{me?.full_name ?? 'You'}</Text>
+          <Text style={styles.email} numberOfLines={1}>
+            {me?.email ?? ''}
+          </Text>
         </View>
 
         <View style={styles.stats}>
-          <Stat value={mine.length} label="Films made" />
+          <Stat value={mine.length} label="Films" />
+          <View style={styles.statDivider} />
           <Stat value={(events.data ?? []).length} label="Events" />
-          <Stat value={liked} label="Likes received" />
+          <View style={styles.statDivider} />
+          <Stat value={liked} label="Likes" />
         </View>
 
         <View style={styles.switcher}>
@@ -193,19 +197,29 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingTop: 0, gap: spacing.lg, paddingBottom: spacing.xxxl },
 
-  identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  identity: { alignItems: 'center', gap: 2, paddingTop: spacing.sm },
+  avatarRing: {
+    padding: 4,
+    borderRadius: 44,
+    borderWidth: 2,
+    borderColor: colors.primarySoft,
+    marginBottom: spacing.sm,
+  },
   name: { ...type.title, color: colors.text },
   email: { ...type.caption, color: colors.textMuted },
 
-  stats: { flexDirection: 'row', gap: spacing.sm },
-  stat: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
+  // One block with hairline dividers rather than three separate tiles — the
+  // numbers belong together, and three cards read as three unrelated facts.
+  stats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    borderRadius: radius.lg,
     backgroundColor: colors.surfaceAlt,
   },
-  statValue: { ...type.title, color: colors.text },
+  stat: { flex: 1, alignItems: 'center', gap: 2 },
+  statDivider: { width: StyleSheet.hairlineWidth, height: 26, backgroundColor: colors.borderStrong },
+  statValue: { ...type.title, color: colors.text, fontVariant: ['tabular-nums'] },
   statLabel: { ...type.caption, color: colors.textMuted },
 
   switcher: {

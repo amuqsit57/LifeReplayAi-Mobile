@@ -10,6 +10,7 @@ import { supabase } from '../../src/lib/supabase';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import { ScreenHeader, SearchBar } from '../../src/ui/Header';
 import { RowSkeleton } from '../../src/ui/Skeleton';
+import SortSheet, { SORTS, applySort } from '../../src/ui/SortSheet';
 
 /** Every album you can reach, across every event. Row level security scopes it. */
 async function allAlbums() {
@@ -21,25 +22,20 @@ async function allAlbums() {
   return data ?? [];
 }
 
-function AlbumCard({ album, onPress }) {
+function AlbumCard({ album, cover, onPress }) {
   const count = album.album_memories?.[0]?.count ?? 0;
-
-  const cover = useQuery({
-    queryKey: ['albumCover', album.id],
-    queryFn: async () => {
-      if (!album.cover_memory_id || !album.event_id) return null;
-      const rows = await api.memories(album.event_id);
-      return rows.find((m) => m.id === album.cover_memory_id)?.thumbnail_url ?? null;
-    },
-    enabled: Boolean(album.cover_memory_id),
-    staleTime: 30 * 60 * 1000,
-  });
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}>
       <View style={styles.coverWrap}>
-        {cover.data ? (
-          <Image source={{ uri: cover.data }} style={styles.cover} contentFit="cover" transition={140} />
+        {cover ? (
+          <Image
+            source={{ uri: cover }}
+            style={styles.cover}
+            contentFit="cover"
+            transition={140}
+            recyclingKey={album.id}
+          />
         ) : (
           <View style={[styles.cover, styles.coverEmpty]}>
             <Feather name="folder" size={22} color={colors.primary} />
@@ -70,31 +66,53 @@ function AlbumCard({ album, onPress }) {
 export default function AlbumsScreen() {
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const [sorting, setSorting] = useState(false);
+  const [sort, setSort] = useState('recent');
+
   const albums = useQuery({ queryKey: ['allAlbums'], queryFn: allAlbums });
   const all = albums.data ?? [];
 
+  // Covers come from the album's own event, batched the same way the events
+  // list does it — one call rather than one per card.
+  const eventIds = useMemo(
+    () => [...new Set(all.map((a) => a.event_id).filter(Boolean))],
+    [all]
+  );
+  const covers = useQuery({
+    queryKey: ['eventCovers', eventIds.join(',')],
+    queryFn: () => api.eventCovers(eventIds),
+    enabled: eventIds.length > 0,
+    staleTime: 30 * 60 * 1000,
+  });
+
   const list = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return all;
-    return all.filter((album) =>
-      [album.title, album.events?.title]
-        .filter(Boolean)
-        .some((field) => field.toLowerCase().includes(needle))
-    );
-  }, [all, query]);
+    const filtered = needle
+      ? all.filter((album) =>
+          [album.title, album.events?.title]
+            .filter(Boolean)
+            .some((field) => field.toLowerCase().includes(needle))
+        )
+      : all;
+    return applySort(filtered, sort, 'albums');
+  }, [all, query, sort]);
+
+  const sortLabel = SORTS.albums.find((s) => s.value === sort)?.label ?? 'Newest first';
 
   return (
     <View style={styles.screen}>
-      <ScreenHeader
-        title="Albums"
-        subtitle={`${all.length} across your events`}
-      >
+      <ScreenHeader title="Albums" subtitle={`${all.length} across your events`}>
         <SearchBar
           value={query}
           onChangeText={setQuery}
           onClear={() => setQuery('')}
           placeholder="Search albums or events"
         />
+        <Pressable style={styles.sortBar} onPress={() => setSorting(true)}>
+          <Feather name="sliders" size={13} color={colors.textSoft} />
+          <Text style={styles.sortText}>{sortLabel}</Text>
+          <Feather name="chevron-down" size={13} color={colors.textMuted} />
+        </Pressable>
       </ScreenHeader>
 
       <FlatList
@@ -102,9 +120,17 @@ export default function AlbumsScreen() {
         data={list}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <AlbumCard album={item} onPress={() => router.push(`/album/${item.id}`)} />
+          <AlbumCard
+            album={item}
+            cover={covers.data?.[item.event_id]}
+            onPress={() => router.push(`/album/${item.id}`)}
+          />
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={5}
+        removeClippedSubviews
         ListEmptyComponent={
           albums.isLoading ? (
             <RowSkeleton count={4} />
@@ -129,6 +155,14 @@ export default function AlbumsScreen() {
           />
         }
       />
+
+      <SortSheet
+        visible={sorting}
+        onClose={() => setSorting(false)}
+        options={SORTS.albums}
+        value={sort}
+        onChange={setSort}
+      />
     </View>
   );
 }
@@ -136,6 +170,18 @@ export default function AlbumsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+
+  sortBar: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+  },
+  sortText: { ...type.caption, color: colors.textSoft },
 
   card: {
     flexDirection: 'row',

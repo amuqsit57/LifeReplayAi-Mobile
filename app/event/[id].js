@@ -218,41 +218,30 @@ export default function EventScreen() {
           </View>
         </View>
 
-        <View style={styles.gutter}>
+        {/* Add sits beside the tabs rather than above them as a full-width bar.
+            It is one action among the ways of looking at an event, not a banner
+            over the top of them. */}
+        <View style={[styles.gutter, styles.tabRow]}>
           <Pressable
-            style={({ pressed }) => [
-              styles.addBar,
-              progress && styles.addBarBusy,
-              pressed && { opacity: 0.9 },
-            ]}
             onPress={addMemories}
             disabled={Boolean(progress)}
+            accessibilityLabel="Add photos and videos"
+            style={({ pressed }) => [styles.addRound, pressed && { opacity: 0.85 }]}
           >
-            <View style={styles.addIcon}>
-              <Feather name={progress ? 'upload-cloud' : 'plus'} size={17} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.addBarText}>
-                {progress ? `Adding ${progress.index + 1} of ${progress.total}` : 'Add photos & videos'}
-              </Text>
-              <Text style={styles.addBarSub}>
-                {progress ? progress.phase : 'Everyone in this event can add theirs'}
-              </Text>
-            </View>
-            {!progress ? <Feather name="chevron-right" size={18} color={colors.textMuted} /> : null}
+            <Feather name={progress ? 'upload-cloud' : 'plus'} size={20} color="#fff" />
           </Pressable>
-        </View>
 
-        <View style={styles.gutter}>
-          <Segmented
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: 'gallery', label: 'Gallery', icon: 'image', count: list.length },
-              { value: 'films', label: 'Films', icon: 'film', count: eventFilms.length || null },
-              { value: 'albums', label: 'Albums', icon: 'folder', count: albumList.length || null },
-            ]}
-          />
+          <View style={{ flex: 1 }}>
+            <Segmented
+              value={tab}
+              onChange={setTab}
+              options={[
+                { value: 'gallery', label: 'Gallery', icon: 'image', count: list.length },
+                { value: 'films', label: 'Films', icon: 'film', count: eventFilms.length || null },
+                { value: 'albums', label: 'Albums', icon: 'folder', count: albumList.length || null },
+              ]}
+            />
+          </View>
         </View>
 
         {/* ---------------------------------------------------------- gallery */}
@@ -541,28 +530,16 @@ const styles = StyleSheet.create({
   // child — that repetition is how the padding drifted between them before.
   gutter: { paddingHorizontal: spacing.lg },
 
-  addBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.primary + '2E',
-    ...shadow.card,
-  },
-  addBarBusy: { borderColor: colors.border },
-  addIcon: {
-    width: 38,
-    height: 38,
+  tabRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  addRound: {
+    width: 44,
+    height: 44,
     borderRadius: radius.md,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadow.card,
   },
-  addBarText: { ...type.bodyStrong, color: colors.text },
-  addBarSub: { ...type.caption, color: colors.textMuted },
 
   filterRow: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: 2 },
   filterChip: {
