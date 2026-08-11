@@ -89,6 +89,7 @@ export function MediaTile({
   selected,
   dimmed,
   badge,
+  uploader,
   onPress,
   onLongPress,
   style,
@@ -124,6 +125,13 @@ export function MediaTile({
           <Text style={styles.badgeText} numberOfLines={1}>
             {badge}
           </Text>
+        </View>
+      ) : null}
+
+      {/* Whose photo this is. Hidden while selecting, where the tick owns the corner. */}
+      {uploader && !selected ? (
+        <View style={styles.uploader}>
+          <Avatar url={uploader.avatar_url} name={uploader.full_name} size="sm" />
         </View>
       ) : null}
 
@@ -194,6 +202,14 @@ const styles = StyleSheet.create({
   },
   badgeText: { ...type.tiny, color: '#fff' },
 
+  uploader: {
+    position: 'absolute',
+    right: 4,
+    top: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
   tick: {
     position: 'absolute',
     right: 5,

@@ -5,8 +5,10 @@ import { useRef } from 'react';
 import { ActivityIndicator, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { api } from '../../src/lib/api';
+import { myProfile } from '../../src/lib/data';
 import { STYLE_META, colors, radius, spacing, type } from '../../src/theme';
 import { Button, Card, Screen } from '../../src/ui';
+import Comments from '../../src/ui/Comments';
 
 export default function ReplayScreen() {
   const { id } = useLocalSearchParams();
@@ -22,6 +24,9 @@ export default function ReplayScreen() {
       return status === 'queued' || status === 'running' ? 4000 : false;
     },
   });
+
+  // Needed only so someone can long-press their own comment to remove it.
+  const me = useQuery({ queryKey: ['myProfile'], queryFn: myProfile });
 
   const data = replay.data;
   const meta = STYLE_META[data?.style] ?? {};
@@ -79,6 +84,10 @@ export default function ReplayScreen() {
           </Text>
         </Card>
       )}
+
+      {data?.status === 'succeeded' ? (
+        <Comments replayId={id} myId={me.data?.id} />
+      ) : null}
 
       {(plan.clips ?? []).length ? (
         <View>

@@ -67,7 +67,10 @@ export default function EventScreen() {
   const list = memories.data ?? [];
   const selecting = selected.length > 0;
   const selectedSet = useMemo(() => new Set(selected), [selected]);
-  const byId = useMemo(() => new Map(list.map((m) => [m.id, m])), [list]);
+  const peopleById = useMemo(
+    () => new Map((people.data ?? []).map((person) => [person.user_id, person])),
+    [people.data]
+  );
 
   const remove = useMutation({
     mutationFn: (ids) => api.deleteMemories(ids),
@@ -267,6 +270,9 @@ export default function EventScreen() {
                 kind={memory.kind}
                 selected={selectedSet.has(memory.id)}
                 badge={STATUS_LABEL[memory.status] ?? memory.status}
+                // Only worth showing once more than one person has contributed —
+                // in a solo event every face would be your own.
+                uploader={people.data?.length > 1 ? peopleById.get(memory.uploaded_by) : null}
                 style={{ width: '31.5%' }}
                 onPress={() => (selecting ? toggle(memory.id) : setViewing(memory.id))}
                 onLongPress={() => toggle(memory.id)}
