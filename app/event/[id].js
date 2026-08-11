@@ -1,28 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image } from 'expo-image';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { api } from '../../src/lib/api';
-import { getEvent } from '../../src/lib/data';
+import { createAlbum, eventPeople, getEvent, listAlbums } from '../../src/lib/data';
 import { pickMemories, uploadAll } from '../../src/lib/upload';
-import { STYLE_META, colors, radius, spacing, type } from '../../src/theme';
-import { Button, Card, Empty, Pill, Screen, SectionHeader } from '../../src/ui';
-
-const STATUS_TONE = {
-  uploading: 'warning',
-  uploaded: 'warning',
-  analyzing: 'primary',
-  ready: 'success',
-  failed: 'danger',
-};
+import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
+import { Button, Empty } from '../../src/ui';
+import { AvatarRow, MediaTile } from '../../src/ui/social';
+import Viewer from '../../src/ui/Viewer';
 
 const STATUS_LABEL = {
   uploading: 'uploading',
   uploaded: 'queued',
-  analyzing: 'understanding',
-  ready: 'ready',
+  analyzing: 'reading',
+  ready: null,
   failed: 'failed',
 };
 
@@ -30,18 +35,20 @@ export default function EventScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
+
   const [progress, setProgress] = useState(null);
-  // Which memories are picked for deletion. Empty means normal browsing; the grid
-  // only becomes a selection grid once something is held down.
   const [selected, setSelected] = useState([]);
+  const [viewing, setViewing] = useState(null);
+  const [albumSheet, setAlbumSheet] = useState(false);
+  const [albumTitle, setAlbumTitle] = useState('');
 
   const event = useQuery({ queryKey: ['event', id], queryFn: () => getEvent(id) });
+  const people = useQuery({ queryKey: ['people', id], queryFn: () => eventPeople(id) });
+  const albums = useQuery({ queryKey: ['albums', id], queryFn: () => listAlbums(id) });
 
   const memories = useQuery({
     queryKey: ['memories', id],
     queryFn: () => api.memories(id),
-    // While anything is still being analysed the list is stale almost immediately,
-    // so poll until everything settles rather than making the user pull to refresh.
     refetchInterval: (query) => {
       const rows = query.state.data ?? [];
       return rows.some((m) => m.status !== 'ready' && m.status !== 'failed') ? 4000 : false;
@@ -57,7 +64,12 @@ export default function EventScreen() {
     },
   });
 
-  const removeMemories = useMutation({
+  const list = memories.data ?? [];
+  const selecting = selected.length > 0;
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const byId = useMemo(() => new Map(list.map((m) => [m.id, m])), [list]);
+
+  const remove = useMutation({
     mutationFn: (ids) => api.deleteMemories(ids),
     onSuccess: () => {
       setSelected([]);
@@ -66,52 +78,23 @@ export default function EventScreen() {
     onError: (error) => Alert.alert('Could not delete', error.message),
   });
 
-  const summarise = useMutation({
-    mutationFn: () => api.summarise(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['event', id] }),
+  const makeAlbum = useMutation({
+    mutationFn: () => createAlbum({ eventId: id, title: albumTitle, memoryIds: selected }),
+    onSuccess: (album) => {
+      setAlbumSheet(false);
+      setAlbumTitle('');
+      setSelected([]);
+      queryClient.invalidateQueries({ queryKey: ['albums', id] });
+      router.push(`/album/${album.id}`);
+    },
+    onError: (error) => Alert.alert('Could not make the album', error.message),
   });
 
   const generate = useMutation({
     mutationFn: (style) => api.requestReplay(id, style),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['replays', id] }),
+    onError: (error) => Alert.alert('Could not start', error.message),
   });
-
-  async function addMemories() {
-    try {
-      const assets = await pickMemories();
-      if (!assets.length) return;
-
-      setProgress({ index: 0, total: assets.length, phase: 'starting' });
-      const results = await uploadAll(id, assets, setProgress);
-      setProgress(null);
-
-      // Each upload analyses itself as it lands. This only sweeps up anything
-      // whose background task died, so a memory never sits unanalysed forever.
-      api.analyseBatch(id).catch(() => {});
-
-      const failures = results.filter((r) => !r.ok);
-      if (failures.length) {
-        // The reason matters far more than the count — "5 failed" is impossible to
-        // act on, while the first actual error usually names the problem.
-        setProgress({
-          error: `${failures.length} of ${assets.length} failed.\n${failures[0].file ?? ''}: ${failures[0].error}`,
-        });
-        setTimeout(() => setProgress(null), 12000);
-      }
-      queryClient.invalidateQueries({ queryKey: ['memories', id] });
-    } catch (err) {
-      setProgress({ error: err.message });
-      setTimeout(() => setProgress(null), 4000);
-    }
-  }
-
-  const list = memories.data ?? [];
-  const ready = list.filter((m) => m.status === 'ready').length;
-  const processing = list.filter((m) => m.status !== 'ready' && m.status !== 'failed').length;
-
-  const selecting = selected.length > 0;
-  const selectedSet = useMemo(() => new Set(selected), [selected]);
-  const allSelected = list.length > 0 && selected.length === list.length;
 
   function toggle(memoryId) {
     setSelected((current) =>
@@ -121,272 +104,339 @@ export default function EventScreen() {
     );
   }
 
+  async function addMemories() {
+    const assets = await pickMemories();
+    if (!assets.length) return;
+
+    setProgress({ index: 0, total: assets.length, phase: 'preparing' });
+    const results = await uploadAll(id, assets, setProgress);
+    setProgress(null);
+
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length) {
+      Alert.alert(
+        `${failed.length} could not be added`,
+        failed.slice(0, 3).map((f) => `${f.file}: ${f.error}`).join('\n\n')
+      );
+    }
+    api.analyseBatch(id).catch(() => {});
+    queryClient.invalidateQueries({ queryKey: ['memories', id] });
+  }
+
   function confirmDelete() {
-    const count = selected.length;
     Alert.alert(
-      `Delete ${count} ${count === 1 ? 'memory' : 'memories'}?`,
-      'The photos and videos are removed for everyone in the family. This cannot be undone.',
+      `Delete ${selected.length}?`,
+      'They are removed for everyone in this event. This cannot be undone.',
       [
-        { text: 'Keep them', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => removeMemories.mutate(selected),
-        },
+        { text: 'Keep', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => remove.mutate(selected) },
       ]
     );
   }
 
+  const info = event.data;
+  const finished = (replays.data ?? []).filter((r) => r.status === 'succeeded');
+
   return (
-    <Screen
-      refreshControl={
-        <RefreshControl
-          refreshing={memories.isFetching}
-          onRefresh={() => {
-            memories.refetch();
-            replays.refetch();
-          }}
-          tintColor={colors.primary}
-        />
-      }
-      contentStyle={{ gap: spacing.xl }}
-    >
-      <View>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Text style={[type.label, { color: colors.primary }]}>‹ Back</Text>
-        </Pressable>
-        <Text style={[type.display, { color: colors.text, marginTop: spacing.sm }]}>
-          {event.data?.title ?? 'Event'}
-        </Text>
-        <Text style={[type.caption, { color: colors.textMuted, marginTop: 2 }]}>
-          {event.data?.event_date ?? 'No date'}
-          {event.data?.location ? ` · ${event.data.location}` : ''}
-        </Text>
-      </View>
-
-      <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
-        <Pill label={`${list.length} memories`} tone="primary" />
-        <Pill label={`${ready} understood`} tone="success" icon="✨" />
-        {processing ? <Pill label={`${processing} processing`} tone="warning" icon="⏳" /> : null}
-      </View>
-
-      <Button label="Add photos & videos" icon="＋" onPress={addMemories} />
-
-      {progress ? (
-        <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary }}>
-          <Text
-            selectable
-            style={[type.body, { color: progress.error ? colors.danger : colors.text }]}
-          >
-            {progress.error
-              ? progress.error
-              : `Uploading ${progress.index + 1} of ${progress.total} — ${progress.phase}…`}
-          </Text>
-        </Card>
-      ) : null}
-
-      {event.data?.summary ? (
-        <Card style={{ backgroundColor: colors.accentSoft, borderColor: colors.accent }}>
-          <Text style={[type.label, { color: colors.accent }]}>✨ WHAT AI SEES</Text>
-          <Text style={[type.body, { color: colors.text, marginTop: spacing.sm, lineHeight: 23 }]}>
-            {event.data.summary}
-          </Text>
-          {(event.data.key_moments ?? []).length ? (
-            <View style={{ gap: spacing.xs, marginTop: spacing.md }}>
-              {event.data.key_moments.map((moment, index) => (
-                <Text key={index} style={[type.caption, { color: colors.textMuted }]}>
-                  {index + 1}. {moment.title} ({moment.memory_ids?.length ?? 0})
-                </Text>
-              ))}
-            </View>
-          ) : null}
-        </Card>
-      ) : null}
-
-      {ready > 0 ? (
-        <View>
-          <SectionHeader
-            title="Make a Replay"
-            subtitle="AI picks the moments and cuts the film"
-            action={summarise.isPending ? 'Working…' : 'Analyse event'}
-            onAction={() => summarise.mutate()}
+    <>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={memories.isFetching}
+            onRefresh={() => {
+              memories.refetch();
+              replays.refetch();
+              albums.refetch();
+            }}
+            tintColor={colors.primary}
           />
+        }
+      >
+        <Pressable onPress={() => router.back()} hitSlop={10}>
+          <Text style={styles.back}>‹ Back</Text>
+        </Pressable>
 
-          <View style={styles.styleGrid}>
-            {Object.entries(STYLE_META).map(([style, meta]) => {
-              const existing = (replays.data ?? []).find((r) => r.style === style);
-              const busy =
-                existing?.status === 'queued' ||
-                existing?.status === 'running' ||
-                (generate.isPending && generate.variables === style);
+        <Text style={styles.title}>{info?.title ?? 'Event'}</Text>
+        <View style={styles.metaRow}>
+          <AvatarRow people={people.data ?? []} />
+          <Text style={styles.meta}>
+            {(people.data ?? []).length} {(people.data ?? []).length === 1 ? 'person' : 'people'} ·{' '}
+            {list.length} {list.length === 1 ? 'item' : 'items'}
+          </Text>
+        </View>
 
-              return (
-                <Pressable
-                  key={style}
-                  onPress={() =>
-                    existing?.status === 'succeeded'
-                      ? router.push(`/replay/${existing.id}`)
-                      : generate.mutate(style)
-                  }
-                  disabled={busy}
-                  style={({ pressed }) => [
-                    styles.styleCard,
-                    { borderColor: existing?.status === 'succeeded' ? meta.tint : colors.border },
-                    pressed && { opacity: 0.85 },
-                    busy && { opacity: 0.6 },
-                  ]}
-                >
-                  <Text style={{ fontSize: 26 }}>{meta.emoji}</Text>
-                  <Text style={[type.bodyStrong, { color: colors.text }]}>{meta.label}</Text>
-                  <Text style={[type.caption, { color: colors.textMuted }]}>
-                    {busy
-                      ? 'Rendering…'
-                      : existing?.status === 'succeeded'
-                        ? `Watch · ${Math.round(existing.duration_seconds ?? 0)}s`
-                        : existing?.status === 'failed'
-                          ? 'Failed — tap to retry'
-                          : 'Generate'}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+        {info?.invite_code ? (
+          <Pressable
+            style={styles.invite}
+            onPress={() => {
+              Clipboard.setStringAsync(info.invite_code);
+              Share.share({
+                message: `Join "${info.title}" on Life Replay with code ${info.invite_code}`,
+              });
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.inviteLabel}>Invite code</Text>
+              <Text style={styles.inviteCode}>{info.invite_code}</Text>
+            </View>
+            <Text style={styles.inviteAction}>Share ↗</Text>
+          </Pressable>
+        ) : null}
 
-          {generate.isError ? (
-            <Text style={[type.caption, { color: colors.danger, marginTop: spacing.sm }]}>
-              {generate.error.message}
-            </Text>
+        <View style={styles.rowButtons}>
+          <Button
+            label={progress ? `Adding ${progress.index + 1}/${progress.total}…` : 'Add photos & videos'}
+            onPress={addMemories}
+            disabled={Boolean(progress)}
+          />
+        </View>
+
+        {/* ---------------------------------------------------------- albums */}
+        <View style={styles.sectionHead}>
+          <Text style={styles.section}>Albums</Text>
+          <Text style={styles.hint}>Select items below to make one</Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.albumRow}>
+          {(albums.data ?? []).map((album) => (
+            <Pressable
+              key={album.id}
+              style={styles.albumCard}
+              onPress={() => router.push(`/album/${album.id}`)}
+            >
+              <Text style={styles.albumTitle} numberOfLines={2}>
+                {album.title}
+              </Text>
+              <Text style={styles.albumCount}>
+                {album.album_memories?.[0]?.count ?? 0} items
+              </Text>
+            </Pressable>
+          ))}
+          {(albums.data ?? []).length === 0 ? (
+            <Text style={styles.hint}>No albums yet.</Text>
           ) : null}
+        </ScrollView>
+
+        {/* ---------------------------------------------------------- films */}
+        <Text style={styles.section}>Films</Text>
+        <View style={styles.styleGrid}>
+          {Object.entries(STYLE_META).map(([style, meta]) => {
+            const existing = (replays.data ?? []).find((r) => r.style === style && !r.album_id);
+            const busy = existing?.status === 'queued' || existing?.status === 'running';
+            return (
+              <Pressable
+                key={style}
+                style={[styles.styleCard, { borderColor: meta.tint + '55' }]}
+                onPress={() =>
+                  existing?.status === 'succeeded'
+                    ? router.push(`/replay/${existing.id}`)
+                    : generate.mutate(style)
+                }
+              >
+                <Text style={styles.styleEmoji}>{meta.emoji}</Text>
+                <Text style={styles.styleLabel}>{meta.label}</Text>
+                <Text style={[styles.styleState, { color: meta.tint }]}>
+                  {busy ? 'making…' : existing?.status === 'succeeded' ? 'watch' : 'generate'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* ---------------------------------------------------------- gallery */}
+        <View style={styles.sectionHead}>
+          <Text style={styles.section}>Everything added</Text>
+          {selecting ? (
+            <Pressable onPress={() => setSelected(list.map((m) => m.id))}>
+              <Text style={styles.hintAction}>Select all</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.hint}>Hold to select</Text>
+          )}
+        </View>
+
+        {list.length === 0 && !memories.isLoading ? (
+          <Empty icon="📸" title="Nothing here yet" body="Add photos and videos — no need to sort them first." />
+        ) : (
+          <View style={styles.grid}>
+            {list.map((memory) => (
+              <MediaTile
+                key={memory.id}
+                uri={memory.thumbnail_url ?? memory.url}
+                kind={memory.kind}
+                selected={selectedSet.has(memory.id)}
+                badge={STATUS_LABEL[memory.status] ?? memory.status}
+                style={{ width: '31.5%' }}
+                onPress={() => (selecting ? toggle(memory.id) : setViewing(memory.id))}
+                onLongPress={() => toggle(memory.id)}
+              />
+            ))}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Selection bar, over the content so the grid does not jump when it appears. */}
+      {selecting ? (
+        <View style={styles.selectBar}>
+          <Pressable onPress={() => setSelected([])} hitSlop={8}>
+            <Text style={styles.selectCancel}>Cancel</Text>
+          </Pressable>
+          <Text style={styles.selectCount}>{selected.length} selected</Text>
+          <View style={{ flex: 1 }} />
+          <Button label="Make album" variant="secondary" onPress={() => setAlbumSheet(true)} />
+          <Button
+            label={remove.isPending ? '…' : 'Delete'}
+            variant="danger"
+            onPress={confirmDelete}
+            disabled={remove.isPending}
+          />
         </View>
       ) : null}
 
-      <View>
-        <SectionHeader
-          title="Memories"
-          subtitle={
-            selecting
-              ? `${selected.length} selected`
-              : 'Everything the family added — hold one to select'
-          }
-        />
+      <Viewer
+        memories={list}
+        startId={viewing}
+        visible={Boolean(viewing)}
+        onClose={() => setViewing(null)}
+        onDelete={(memoryId) => {
+          setViewing(null);
+          remove.mutate([memoryId]);
+        }}
+      />
 
-        {selecting ? (
-          <View style={styles.selectBar}>
-            <Button
-              label={allSelected ? 'Select none' : 'Select all'}
-              variant="ghost"
-              onPress={() => setSelected(allSelected ? [] : list.map((m) => m.id))}
+      <Modal visible={albumSheet} transparent animationType="fade" onRequestClose={() => setAlbumSheet(false)}>
+        <Pressable style={styles.sheetBack} onPress={() => setAlbumSheet(false)}>
+          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.sheetTitle}>Name the album</Text>
+            <Text style={styles.sheetBlurb}>
+              {selected.length} {selected.length === 1 ? 'item' : 'items'} will go in it. You can
+              generate a separate film from an album.
+            </Text>
+            <TextInput
+              value={albumTitle}
+              onChangeText={setAlbumTitle}
+              placeholder="The ceremony"
+              placeholderTextColor={colors.textMuted}
+              style={styles.sheetInput}
+              autoFocus
             />
-            <Button label="Cancel" variant="ghost" onPress={() => setSelected([])} />
-            <Button
-              label={removeMemories.isPending ? 'Deleting…' : `Delete ${selected.length}`}
-              variant="danger"
-              disabled={removeMemories.isPending}
-              onPress={confirmDelete}
-            />
-          </View>
-        ) : null}
-
-        {list.length === 0 && !memories.isLoading ? (
-          <Empty
-            icon="📸"
-            title="Nothing here yet"
-            body="Add photos and videos — no need to sort them first."
-          />
-        ) : (
-          <View style={styles.grid}>
-            {list.map((memory) => {
-              const picked = selectedSet.has(memory.id);
-              // Never the original: those run to megabytes each and a screenful
-              // of them stalls long enough to look like nothing loaded at all.
-              const preview = memory.thumbnail_url ?? memory.url;
-
-              return (
-                <Pressable
-                  key={memory.id}
-                  style={styles.tile}
-                  onLongPress={() => toggle(memory.id)}
-                  onPress={() => (selecting ? toggle(memory.id) : null)}
-                >
-                  {preview ? (
-                    <Image
-                      source={{ uri: preview }}
-                      style={[styles.thumb, picked && styles.thumbPicked]}
-                      contentFit="cover"
-                      transition={120}
-                    />
-                  ) : (
-                    <View style={[styles.thumb, styles.thumbFallback]}>
-                      <Text style={{ fontSize: 26 }}>
-                        {memory.kind === 'video' ? '🎥' : memory.kind === 'voice' ? '🎙️' : '🖼️'}
-                      </Text>
-                    </View>
-                  )}
-
-                  {memory.kind === 'video' ? (
-                    <Text style={styles.videoMark}>🎥</Text>
-                  ) : null}
-                  {picked ? <Text style={styles.tick}>✓</Text> : null}
-
-                  <View style={styles.tileFoot}>
-                    <Pill
-                      label={STATUS_LABEL[memory.status] ?? memory.status}
-                      tone={STATUS_TONE[memory.status] ?? 'neutral'}
-                    />
-                  </View>
-                  {memory.tags?.length ? (
-                    <Text numberOfLines={1} style={styles.tags}>
-                      {memory.tags.slice(0, 3).join(' · ')}
-                    </Text>
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-      </View>
-    </Screen>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <Button label="Cancel" variant="ghost" onPress={() => setAlbumSheet(false)} />
+              <View style={{ flex: 1 }}>
+                <Button
+                  label={makeAlbum.isPending ? 'Making…' : 'Make album'}
+                  onPress={() => makeAlbum.mutate()}
+                  disabled={!albumTitle.trim() || makeAlbum.isPending}
+                />
+              </View>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  styleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  screen: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 120 },
+  back: { ...type.label, color: colors.primary },
+  title: { ...type.display, color: colors.text },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  meta: { ...type.caption, color: colors.textMuted },
+
+  invite: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+  },
+  inviteLabel: { ...type.tiny, color: colors.textSoft },
+  inviteCode: { ...type.title, color: colors.primary, letterSpacing: 2 },
+  inviteAction: { ...type.label, color: colors.primary },
+
+  rowButtons: { gap: spacing.sm },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+  },
+  section: { ...type.heading, color: colors.text },
+  hint: { ...type.caption, color: colors.textMuted },
+  hintAction: { ...type.caption, color: colors.primary },
+
+  albumRow: { gap: spacing.sm, paddingVertical: spacing.xs },
+  albumCard: {
+    width: 132,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+    gap: 4,
+  },
+  albumTitle: { ...type.bodyStrong, color: colors.text },
+  albumCount: { ...type.caption, color: colors.textMuted },
+
+  styleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   styleCard: {
     flexGrow: 1,
     flexBasis: '45%',
-    gap: 4,
-    padding: spacing.lg,
+    padding: spacing.md,
     borderRadius: radius.md,
     borderWidth: 1.5,
     backgroundColor: colors.surface,
+    gap: 2,
+    ...shadow.card,
   },
+  styleEmoji: { fontSize: 20 },
+  styleLabel: { ...type.bodyStrong, color: colors.text },
+  styleState: { ...type.tiny },
+
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  tile: { width: '31.5%', gap: 4 },
-  thumb: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceAlt,
-  },
-  thumbPicked: { opacity: 0.55, borderWidth: 3, borderColor: colors.primary },
-  thumbFallback: { alignItems: 'center', justifyContent: 'center' },
-  tileFoot: { alignItems: 'flex-start' },
-  tags: { ...type.caption, color: colors.textMuted },
-  // Sits over the top-left of the tile so a clip is identifiable at a glance.
-  videoMark: { position: 'absolute', top: 6, left: 6, fontSize: 14 },
-  tick: {
-    position: 'absolute',
-    top: 4,
-    right: 6,
-    fontSize: 20,
-    color: colors.primary,
-    fontWeight: '800',
-  },
+
   selectBar: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.lg,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
+    padding: spacing.sm,
+    paddingLeft: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    ...shadow.raised,
+  },
+  selectCancel: { ...type.label, color: colors.textMuted },
+  selectCount: { ...type.label, color: colors.text },
+
+  sheetBack: {
+    flex: 1,
+    backgroundColor: colors.scrim,
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  sheetTitle: { ...type.title, color: colors.text },
+  sheetBlurb: { ...type.caption, color: colors.textMuted },
+  sheetInput: {
+    ...type.body,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surfaceAlt,
   },
 });

@@ -1,54 +1,85 @@
 /**
- * A dark, cinema-leaning palette: the app is mostly photographs and video, and
- * dark surfaces let the media carry the colour instead of competing with it.
+ * A light palette built for a feed.
+ *
+ * The old scheme was dark and cinema-leaning, which suits a player and fights a
+ * social app: on a white ground the photographs are the only saturated thing on
+ * screen, which is what makes a feed feel like other people's lives rather than
+ * like a piece of software.
+ *
+ * The neutrals carry a slight violet bias rather than being pure grey, so the
+ * chrome relates to the accent instead of sitting beside it.
  */
 export const colors = {
-  background: '#131019',
-  surface: '#1C1826',
-  surfaceAlt: '#262032',
-  border: '#332B42',
+  background: '#FFFFFF',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F4F3F8',
+  surfaceSunk: '#ECEAF3',
+  border: '#E4E1EC',
+  borderStrong: '#CFC9DD',
 
-  text: '#F3EFF8',
-  textMuted: '#9C93AD',
-  textOnAccent: '#1A1020',
+  text: '#16121F',
+  textSoft: '#4A4358',
+  textMuted: '#8B8399',
+  textOnAccent: '#FFFFFF',
 
-  accent: '#C9A227',
-  accentSoft: '#3A2F14',
-  primary: '#8B6FE8',
-  primarySoft: '#2A2340',
+  // One saturated brand colour, used sparingly: primary actions, the active tab,
+  // a liked heart. Everything else is neutral so it keeps its meaning.
+  primary: '#6B4EE6',
+  primarySoft: '#EFEBFF',
+  primaryPress: '#5A3FD0',
 
-  success: '#4FB477',
-  warning: '#D9A441',
-  danger: '#E0605E',
+  accent: '#F0562D',
+  accentSoft: '#FFEDE7',
+
+  success: '#1F9D5B',
+  successSoft: '#E4F6EC',
+  warning: '#C2820B',
+  warningSoft: '#FCF2DC',
+  danger: '#DC2F3E',
+  dangerSoft: '#FDE9EB',
+
+  // Media sits on this while it loads, so a grid never flashes white.
+  mediaPlaceholder: '#E7E4EF',
+  scrim: 'rgba(16, 12, 26, 0.55)',
 };
 
 export const type = {
-  display: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.5 },
-  title: { fontSize: 22, lineHeight: 28, fontWeight: '700' },
-  heading: { fontSize: 18, lineHeight: 24, fontWeight: '700' },
+  display: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6 },
+  title: { fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.3 },
+  heading: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.2 },
   body: { fontSize: 15, lineHeight: 22, fontWeight: '500' },
   bodyStrong: { fontSize: 15, lineHeight: 22, fontWeight: '700' },
   label: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  tiny: { fontSize: 11, lineHeight: 14, fontWeight: '600', letterSpacing: 0.3 },
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 };
-export const radius = { sm: 10, md: 16, lg: 22, pill: 999 };
+export const radius = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 };
 
 export const shadow = {
+  // Light UI needs shadow to be almost invisible; anything heavier reads as a
+  // dark theme with the colours swapped.
   card: {
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    shadowColor: '#221A38',
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  raised: {
+    shadowColor: '#221A38',
+    shadowOpacity: 0.13,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
 };
 
 /** Each replay style gets an identity so the picker reads at a glance. */
 export const STYLE_META = {
-  highlights: { emoji: '⚡', label: 'Highlights', tint: '#D9A441' },
-  celebration: { emoji: '🎉', label: 'Celebration', tint: '#E0605E' },
-  cinematic: { emoji: '🎬', label: 'Cinematic', tint: '#8B6FE8' },
-  family_story: { emoji: '❤️', label: 'Family Story', tint: '#4FB477' },
+  highlights: { emoji: '⚡', label: 'Highlights', tint: '#C2820B' },
+  celebration: { emoji: '🎉', label: 'Celebration', tint: '#F0562D' },
+  cinematic: { emoji: '🎬', label: 'Cinematic', tint: '#6B4EE6' },
+  family_story: { emoji: '❤️', label: 'Family Story', tint: '#1F9D5B' },
 };

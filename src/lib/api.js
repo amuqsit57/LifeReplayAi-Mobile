@@ -81,10 +81,10 @@ export const api = {
   summarise: (eventId) =>
     request(`/api/events/${eventId}/summarise`, { method: 'POST', timeoutMs: 120_000 }),
 
-  requestReplay: (eventId, style) =>
+  requestReplay: (eventId, style, albumId = null) =>
     request('/api/replays', {
       method: 'POST',
-      body: JSON.stringify({ event_id: eventId, style }),
+      body: JSON.stringify({ event_id: eventId, style, album_id: albumId }),
     }),
 
   replay: (replayId) => request(`/api/replays/${replayId}`),
