@@ -18,6 +18,7 @@ import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/the
 import Comments from '../../src/ui/Comments';
 import FilmCard from '../../src/ui/FilmCard';
 import { RoundButton, ScreenHeader } from '../../src/ui/Header';
+import { Shimmer } from '../../src/ui/Skeleton';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -100,12 +101,18 @@ export default function ReplayScreen() {
               </Text>
             </View>
           </View>
+        ) : !data ? (
+          // Nothing known yet. Falling through to the card below would have shown
+          // its idle state — a "Make Highlights" offer — for the half second
+          // before the finished film arrived, which is what was flashing up when
+          // you opened a video from the feed.
+          <Shimmer style={styles.playerSkeleton} />
         ) : (
           // The same card the event page uses, so a film being made looks the
           // same wherever you meet it — with the real stage and progress rather
           // than the word "Queued" and a spinner.
           <View style={styles.gutter}>
-            <FilmCard style={data?.style ?? 'highlights'} replay={data} onGenerate={() => {}} />
+            <FilmCard style={data.style} replay={data} onGenerate={() => {}} />
             <Text style={styles.leaveHint}>
               You can leave this screen — it keeps going, and lands in the feed when it is done.
             </Text>
@@ -165,6 +172,12 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: Math.round((SCREEN_WIDTH * 16) / 9),
     backgroundColor: '#000',
+  },
+  // The same footprint as the player, so nothing shifts when the film arrives.
+  playerSkeleton: {
+    width: SCREEN_WIDTH,
+    height: Math.round((SCREEN_WIDTH * 16) / 9),
+    borderRadius: 0,
   },
 
   card: {
