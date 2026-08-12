@@ -2,10 +2,12 @@ import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { VideoView } from 'expo-video';
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { GRADE_FILTER } from '../../lib/plan';
 import { colors, spacing, type } from '../../theme';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 /**
  * How each transition reads as a movement of the incoming shot.
@@ -82,6 +84,7 @@ export default function Stage({
   total,
   playing,
   player,
+  videoStatus,
   entrance,
   height,
   onTogglePlay,
@@ -173,24 +176,26 @@ export default function Stage({
   return (
     <View style={[styles.stage, { height }]}>
       {isVideo ? (
-        // Bare. No filter, no transform, no animated parent, no rounding.
+        // Concrete width and height, no absolute positioning, no filter, no
+        // transform, no animated parent, no clipping above it.
         //
-        // The video surface does not survive being wrapped: stacking styles over
-        // this player is what blacked the picture out before, and a colour filter
-        // on a parent of it does the same thing. So a video shot plays clean and
-        // ungraded, and the bar below says as much. Wrong colours would be a
-        // worse lie than no colours.
+        // This is the shape the replay screen uses, and that one has always
+        // worked. An absolutely-filled player inside a parent that clips is what
+        // blacked the picture out here — the same combination that blacked it out
+        // once before. A video shot therefore plays clean and ungraded, and the
+        // bar below says as much: wrong colours would be a worse lie than none.
         //
-        // nativeControls off because the stage has its own transport — leaving it
+        // nativeControls off because the stage has its own transport; leaving it
         // on put a second play button on top of the first.
         <VideoView
           player={player}
-          style={styles.fill}
+          style={{ width: SCREEN_WIDTH, height }}
           contentFit="contain"
           nativeControls={false}
         />
       ) : (
-        <Animated.View style={[styles.fill, entering]}>
+        // Stills get the full treatment, and the clipping the camera move needs.
+        <Animated.View style={[styles.fill, styles.clip, entering]}>
           <Animated.View
             style={[
               styles.fill,
@@ -256,11 +261,15 @@ export default function Stage({
             Shot {index + 1} of {total} · {Number(clip.seconds).toFixed(1)}s
           </Text>
           <Text style={styles.barNote} numberOfLines={1}>
-            {isVideo
-              ? 'Video plays ungraded here — the grade is applied when you render'
-              : clip.texture && clip.texture !== 'none'
-                ? 'Grain and bloom only appear in the render'
-                : 'Preview — the render is sharper than this'}
+            {isVideo && videoStatus === 'error'
+              ? 'This clip would not load — it will still be cut into the render'
+              : isVideo && videoStatus === 'loading'
+                ? 'Loading this clip…'
+                : isVideo
+                  ? 'Video plays ungraded here — the grade is applied when you render'
+                  : clip.texture && clip.texture !== 'none'
+                    ? 'Grain and bloom only appear in the render'
+                    : 'Preview — the render is sharper than this'}
           </Text>
         </View>
       ) : null}
@@ -271,8 +280,12 @@ export default function Stage({
 const styles = StyleSheet.create({
   // Dark behind the picture: it is the one place in the app showing a frame
   // rather than a page, and a white surround changes how a grade reads.
-  stage: { backgroundColor: '#0B0812', justifyContent: 'center', overflow: 'hidden' },
+  // No `overflow: hidden` here. The camera move needs clipping, but putting it
+  // on the parent of the video surface is half of what blacked the picture out,
+  // so it lives on the stills wrapper instead.
+  stage: { backgroundColor: '#0B0812', justifyContent: 'center', alignItems: 'center' },
   fill: { ...StyleSheet.absoluteFillObject },
+  clip: { overflow: 'hidden' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   emptyText: { ...type.caption, color: colors.textMuted },
 

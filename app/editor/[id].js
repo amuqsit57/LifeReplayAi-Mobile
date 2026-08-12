@@ -132,8 +132,14 @@ export default function EditorScreen() {
   const live = useRef({});
   live.current = { clips, byId, selected, playing };
 
-  // Seek and play, once it is actually ready to do either.
+  // Seek and play, once it is actually ready to do either. The status is also
+  // kept so the stage can say "loading" or "would not load" — without it a clip
+  // that fails to decode looks exactly like one that is simply paused, which is
+  // how this went unexplained for as long as it did.
+  const [videoStatus, setVideoStatus] = useState('idle');
+
   useEventListener(player, 'statusChange', ({ status }) => {
+    setVideoStatus(status);
     if (status !== 'readyToPlay') return;
     const { clips: reel, selected: at, playing: running } = live.current;
     const current = reel[at];
@@ -382,6 +388,7 @@ export default function EditorScreen() {
         total={clips.length}
         playing={playing}
         player={player}
+        videoStatus={videoStatus}
         entrance={entrance}
         height={Math.max(190, STAGE_HEIGHT)}
         onTogglePlay={() => setPlaying((on) => !on)}
