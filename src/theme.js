@@ -11,41 +11,37 @@
 export const colors = {
   background: '#FFFFFF',
   surface: '#FFFFFF',
-  surfaceAlt: '#F5F6F8',
-  surfaceSunk: '#ECEEF2',
-  border: '#E4E7EC',
-  borderStrong: '#C6CBD4',
+  surfaceAlt: '#F4F3F8',
+  surfaceSunk: '#ECEAF3',
+  border: '#E4E1EC',
+  borderStrong: '#CFC9DD',
 
-  // Near-black rather than pure, so long text is not harsh, with a trace of blue
-  // to sit with the neutral ramp.
-  text: '#0C0E14',
-  textSoft: '#474D59',
-  textMuted: '#858B98',
+  text: '#16121F',
+  textSoft: '#4A4358',
+  textMuted: '#8B8399',
   textOnAccent: '#FFFFFF',
 
-  // One accent. Indigo carries authority without being the corporate blue every
-  // utility app defaults to.
-  primary: '#4F46E5',
-  primarySoft: '#EEEDFD',
-  primaryPress: '#4038C7',
+  // One saturated brand colour, used sparingly: primary actions, the active tab,
+  // a liked heart. Everything else is neutral so it keeps its meaning.
+  primary: '#6B4EE6',
+  primarySoft: '#EFEBFF',
+  primaryPress: '#5A3FD0',
 
-  // Reserved for emphasis inside content — counts, an active heart — never for
-  // navigation, so it keeps its weight.
-  accent: '#E0453C',
-  accentSoft: '#FDECEB',
+  accent: '#F0562D',
+  accentSoft: '#FFEDE7',
 
-  success: '#0F8B54',
-  successSoft: '#E4F5ED',
-  warning: '#B25E09',
-  warningSoft: '#FDF1E3',
-  danger: '#D02F3A',
-  dangerSoft: '#FDEBEC',
+  success: '#1F9D5B',
+  successSoft: '#E4F6EC',
+  warning: '#C2820B',
+  warningSoft: '#FCF2DC',
+  danger: '#DC2F3E',
+  dangerSoft: '#FDE9EB',
 
-  mediaPlaceholder: '#EDEFF3',
-  scrim: 'rgba(12, 14, 20, 0.6)',
-  // Over the foot of a poster, so white text holds on any picture.
-  posterScrim: ['rgba(8,10,14,0)', 'rgba(8,10,14,0.5)', 'rgba(8,10,14,0.9)'],
-  heroScrim: ['rgba(8,10,14,0.1)', 'rgba(8,10,14,0.55)', 'rgba(8,10,14,0.88)'],
+  mediaPlaceholder: '#E7E4EF',
+  scrim: 'rgba(16, 12, 26, 0.55)',
+  // Over a poster or a hero, so anything white on top of a picture holds.
+  posterScrim: ['rgba(12,9,20,0)', 'rgba(12,9,20,0.45)', 'rgba(12,9,20,0.85)'],
+  heroScrim: ['rgba(12,9,20,0.15)', 'rgba(12,9,20,0.55)', 'rgba(12,9,20,0.88)'],
 };
 
 /**
@@ -78,24 +74,24 @@ export const type = {
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 };
-export const radius = { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 };
+export const radius = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 };
 
 export const shadow = {
-  // Barely there. On white, separation should come from the hairline border;
-  // the shadow only lifts the element off the page a fraction.
+  // Light UI needs shadow to be almost invisible; anything heavier reads as a
+  // dark theme with the colours swapped.
   card: {
-    shadowColor: '#0C0E14',
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 3 },
+    shadowColor: '#221A38',
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
   raised: {
-    shadowColor: '#0C0E14',
-    shadowOpacity: 0.12,
-    shadowRadius: 26,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 8,
+    shadowColor: '#221A38',
+    shadowOpacity: 0.13,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
 };
 
@@ -106,25 +102,25 @@ export const shadow = {
 export const STYLE_META = {
   highlights: {
     label: 'Highlights',
-    tint: '#B25E09',
+    tint: '#C2820B',
     icon: 'zap',
     blurb: 'Short and quick — the best bits only',
   },
   celebration: {
     label: 'Celebration',
-    tint: '#D02F3A',
+    tint: '#F0562D',
     icon: 'gift',
     blurb: 'Upbeat, for a party or a night out',
   },
   cinematic: {
     label: 'Cinematic',
-    tint: '#4F46E5',
+    tint: '#6B4EE6',
     icon: 'film',
     blurb: 'Slow and unhurried, long holds',
   },
   family_story: {
     label: 'Family Story',
-    tint: '#0F8B54',
+    tint: '#1F9D5B',
     icon: 'heart',
     blurb: 'The whole day, nothing left out',
   },

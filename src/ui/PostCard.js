@@ -23,19 +23,8 @@ function runtime(seconds) {
   return `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
 }
 
-/**
- * A film in the feed, and the frames it was cut from.
- *
- * The strip along the bottom is the point of this card. A photo app shows you a
- * picture; this shows you a film and, underneath it, the actual moments several
- * different people separately happened to capture that went into making it.
- * Nothing else in a feed can show that, because nothing else is assembled out of
- * a shared pool — and it says what the product does far better than any wording.
- *
- * Frames are taken evenly across the running order, so the strip reads as the
- * shape of the whole film rather than its opening seconds.
- */
-export default function PostCard({ post, media, strip = [], liked, onToggleLike, onOpen, onOpenEvent }) {
+/** A film in the feed: its poster, what it is, and who made it. */
+export default function PostCard({ post, media, liked, onToggleLike, onOpen, onOpenEvent }) {
   const meta = STYLE_META[post.style] ?? {};
   const author = post.profiles ?? {};
   const event = post.events ?? {};
@@ -89,38 +78,21 @@ export default function PostCard({ post, media, strip = [], liked, onToggleLike,
           <Feather name="play" size={19} color={colors.text} style={{ marginLeft: 3 }} />
         </View>
 
-        <View style={styles.credits}>
-          <Text style={styles.filmTitle} numberOfLines={2}>
-            {post.editing_plan?.title || event.title || 'A film'}
-          </Text>
-          <Text style={styles.creditsLine} numberOfLines={1}>
-            {event.title}
-            {post.albums?.title ? ` · ${post.albums.title}` : ''}
-          </Text>
-        </View>
       </Pressable>
 
-      {strip.length ? (
-        <Pressable onPress={onOpen} style={styles.strip}>
-          <View style={styles.stripHead}>
-            <Feather name="scissors" size={11} color={colors.textMuted} />
-            <Text style={styles.stripLabel}>
-              CUT FROM {shots ? `${shots} SHOTS` : 'YOUR MEMORIES'}
-            </Text>
-          </View>
-          <View style={styles.frames}>
-            {strip.slice(0, 5).map((uri, index) => (
-              <Image
-                key={`${post.id}-${index}`}
-                source={{ uri }}
-                style={styles.frame}
-                contentFit="cover"
-                transition={160}
-              />
-            ))}
-          </View>
-        </Pressable>
-      ) : null}
+      {/* Title below the picture rather than over it. White text on a poster is
+          only readable when the picture underneath happens to be dark, and half
+          of these are not. */}
+      <Pressable onPress={onOpen} style={styles.caption}>
+        <Text style={styles.filmTitle} numberOfLines={2}>
+          {post.editing_plan?.title || event.title || 'A film'}
+        </Text>
+        <Text style={styles.creditsLine} numberOfLines={1}>
+          {event.title}
+          {post.albums?.title ? ` · ${post.albums.title}` : ''}
+          {shots ? ` · ${shots} shots` : ''}
+        </Text>
+      </Pressable>
 
       <View style={styles.foot}>
         <Pressable style={styles.by} onPress={onOpenEvent}>
@@ -210,30 +182,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(246,240,232,0.4)',
   },
 
-  credits: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg, gap: 2 },
+  caption: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: 2 },
   filmTitle: { ...type.title, color: colors.text },
-  creditsLine: { ...type.caption, color: colors.textSoft },
-
-  // The contact sheet. Sunk below the card surface so it reads as material the
-  // film was made from rather than as more of the film.
-  strip: {
-    backgroundColor: colors.surfaceSunk,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    gap: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  stripHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  stripLabel: { ...type.slate, color: colors.textMuted, fontSize: 9.5 },
-  frames: { flexDirection: 'row', gap: 4 },
-  frame: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: 4,
-    backgroundColor: colors.mediaPlaceholder,
-  },
+  creditsLine: { ...type.caption, color: colors.textMuted },
 
   foot: {
     flexDirection: 'row',

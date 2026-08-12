@@ -4,12 +4,11 @@ import { useCallback, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { api } from '../../src/lib/api';
-import { feed, listEvents, myLikes, setLike } from '../../src/lib/data';
+import { feed, myLikes, setLike } from '../../src/lib/data';
 import { STYLE_META, colors, spacing } from '../../src/theme';
 import { Empty } from '../../src/ui';
 import { Wordmark } from '../../src/ui/brand';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
-import EventRail from '../../src/ui/EventRail';
 import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
 import PostCard from '../../src/ui/PostCard';
 import Rise from '../../src/ui/Rise';
@@ -24,14 +23,6 @@ export default function FeedScreen() {
   const posts = useQuery({ queryKey: ['feed'], queryFn: feed });
   const all = posts.data ?? [];
 
-  const events = useQuery({ queryKey: ['events'], queryFn: listEvents });
-  const eventIds = useMemo(() => (events.data ?? []).map((e) => e.id), [events.data]);
-  const eventCovers = useQuery({
-    queryKey: ['eventCovers', eventIds.join(',')],
-    queryFn: () => api.eventCovers(eventIds),
-    enabled: eventIds.length > 0,
-    staleTime: 30 * 60 * 1000,
-  });
 
   const list = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -50,15 +41,6 @@ export default function FeedScreen() {
     queryKey: ['feedMedia', idKey],
     queryFn: () => api.replayMedia(ids),
     enabled: ids.length > 0,
-    staleTime: 45 * 60 * 1000,
-  });
-
-  // Loaded after the posters, so the cards appear first and the contact sheets
-  // fill in behind them rather than holding the whole feed up.
-  const strips = useQuery({
-    queryKey: ['feedStrips', idKey],
-    queryFn: () => api.replayStrips(ids),
-    enabled: ids.length > 0 && Boolean(media.data),
     staleTime: 45 * 60 * 1000,
   });
 
@@ -95,7 +77,6 @@ export default function FeedScreen() {
         <PostCard
           post={item}
           media={media.data?.[item.id]}
-          strip={strips.data?.[item.id] ?? []}
           liked={optimistic[item.id] ?? likedSet.has(item.id)}
           onToggleLike={(id, next) => toggle.mutate({ id, next })}
           onOpen={() => router.push(`/replay/${item.id}`)}
@@ -103,7 +84,7 @@ export default function FeedScreen() {
         />
       </Rise>
     ),
-    [media.data, strips.data, optimistic, likedSet, toggle, router]
+    [media.data, optimistic, likedSet, toggle, router]
   );
 
   return (
@@ -132,16 +113,6 @@ export default function FeedScreen() {
 
       <FlatList
         contentContainerStyle={styles.content}
-        ListHeaderComponent={
-          !query && (events.data ?? []).length ? (
-            <EventRail
-              events={events.data ?? []}
-              covers={eventCovers.data ?? {}}
-              onOpen={(eventId) => router.push(`/event/${eventId}`)}
-              onCreate={() => setCreating(true)}
-            />
-          ) : null
-        }
         data={list}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
