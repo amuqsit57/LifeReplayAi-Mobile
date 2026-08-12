@@ -3,7 +3,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, radius, shadow, spacing, type } from '../theme';
+import { colors, markType, radius, shadow, spacing, type } from '../theme';
 
 /**
  * The lockup: a mark, then the name set tight.
@@ -91,8 +91,10 @@ export function Segmented({ options, value, onChange }) {
 const styles = StyleSheet.create({
   lockup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   frame: { position: 'absolute' },
-  nameLg: { ...type.title, color: colors.text, letterSpacing: -0.6 },
-  nameSm: { ...type.heading, color: colors.text, letterSpacing: -0.4 },
+  // markType, not type: the logo keeps the system face it was drawn in while the
+  // rest of the app moves to Fraunces and Manrope.
+  nameLg: { ...markType.lg, color: colors.text },
+  nameSm: { ...markType.sm, color: colors.text },
 
   segmented: {
     flexDirection: 'row',

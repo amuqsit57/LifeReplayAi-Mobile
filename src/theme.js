@@ -42,18 +42,44 @@ export const colors = {
   heroScrim: ['rgba(12,9,20,0.15)', 'rgba(12,9,20,0.55)', 'rgba(12,9,20,0.88)'],
 };
 
+/**
+ * Two faces, doing different jobs.
+ *
+ * Fraunces carries headings — a serif with real character in its curves, which
+ * is what gives the app a voice a system stack cannot. Manrope sets everything
+ * meant to be read rather than looked at.
+ *
+ * The wordmark deliberately does not use either: it keeps the system face it was
+ * drawn in, so the logo stays exactly as it is while the rest of the app gains
+ * the typography.
+ */
+export const fonts = {
+  display: 'Fraunces_700Bold',
+  body: 'Manrope_500Medium',
+  bodyBold: 'Manrope_700Bold',
+  bodyExtra: 'Manrope_800ExtraBold',
+};
+
 export const type = {
-  display: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6 },
-  title: { fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.3 },
-  heading: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.2 },
-  body: { fontSize: 15, lineHeight: 22, fontWeight: '500' },
-  bodyStrong: { fontSize: 15, lineHeight: 22, fontWeight: '700' },
-  label: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
-  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
-  tiny: { fontSize: 11, lineHeight: 14, fontWeight: '600', letterSpacing: 0.3 },
-  // Spaced caps, for codes and runtimes. Added since; everything above is the
-  // scale as it was.
-  slate: { fontSize: 10.5, lineHeight: 14, fontWeight: '800', letterSpacing: 1.4 },
+  display: { fontFamily: fonts.display, fontSize: 30, lineHeight: 36, letterSpacing: -0.6 },
+  title: { fontFamily: fonts.display, fontSize: 22, lineHeight: 28, letterSpacing: -0.3 },
+  heading: { fontFamily: fonts.bodyExtra, fontSize: 17, lineHeight: 23, letterSpacing: -0.2 },
+  body: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },
+  bodyStrong: { fontFamily: fonts.bodyBold, fontSize: 15, lineHeight: 22 },
+  label: { fontFamily: fonts.bodyBold, fontSize: 13, lineHeight: 18 },
+  caption: { fontFamily: fonts.body, fontSize: 12, lineHeight: 16 },
+  tiny: { fontFamily: fonts.bodyBold, fontSize: 11, lineHeight: 14, letterSpacing: 0.3 },
+  // Spaced caps, for codes and runtimes.
+  slate: { fontFamily: fonts.bodyExtra, fontSize: 10.5, lineHeight: 14, letterSpacing: 1.4 },
+};
+
+/**
+ * The wordmark's own type. System face, weights rather than families — the shape
+ * the logo already has.
+ */
+export const markType = {
+  lg: { fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.6 },
+  sm: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.4 },
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 };
