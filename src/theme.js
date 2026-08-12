@@ -1,12 +1,10 @@
 /**
- * A neutral, high-contrast system on white.
+ * A light palette built for a feed.
  *
- * Earlier passes tinted the greys warm and set the titles in a serif, which read
- * as characterful rather than professional. Both are gone. The greys are a true
- * cool-neutral ramp, the ground is white without a cast, and there is exactly
- * one accent — everything else is neutral, so when colour appears it means
- * something. This is the discipline that makes an interface look considered:
- * restraint, contrast, and spacing, not hue.
+ * On a white ground the photographs are the only saturated thing on screen,
+ * which is what makes a feed feel like other people's lives rather than like a
+ * piece of software. The neutrals carry a slight violet bias rather than being
+ * pure grey, so the chrome relates to the accent instead of sitting beside it.
  */
 export const colors = {
   background: '#FFFFFF',
@@ -44,33 +42,18 @@ export const colors = {
   heroScrim: ['rgba(12,9,20,0.15)', 'rgba(12,9,20,0.55)', 'rgba(12,9,20,0.88)'],
 };
 
-/**
- * One family, many weights.
- *
- * A single grotesque used across the whole scale reads as more professional than
- * a display serif paired with a body face — the serif gave the app a voice, but
- * the voice was wrong for something people trust with their photographs. Weight
- * and tracking carry the hierarchy instead of a change of typeface.
- */
-export const fonts = {
-  regular: 'Manrope_500Medium',
-  bold: 'Manrope_700Bold',
-  black: 'Manrope_800ExtraBold',
-};
-
 export const type = {
-  // Tight tracking at large sizes is most of what makes a heading look drawn
-  // rather than typed.
-  display: { fontFamily: fonts.black, fontSize: 28, lineHeight: 34, letterSpacing: -0.9 },
-  title: { fontFamily: fonts.black, fontSize: 20, lineHeight: 26, letterSpacing: -0.5 },
-  heading: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 22, letterSpacing: -0.2 },
-  body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22 },
-  bodyStrong: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 22 },
-  label: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 18, letterSpacing: -0.1 },
-  caption: { fontFamily: fonts.regular, fontSize: 12.5, lineHeight: 17 },
-  tiny: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 14 },
-  // Spaced caps, for codes, runtimes and section markers.
-  slate: { fontFamily: fonts.black, fontSize: 10.5, lineHeight: 14, letterSpacing: 1.4 },
+  display: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6 },
+  title: { fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.3 },
+  heading: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.2 },
+  body: { fontSize: 15, lineHeight: 22, fontWeight: '500' },
+  bodyStrong: { fontSize: 15, lineHeight: 22, fontWeight: '700' },
+  label: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  tiny: { fontSize: 11, lineHeight: 14, fontWeight: '600', letterSpacing: 0.3 },
+  // Spaced caps, for codes and runtimes. Added since; everything above is the
+  // scale as it was.
+  slate: { fontSize: 10.5, lineHeight: 14, fontWeight: '800', letterSpacing: 1.4 },
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 };
