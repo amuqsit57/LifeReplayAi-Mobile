@@ -90,11 +90,55 @@ export default function Tracks({
     return () => run.stop();
   }, [playing, selected, clips, offsets, head]);
 
-  // Follow the playhead, and keep a newly selected shot on screen.
+  // Follow the playhead, and keep a newly selected shot on screen. Suppressed
+  // while scrubbing: the scroll and the finger end up chasing each other.
+  const scrubbing = useRef(false);
   useEffect(() => {
+    if (scrubbing.current) return;
     const x = offsets[selected];
     if (x != null) scroller.current?.scrollTo({ x: Math.max(0, x - 96), animated: true });
   }, [selected, offsets]);
+
+  // Dragging the playhead. Everything it reads lives in a ref, because the
+  // responder is built once and the offsets change every time a shot is trimmed.
+  const laneLeft = useRef(0);
+  const scrollX = useRef(0);
+  const scrub = useRef({ offsets, clips, onSelect, selected });
+  scrub.current = { offsets, clips, onSelect, selected };
+
+  const shotAt = (x) => {
+    const { offsets: marks, clips: reel } = scrub.current;
+    for (let i = reel.length - 1; i >= 0; i -= 1) {
+      if (x >= marks[i]) return i;
+    }
+    return 0;
+  };
+
+  const headDrag = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        scrubbing.current = true;
+        Haptics.selectionAsync().catch(() => {});
+      },
+      onPanResponderMove: (_event, gesture) => {
+        // moveX is screen space; the lane's own origin and its scroll offset are
+        // what turn it back into a position on the timeline.
+        const x = gesture.moveX - laneLeft.current + scrollX.current;
+        head.setValue(Math.max(GUTTER, x));
+        const index = shotAt(x);
+        if (index !== scrub.current.selected) scrub.current.onSelect(index);
+      },
+      onPanResponderRelease: () => {
+        scrubbing.current = false;
+      },
+      onPanResponderTerminate: () => {
+        scrubbing.current = false;
+      },
+    })
+  ).current;
 
   return (
     <View style={styles.wrap}>
@@ -103,6 +147,18 @@ export default function Tracks({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.canvas}
+        scrollEnabled={!scrubbing.current}
+        scrollEventThrottle={16}
+        onScroll={(event) => {
+          scrollX.current = event.nativeEvent.contentOffset.x;
+        }}
+        onLayout={(event) => {
+          // Screen position of the lane, so a finger's x can be turned back into
+          // a position on the timeline.
+          event.target?.measureInWindow?.((x) => {
+            laneLeft.current = x;
+          });
+        }}
       >
         <View>
           {/* ------------------------------------------------ the picture */}
@@ -157,10 +213,14 @@ export default function Tracks({
             </View>
           </Pressable>
 
-          {/* The playhead crosses both lanes, because it is one moment in time. */}
+          {/* The playhead crosses both lanes, because it is one moment in time.
+              Drag it to move through the edit — the knob is the handle, and it is
+              deliberately larger than the line it draws. */}
           {clips.length ? (
-            <Animated.View pointerEvents="none" style={[styles.head, { left: head }]}>
-              <View style={styles.headKnob} />
+            <Animated.View style={[styles.head, { left: head }]} {...headDrag.panHandlers}>
+              <View style={styles.headGrab}>
+                <View style={styles.headKnob} />
+              </View>
               <View style={styles.headLine} />
             </Animated.View>
           ) : null}
@@ -173,7 +233,14 @@ export default function Tracks({
 /** One shot, with a handle on its out point. */
 function Shot({ clip, memory, selected, last, onSelect, onSelectJoin, onResize, onResizeEnd }) {
   const width = widthFor(clip.seconds);
-  const start = useRef(Number(clip.seconds) || 1);
+
+  // The responder is built once, so anything it reads has to come from a ref.
+  // Closing over the props directly meant the second drag measured from the
+  // length the shot had on first render — which is why stretching twice snapped
+  // back to where the first stretch began.
+  const now = useRef({ seconds: clip.seconds, onResize, onResizeEnd, onSelect });
+  now.current = { seconds: clip.seconds, onResize, onResizeEnd, onSelect };
+  const start = useRef(1);
 
   const drag = useRef(
     PanResponder.create({
@@ -184,14 +251,17 @@ function Shot({ clip, memory, selected, last, onSelect, onSelectJoin, onResize, 
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         Haptics.selectionAsync().catch(() => {});
-        start.current = Number(clip.seconds) || 1;
-        onSelect();
+        start.current = Number(now.current.seconds) || 1;
+        now.current.onSelect();
       },
       onPanResponderMove: (_event, gesture) => {
         const next = start.current + gesture.dx / PER_SECOND;
-        onResize(Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, Math.round(next * 10) / 10)));
+        now.current.onResize(
+          Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, Math.round(next * 10) / 10))
+        );
       },
-      onPanResponderRelease: () => onResizeEnd?.(),
+      onPanResponderRelease: () => now.current.onResizeEnd?.(),
+      onPanResponderTerminate: () => now.current.onResizeEnd?.(),
     })
   ).current;
 
@@ -345,13 +415,24 @@ const styles = StyleSheet.create({
   wave: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3, overflow: 'hidden' },
   waveBar: { width: 2, borderRadius: 1, backgroundColor: colors.primary, opacity: 0.55 },
 
-  head: { position: 'absolute', top: -4, bottom: -2, width: 2, alignItems: 'center' },
+  // Wider than the line it draws so there is something to actually grab; the
+  // line itself is centred inside it.
+  head: {
+    position: 'absolute',
+    top: -8,
+    bottom: -2,
+    width: 34,
+    marginLeft: -16,
+    alignItems: 'center',
+  },
+  headGrab: { width: 34, height: 22, alignItems: 'center', justifyContent: 'center' },
   headLine: { flex: 1, width: 2, backgroundColor: colors.accent },
   headKnob: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
     backgroundColor: colors.accent,
-    marginBottom: -1,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
 });

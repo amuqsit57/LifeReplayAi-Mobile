@@ -172,41 +172,56 @@ export default function Stage({
 
   return (
     <View style={[styles.stage, { height }]}>
-      <Animated.View style={[styles.fill, entering]}>
-        <Animated.View
-          style={[
-            styles.fill,
-            { transform: [{ scale }, { translateX: driftX }, { translateY: driftY }] },
-          ]}
-        >
-          {/* The grade sits on the wrapper rather than the image so it covers the
-              video and the still equally. */}
-          <View style={[styles.fill, filter ? { filter } : null]}>
-            {isVideo ? (
-              <VideoView player={player} style={styles.fill} contentFit="contain" />
-            ) : memory?.thumbnail_url ? (
-              <Image
-                source={{ uri: memory.thumbnail_url }}
-                style={styles.fill}
-                contentFit="contain"
-                transition={0}
-                recyclingKey={memory.id}
-              />
-            ) : (
-              <View style={styles.empty}>
-                <Feather name="film" size={30} color={colors.textMuted} />
-                <Text style={styles.emptyText}>
-                  {total ? 'No preview for this shot' : 'Add your first shot below'}
-                </Text>
-              </View>
-            )}
-          </View>
+      {isVideo ? (
+        // Bare. No filter, no transform, no animated parent, no rounding.
+        //
+        // The video surface does not survive being wrapped: stacking styles over
+        // this player is what blacked the picture out before, and a colour filter
+        // on a parent of it does the same thing. So a video shot plays clean and
+        // ungraded, and the bar below says as much. Wrong colours would be a
+        // worse lie than no colours.
+        //
+        // nativeControls off because the stage has its own transport — leaving it
+        // on put a second play button on top of the first.
+        <VideoView
+          player={player}
+          style={styles.fill}
+          contentFit="contain"
+          nativeControls={false}
+        />
+      ) : (
+        <Animated.View style={[styles.fill, entering]}>
+          <Animated.View
+            style={[
+              styles.fill,
+              { transform: [{ scale }, { translateX: driftX }, { translateY: driftY }] },
+            ]}
+          >
+            <View style={[styles.fill, filter ? { filter } : null]}>
+              {memory?.thumbnail_url ? (
+                <Image
+                  source={{ uri: memory.thumbnail_url }}
+                  style={styles.fill}
+                  contentFit="contain"
+                  transition={0}
+                  recyclingKey={memory.id}
+                />
+              ) : (
+                <View style={styles.empty}>
+                  <Feather name="film" size={30} color={colors.textMuted} />
+                  <Text style={styles.emptyText}>
+                    {total ? 'No preview for this shot' : 'Add your first shot below'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      )}
 
       {/* A transition through a colour is the colour clearing, not the shot
           arriving — so it is drawn over the top rather than applied to it. */}
-      {kind === 'black' || kind === 'white' ? (
+      {!isVideo && (kind === 'black' || kind === 'white') ? (
         <Animated.View
           pointerEvents="none"
           style={[
@@ -241,9 +256,11 @@ export default function Stage({
             Shot {index + 1} of {total} · {Number(clip.seconds).toFixed(1)}s
           </Text>
           <Text style={styles.barNote} numberOfLines={1}>
-            {clip.texture && clip.texture !== 'none'
-              ? 'Grain and bloom only appear in the render'
-              : 'Preview — the render is sharper than this'}
+            {isVideo
+              ? 'Video plays ungraded here — the grade is applied when you render'
+              : clip.texture && clip.texture !== 'none'
+                ? 'Grain and bloom only appear in the render'
+                : 'Preview — the render is sharper than this'}
           </Text>
         </View>
       ) : null}

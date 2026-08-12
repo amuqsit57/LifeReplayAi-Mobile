@@ -182,10 +182,16 @@ export const TRANSITION_GROUPS = [
 
 export const TRANSITIONS = TRANSITION_GROUPS.flatMap((group) => group.items);
 
-/** Whether a shot's own sound is worth hearing. */
-export const SOUNDS = [
-  { value: 'keep', label: 'Keep', hint: 'You hear this shot' },
-  { value: 'under', label: 'Duck', hint: 'Room tone, under the music' },
+/**
+ * Where a title sits in the frame.
+ *
+ * Bottom on almost every shot; the others exist for the ones where the bottom of
+ * the frame is the subject.
+ */
+export const CAPTION_PLACES = [
+  { value: 'top', label: 'Top' },
+  { value: 'middle', label: 'Middle' },
+  { value: 'bottom', label: 'Bottom' },
 ];
 
 /**
@@ -269,6 +275,9 @@ export function clipFor(memory) {
     texture: 'none',
     motion: isVideo ? 'static' : 'push_in',
     speed: 'normal',
+    // The renderer drops every clip's audio, so this never varies. Kept because
+    // the plan schema still carries it and the field turning up absent would be
+    // a change to what a plan looks like, for nothing.
     sound: 'keep',
   };
 }

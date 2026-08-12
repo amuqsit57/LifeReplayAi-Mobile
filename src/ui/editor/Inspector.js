@@ -6,8 +6,8 @@ import {
   GRADES,
   MAX_SECONDS,
   MIN_SECONDS,
+  CAPTION_PLACES,
   MOTIONS,
-  SOUNDS,
   SPEEDS,
   TEXTURES,
   TRANSITION_GROUPS,
@@ -16,10 +16,12 @@ import {
 import { colors, radius, spacing, type } from '../../theme';
 import { ChipRow, Group, GroupedSheet, Section, Slider, SwatchRow } from './controls';
 
+// No Sound tab. The renderer sets MUSIC_ONLY and drops every clip's audio, so a
+// keep-or-duck control did nothing at all — it was a switch wired to nothing.
+// Music for the whole film lives on the music lane under the timeline.
 const TABS = [
   { value: 'shot', label: 'Shot', icon: 'crop' },
   { value: 'look', label: 'Look', icon: 'droplet' },
-  { value: 'sound', label: 'Sound', icon: 'volume-2' },
   { value: 'text', label: 'Text', icon: 'type' },
 ];
 
@@ -222,45 +224,64 @@ export default function Inspector({
           </>
         ) : null}
 
-        {tab === 'sound' ? (
-          <>
-          <Section title="Mix" icon="volume-2" hint="Music is set for the whole film — that lives under Music, below the timeline." />
-          <Group
-            title="This shot's own sound"
-            hint={
-              isVideo
-                ? 'Keep it for anything said out loud. Duck it when it is only the room.'
-                : 'A photograph has no sound of its own.'
-            }
-          >
-            {isVideo ? (
-              <ChipRow
-                options={SOUNDS}
-                value={clip.sound ?? 'keep'}
-                onChange={(sound) => onChange({ sound })}
-              />
-            ) : null}
-          </Group>
-          </>
-        ) : null}
-
         {tab === 'text' ? (
           <>
-          <Section title="Titles" icon="type" hint="Words drawn over this shot." />
-          <Group
-            title="Label"
-            hint="Set as a title over the shot. A few words — a place, a name, a year."
-          >
-            <TextInput
-              style={styles.input}
-              value={clip.caption ?? ''}
-              onChangeText={(caption) => onChange({ caption })}
-              placeholder="Nothing on this shot"
-              placeholderTextColor={colors.textMuted}
-              maxLength={90}
-              returnKeyType="done"
+            <Section
+              title="Titles"
+              icon="type"
+              hint="Words drawn over this shot — set in caps with a rule above them, not as a subtitle."
             />
-          </Group>
+            <Group
+              title="Label"
+              hint="A few words. A place, a name, a year."
+            >
+              <TextInput
+                style={styles.input}
+                value={clip.caption ?? ''}
+                onChangeText={(caption) => onChange({ caption })}
+                placeholder="Nothing on this shot"
+                placeholderTextColor={colors.textMuted}
+                maxLength={90}
+                returnKeyType="done"
+              />
+            </Group>
+
+            {clip.caption ? (
+              <Group
+                title="Where it sits"
+                hint="Move it off the bottom when that is where the subject is."
+              >
+                <View style={styles.places}>
+                  {CAPTION_PLACES.map((place) => {
+                    const on = (clip.caption_at ?? 'bottom') === place.value;
+                    return (
+                      <Pressable
+                        key={place.value}
+                        style={[styles.place, on && styles.placeOn]}
+                        onPress={() => onChange({ caption_at: place.value })}
+                      >
+                        {/* A frame with the band drawn where the words will land,
+                            which says it faster than the word "middle" does. */}
+                        <View style={styles.placeFrame}>
+                          <View
+                            style={[
+                              styles.placeBand,
+                              place.value === 'top' && { top: 4 },
+                              place.value === 'middle' && { top: '38%' },
+                              place.value === 'bottom' && { bottom: 4 },
+                              on && { backgroundColor: colors.primary },
+                            ]}
+                          />
+                        </View>
+                        <Text style={[styles.placeText, on && { color: colors.primary }]}>
+                          {place.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </Group>
+            ) : null}
           </>
         ) : null}
       </ScrollView>
@@ -360,6 +381,35 @@ const styles = StyleSheet.create({
   },
   toolOff: { opacity: 0.55 },
   toolText: { ...type.tiny, fontSize: 10, color: colors.textSoft },
+
+  places: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
+  place: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  placeOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  placeFrame: {
+    width: 30,
+    height: 44,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceSunk,
+    overflow: 'hidden',
+  },
+  placeBand: {
+    position: 'absolute',
+    left: 4,
+    right: 4,
+    height: 7,
+    borderRadius: 2,
+    backgroundColor: colors.borderStrong,
+  },
+  placeText: { ...type.tiny, fontSize: 10, color: colors.textSoft },
 
   input: {
     marginHorizontal: spacing.lg,
