@@ -436,8 +436,10 @@ export default function EditorScreen() {
         visible={scoring}
         onClose={() => setScoring(false)}
         replayId={id}
+        eventId={source.data?.replay?.event_id}
+        style={source.data?.replay?.style}
         music={plan.music}
-        musicUrl={source.data?.music_url}
+        score={source.data?.score}
         onChange={(music) => edit((p) => setMusic(p, music))}
       />
     </KeyboardAvoidingView>

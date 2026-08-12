@@ -154,16 +154,36 @@ export const SOUNDS = [
   { value: 'under', label: 'Duck', hint: 'Room tone, under the music' },
 ];
 
+/**
+ * Where a film's music comes from.
+ *
+ * `ai` is the score written from the occasion — already composed if anything has
+ * been rendered, composed on the way if not. `track` is one specific file,
+ * whether that came from composing to a brief, from the library, or off the
+ * phone. `prompt` still exists server side but the app no longer sets it:
+ * composing now and playing the result is strictly better than promising music
+ * nobody has heard.
+ */
 export const MUSIC_MODES = [
   {
     value: 'ai',
-    label: 'Generate from AI',
+    label: 'Already generated',
     icon: 'zap',
     hint: 'Considering the vibe of the event, this music was generated',
     recommended: true,
   },
-  { value: 'prompt', label: 'Describe it yourself', icon: 'edit-3', hint: 'Written from your words' },
-  { value: 'track', label: 'My own track', icon: 'upload', hint: 'Use a file you have' },
+  {
+    value: 'make',
+    label: 'Generate from AI',
+    icon: 'edit-3',
+    hint: 'Describe the music you want and compose it now',
+  },
+  {
+    value: 'track',
+    label: 'Custom or from library',
+    icon: 'folder',
+    hint: 'Anything you have made before, or a file from this phone',
+  },
   { value: 'none', label: 'No music', icon: 'volume-x', hint: 'Silent' },
 ];
 
@@ -271,6 +291,13 @@ export function applyToAll(plan, patch) {
   );
 }
 
+/**
+ * Replaces rather than merges.
+ *
+ * Merging left the previous choice's fields behind — switching from an uploaded
+ * track back to the composed score kept the `path`, and the backend, seeing a
+ * path, went on using the file.
+ */
 export function setMusic(plan, music) {
-  return { ...plan, music: { ...(plan.music ?? {}), ...music } };
+  return { ...plan, music };
 }

@@ -138,6 +138,30 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  /** Every track this family has composed, uploaded, or had a render leave behind. */
+  musicLibrary: () => request('/api/music'),
+
+  /**
+   * Compose a track now and keep it.
+   *
+   * Deliberately slow — the model takes a minute or two and this waits for it,
+   * because the point is to hear the result before committing to it. If the wait
+   * runs out the track is still saved server side and turns up in the library, so
+   * a timeout costs the wait rather than the work.
+   */
+  composeMusic: (eventId, payload) =>
+    request(`/api/events/${eventId}/music`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      timeoutMs: 240_000,
+    }),
+
+  /** Tell the library about a file that went straight from the phone to storage. */
+  registerMusic: (payload) =>
+    request('/api/music/register', { method: 'POST', body: JSON.stringify(payload) }),
+
+  deleteMusic: (trackId) => request(`/api/music/${trackId}`, { method: 'DELETE' }),
 };
 
 /**
