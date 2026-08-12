@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -112,7 +113,11 @@ export default function EventScreen() {
   }, [list, filter, me.data?.id]);
 
   const albumList = albums.data ?? [];
-  const eventFilms = (replays.data ?? []).filter((r) => !r.album_id);
+  // One generated film per style; as many hand-cut edits as anybody makes. The
+  // two are listed separately because they behave differently — asking for the
+  // cinematic cut again replaces it, and an edit never replaces anything.
+  const eventFilms = (replays.data ?? []).filter((r) => !r.album_id && !r.is_edit);
+  const edits = (replays.data ?? []).filter((r) => r.is_edit);
   const selecting = selected.length > 0;
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const peopleById = useMemo(
@@ -145,6 +150,17 @@ export default function EventScreen() {
     mutationFn: (style) => api.requestReplay(id, style),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['replays', id] }),
     onError: (error) => Alert.alert('Could not start', error.message),
+  });
+
+  // A blank edit. Nothing renders until they say so — the draft exists purely to
+  // give the plan somewhere to live while it is being written.
+  const startEdit = useMutation({
+    mutationFn: () => api.draft({ event_id: id, title: `${event.data?.title ?? 'Untitled'} — my edit` }),
+    onSuccess: (draft) => {
+      queryClient.invalidateQueries({ queryKey: ['replays', id] });
+      router.push(`/editor/${draft.id}`);
+    },
+    onError: (error) => Alert.alert('Could not open the editor', error.message),
   });
 
   function toggle(memoryId) {
@@ -349,6 +365,67 @@ export default function EventScreen() {
                 />
               );
             })}
+
+            {/* -------------------------------------------------- by hand */}
+            <View style={styles.editsHead}>
+              <Text style={styles.editsTitle}>Cut it yourself</Text>
+              <Text style={styles.hint}>
+                Choose the shots, how long each holds, how it is graded and what it is scored
+                with. Open a film above to start from its cut instead of a blank timeline.
+              </Text>
+            </View>
+
+            {edits.map((edit) => (
+              <Pressable
+                key={edit.id}
+                style={styles.editRow}
+                onPress={() =>
+                  router.push(edit.status === 'succeeded' ? `/replay/${edit.id}` : `/editor/${edit.id}`)
+                }
+              >
+                <View style={styles.editIcon}>
+                  <Feather name="scissors" size={16} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.editTitle} numberOfLines={1}>
+                    {edit.title || 'Untitled edit'}
+                  </Text>
+                  <Text style={styles.hint}>
+                    {edit.shot_count} {edit.shot_count === 1 ? 'shot' : 'shots'}
+                    {edit.status === 'draft'
+                      ? ' · not rendered yet'
+                      : edit.status === 'succeeded'
+                        ? ' · ready'
+                        : edit.status === 'failed'
+                          ? ' · failed'
+                          : ' · rendering'}
+                  </Text>
+                </View>
+                {edit.status === 'succeeded' ? (
+                  <Pressable
+                    hitSlop={10}
+                    onPress={() => router.push(`/editor/${edit.id}`)}
+                    style={styles.editAgain}
+                  >
+                    <Feather name="edit-3" size={16} color={colors.textSoft} />
+                  </Pressable>
+                ) : null}
+                <Feather name="chevron-right" size={18} color={colors.textMuted} />
+              </Pressable>
+            ))}
+
+            <Pressable
+              style={[styles.startEdit, !list.length && styles.startEditOff]}
+              onPress={() => list.length && startEdit.mutate()}
+              disabled={!list.length || startEdit.isPending}
+            >
+              {startEdit.isPending ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Feather name="plus" size={17} color={colors.primary} />
+              )}
+              <Text style={styles.startEditText}>Start an edit</Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -623,6 +700,42 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
+
+  editsHead: { gap: 4, paddingTop: spacing.lg },
+  editsTitle: { ...type.heading, color: colors.text },
+  editRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  editIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editTitle: { ...type.bodyStrong, color: colors.text },
+  editAgain: { padding: 6 },
+  startEdit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.borderStrong,
+  },
+  startEditOff: { opacity: 0.5 },
+  startEditText: { ...type.label, color: colors.primary },
   albumIcon: {
     width: 38,
     height: 38,

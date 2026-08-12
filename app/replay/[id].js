@@ -1,9 +1,10 @@
 import { Feather } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   ScrollView,
   Share,
@@ -37,6 +38,22 @@ export default function ReplayScreen() {
 
   const me = useQuery({ queryKey: ['myProfile'], queryFn: myProfile });
 
+  // Open this cut in the editor. Seeded from the plan rather than starting
+  // blank, so the model's edit is the first draft — which is what makes it worth
+  // having generated one at all.
+  const openInEditor = useMutation({
+    mutationFn: () =>
+      api.draft({
+        event_id: replay.data.event_id,
+        album_id: replay.data.album_id ?? null,
+        style: replay.data.style,
+        from_replay_id: id,
+        title: `${replay.data.editing_plan?.title ?? 'This film'} — my edit`,
+      }),
+    onSuccess: (draft) => router.push(`/editor/${draft.id}`),
+    onError: (problem) => Alert.alert('Could not open the editor', problem.message),
+  });
+
   const data = replay.data;
   const meta = STYLE_META[data?.style] ?? {};
   const plan = data?.editing_plan ?? {};
@@ -65,13 +82,20 @@ export default function ReplayScreen() {
         left={<RoundButton name="chevron-left" label="Back" onPress={() => router.back()} />}
         right={
           ready ? (
-            <RoundButton
-              name="share-2"
-              label="Share"
-              onPress={() =>
-                Share.share({ message: `Watch our Life Replay film: ${data.url}` }).catch(() => {})
-              }
-            />
+            <View style={styles.headActions}>
+              <RoundButton
+                name={openInEditor.isPending ? 'loader' : 'edit-3'}
+                label="Edit this cut"
+                onPress={() => !openInEditor.isPending && openInEditor.mutate()}
+              />
+              <RoundButton
+                name="share-2"
+                label="Share"
+                onPress={() =>
+                  Share.share({ message: `Watch our Life Replay film: ${data.url}` }).catch(() => {})
+                }
+              />
+            </View>
           ) : null
         }
       />
@@ -157,6 +181,7 @@ function Fact({ icon, label }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  headActions: { flexDirection: 'row', gap: spacing.sm },
   // No horizontal padding here: the player is full bleed, so the gutter is
   // applied by the sections that want it rather than to everything. The top
   // space keeps the title off the picture — they were touching.

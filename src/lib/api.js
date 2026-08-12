@@ -112,6 +112,32 @@ export const api = {
       body: JSON.stringify(replayIds),
     }),
   eventReplays: (eventId) => request(`/api/events/${eventId}/replays`),
+
+  // ---- editing by hand -------------------------------------------------
+  // The plan the renderer executes is an edit decision list, so editing is
+  // reading it, changing it and handing it back. No second pipeline.
+
+  /** Open a new edit — blank, or seeded from a film that already exists. */
+  draft: (payload) =>
+    request('/api/replays/draft', { method: 'POST', body: JSON.stringify(payload) }),
+
+  /** The edit plus every memory it may cut from, in one call. */
+  editable: (replayId) => request(`/api/replays/${replayId}/editable`),
+
+  /** Store the edit; `render` also queues it. Everything is re-checked server side. */
+  savePlan: (replayId, plan, render = false) =>
+    request(`/api/replays/${replayId}/plan`, {
+      method: 'PUT',
+      body: JSON.stringify({ plan, render }),
+      timeoutMs: 45_000,
+    }),
+
+  /** Permission to upload a track to score an edit with. */
+  audioUploadUrl: (replayId, payload) =>
+    request(`/api/replays/${replayId}/audio`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };
 
 /**
