@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, Share, StyleSheet, Text, View } from 'react-native';
@@ -24,15 +24,18 @@ function runtime(seconds) {
 }
 
 /**
- * A film in the feed.
+ * A film in the feed, and the frames it was cut from.
  *
- * Shaped like the film itself rather than like a social post with a picture in
- * it: a tall poster carrying its own title and credits, with the chrome sitting
- * on the image instead of in bands above and below it. The style's colour is the
- * only colour on the card, which is what makes four cinematic cuts and four
- * highlight reels distinguishable at a glance while scrolling.
+ * The strip along the bottom is the point of this card. A photo app shows you a
+ * picture; this shows you a film and, underneath it, the actual moments several
+ * different people separately happened to capture that went into making it.
+ * Nothing else in a feed can show that, because nothing else is assembled out of
+ * a shared pool — and it says what the product does far better than any wording.
+ *
+ * Frames are taken evenly across the running order, so the strip reads as the
+ * shape of the whole film rather than its opening seconds.
  */
-export default function PostCard({ post, media, liked, onToggleLike, onOpen, onOpenEvent }) {
+export default function PostCard({ post, media, strip = [], liked, onToggleLike, onOpen, onOpenEvent }) {
   const meta = STYLE_META[post.style] ?? {};
   const author = post.profiles ?? {};
   const event = post.events ?? {};
@@ -50,8 +53,6 @@ export default function PostCard({ post, media, liked, onToggleLike, onOpen, onO
       return;
     }
     if (!liked) return;
-    // A small kick on the way in. Springs rather than a timing curve, because a
-    // like should feel like a press rather than an animation playing.
     Animated.sequence([
       Animated.spring(heart, { toValue: 1.35, useNativeDriver: true, speed: 50, bounciness: 14 }),
       Animated.spring(heart, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 10 }),
@@ -66,7 +67,7 @@ export default function PostCard({ post, media, liked, onToggleLike, onOpen, onO
             source={{ uri: media.thumbnail_url }}
             style={styles.poster}
             contentFit="cover"
-            transition={180}
+            transition={200}
             recyclingKey={post.id}
           />
         ) : (
@@ -77,23 +78,17 @@ export default function PostCard({ post, media, liked, onToggleLike, onOpen, onO
 
         <LinearGradient colors={colors.posterScrim} style={styles.scrim} pointerEvents="none" />
 
-        <View style={styles.topRow}>
-          <View style={[styles.styleChip, { backgroundColor: meta.tint ?? colors.primary }]}>
-            <Feather name={meta.icon ?? 'film'} size={11} color="#fff" />
-            <Text style={styles.styleChipText}>{meta.label ?? post.style}</Text>
-          </View>
-          {length ? (
-            <View style={styles.runtime}>
-              <Text style={styles.runtimeText}>{length}</Text>
-            </View>
-          ) : null}
+        {/* A slate, the way a shot is marked before it is filmed. */}
+        <View style={styles.slate}>
+          <View style={[styles.slateBar, { backgroundColor: meta.tint ?? colors.primary }]} />
+          <Text style={styles.slateText}>{(meta.label ?? post.style).toUpperCase()}</Text>
+          {length ? <Text style={styles.slateDim}>{length}</Text> : null}
         </View>
 
         <View style={styles.play}>
-          <Feather name="play" size={20} color="#fff" style={{ marginLeft: 3 }} />
+          <Feather name="play" size={19} color={colors.text} style={{ marginLeft: 3 }} />
         </View>
 
-        {/* Title and credits sit on the picture, the way they would on a poster. */}
         <View style={styles.credits}>
           <Text style={styles.filmTitle} numberOfLines={2}>
             {post.editing_plan?.title || event.title || 'A film'}
@@ -101,10 +96,31 @@ export default function PostCard({ post, media, liked, onToggleLike, onOpen, onO
           <Text style={styles.creditsLine} numberOfLines={1}>
             {event.title}
             {post.albums?.title ? ` · ${post.albums.title}` : ''}
-            {shots ? ` · ${shots} shots` : ''}
           </Text>
         </View>
       </Pressable>
+
+      {strip.length ? (
+        <Pressable onPress={onOpen} style={styles.strip}>
+          <View style={styles.stripHead}>
+            <Feather name="scissors" size={11} color={colors.textMuted} />
+            <Text style={styles.stripLabel}>
+              CUT FROM {shots ? `${shots} SHOTS` : 'YOUR MEMORIES'}
+            </Text>
+          </View>
+          <View style={styles.frames}>
+            {strip.slice(0, 5).map((uri, index) => (
+              <Image
+                key={`${post.id}-${index}`}
+                source={{ uri }}
+                style={styles.frame}
+                contentFit="cover"
+                transition={160}
+              />
+            ))}
+          </View>
+        </Pressable>
+      ) : null}
 
       <View style={styles.foot}>
         <Pressable style={styles.by} onPress={onOpenEvent}>
@@ -119,11 +135,11 @@ export default function PostCard({ post, media, liked, onToggleLike, onOpen, onO
         <View style={styles.actions}>
           <Animated.View style={{ transform: [{ scale: heart }] }}>
             <ActionCount
-              icon={liked ? 'heart' : 'heart'}
+              icon="heart"
               count={likes}
               label="Like"
               active={liked}
-              tint={colors.accent}
+              tint={colors.primary}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 onToggleLike(post.id, !liked);
@@ -158,54 +174,66 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   stage: { backgroundColor: colors.mediaPlaceholder },
-  // Nearer the shape of the films themselves without taking a whole screen.
   poster: { width: '100%', aspectRatio: 3 / 4, backgroundColor: colors.mediaPlaceholder },
   posterEmpty: { alignItems: 'center', justifyContent: 'center' },
-  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '52%' },
+  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '60%' },
 
-  topRow: {
+  slate: {
     position: 'absolute',
     top: spacing.md,
     left: spacing.md,
-    right: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  styleChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 9,
+    gap: spacing.sm,
+    paddingRight: spacing.md,
     paddingVertical: 5,
-    borderRadius: radius.pill,
-  },
-  styleChipText: { ...type.tiny, color: '#fff' },
-  runtime: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingLeft: 0,
     borderRadius: radius.sm,
-    backgroundColor: 'rgba(10,7,18,0.5)',
+    backgroundColor: 'rgba(8,6,5,0.62)',
+    overflow: 'hidden',
   },
-  runtimeText: { ...type.tiny, color: '#fff' },
+  slateBar: { width: 4, alignSelf: 'stretch', marginRight: 4 },
+  slateText: { ...type.slate, color: colors.text },
+  slateDim: { ...type.slate, color: colors.textSoft },
 
   play: {
     position: 'absolute',
     alignSelf: 'center',
-    top: '40%',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(10,7,18,0.42)',
+    top: '38%',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: 'rgba(246,240,232,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(246,240,232,0.4)',
   },
 
   credits: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg, gap: 2 },
-  filmTitle: { ...type.title, color: '#fff' },
-  creditsLine: { ...type.caption, color: 'rgba(255,255,255,0.78)' },
+  filmTitle: { ...type.title, color: colors.text },
+  creditsLine: { ...type.caption, color: colors.textSoft },
+
+  // The contact sheet. Sunk below the card surface so it reads as material the
+  // film was made from rather than as more of the film.
+  strip: {
+    backgroundColor: colors.surfaceSunk,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    gap: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  stripHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  stripLabel: { ...type.slate, color: colors.textMuted, fontSize: 9.5 },
+  frames: { flexDirection: 'row', gap: 4 },
+  frame: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: 4,
+    backgroundColor: colors.mediaPlaceholder,
+  },
 
   foot: {
     flexDirection: 'row',

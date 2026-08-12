@@ -201,7 +201,7 @@ export default function EventScreen() {
             <>
               <Image source={{ uri: cover }} style={styles.heroImage} contentFit="cover" />
               <LinearGradient
-                colors={['rgba(10,7,18,0.45)', 'rgba(10,7,18,0.86)']}
+                colors={colors.heroScrim}
                 style={styles.heroImage}
                 pointerEvents="none"
               />

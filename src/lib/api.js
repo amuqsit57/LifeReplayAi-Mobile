@@ -104,6 +104,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(replayIds),
     }),
+
+  // The source frames each film was cut from, spaced across its running order.
+  replayStrips: (replayIds) =>
+    request('/api/replays/strips', {
+      method: 'POST',
+      body: JSON.stringify(replayIds),
+    }),
   eventReplays: (eventId) => request(`/api/events/${eventId}/replays`),
 };
 

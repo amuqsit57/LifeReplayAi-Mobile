@@ -43,6 +43,15 @@ export default function FeedScreen() {
     staleTime: 45 * 60 * 1000,
   });
 
+  // Loaded after the posters, so the cards appear first and the contact sheets
+  // fill in behind them rather than holding the whole feed up.
+  const strips = useQuery({
+    queryKey: ['feedStrips', idKey],
+    queryFn: () => api.replayStrips(ids),
+    enabled: ids.length > 0 && Boolean(media.data),
+    staleTime: 45 * 60 * 1000,
+  });
+
   const liked = useQuery({
     queryKey: ['myLikes', idKey],
     queryFn: () => myLikes(ids),
@@ -76,6 +85,7 @@ export default function FeedScreen() {
         <PostCard
           post={item}
           media={media.data?.[item.id]}
+          strip={strips.data?.[item.id] ?? []}
           liked={optimistic[item.id] ?? likedSet.has(item.id)}
           onToggleLike={(id, next) => toggle.mutate({ id, next })}
           onOpen={() => router.push(`/replay/${item.id}`)}
@@ -83,7 +93,7 @@ export default function FeedScreen() {
         />
       </Rise>
     ),
-    [media.data, optimistic, likedSet, toggle, router]
+    [media.data, strips.data, optimistic, likedSet, toggle, router]
   );
 
   return (
