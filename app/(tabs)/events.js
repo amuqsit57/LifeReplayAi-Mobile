@@ -90,6 +90,43 @@ function EventCard({ event, cover, onPress }) {
   );
 }
 
+/** The same event at half the width, for everything below the first. */
+function EventTile({ event, cover, onPress }) {
+  const count = event.memories?.[0]?.count ?? 0;
+
+  return (
+    <Tappable onPress={onPress} haptic scaleTo={0.97} style={styles.tile}>
+      <View style={styles.tileCoverWrap}>
+        {cover ? (
+          <Image
+            source={{ uri: cover }}
+            style={styles.tileCover}
+            contentFit="cover"
+            transition={160}
+            recyclingKey={event.id}
+          />
+        ) : (
+          <View style={[styles.tileCover, styles.coverEmpty]}>
+            <Feather name="image" size={18} color={colors.textMuted} />
+          </View>
+        )}
+        <View style={styles.tileBadge}>
+          <Feather name="layers" size={9} color="#fff" />
+          <Text style={styles.tileBadgeText}>{count}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.tileTitle} numberOfLines={1}>
+        {event.title}
+      </Text>
+      <Text style={styles.tileMeta} numberOfLines={1}>
+        {ago(event.created_at)}
+        {event.location ? ` · ${event.location}` : ''}
+      </Text>
+    </Tappable>
+  );
+}
+
 export default function EventsScreen() {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
@@ -120,9 +157,14 @@ export default function EventsScreen() {
     return applySort(filtered, sort, 'events');
   }, [all, query, sort]);
 
+  // The newest event runs full width; everything after it goes two abreast. One
+  // large card gives the list a place to start, and twenty identical rows do not.
+  const featured = list[0] ?? null;
+  const rest = useMemo(() => list.slice(1), [list]);
+
   const renderItem = useCallback(
     ({ item }) => (
-      <EventCard
+      <EventTile
         event={item}
         cover={covers.data?.[item.id]}
         onPress={() => router.push(`/event/${item.id}`)}
@@ -166,16 +208,29 @@ export default function EventsScreen() {
 
       <FlatList
         contentContainerStyle={styles.content}
-        data={list}
+        data={rest}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
+        numColumns={2}
+        columnWrapperStyle={styles.row}
         ListHeaderComponent={
-          !query ? (
-            <View style={styles.lead}>
-              <CreateCard onPress={() => setCreating(true)} />
-            </View>
-          ) : null
+          <View>
+            {!query ? (
+              <View style={styles.lead}>
+                <CreateCard onPress={() => setCreating(true)} />
+              </View>
+            ) : null}
+            {featured ? (
+              <View style={styles.lead}>
+                <EventCard
+                  event={featured}
+                  cover={covers.data?.[featured.id]}
+                  onPress={() => router.push(`/event/${featured.id}`)}
+                />
+              </View>
+            ) : null}
+            {rest.length ? <Text style={styles.section}>Earlier</Text> : null}
+          </View>
         }
         ListEmptyComponent={
           events.isLoading ? (
@@ -213,6 +268,27 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
   lead: { marginBottom: spacing.xl },
+  row: { gap: spacing.md, marginBottom: spacing.lg },
+  section: { ...type.heading, color: colors.text, marginBottom: spacing.md },
+
+  tile: { flex: 1, gap: 6 },
+  tileCoverWrap: { borderRadius: radius.md, overflow: 'hidden' },
+  tileCover: { width: '100%', aspectRatio: 1, backgroundColor: colors.mediaPlaceholder },
+  tileBadge: {
+    position: 'absolute',
+    left: spacing.sm,
+    bottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    backgroundColor: 'rgba(16,12,26,0.62)',
+  },
+  tileBadgeText: { ...type.tiny, color: '#fff', fontSize: 10 },
+  tileTitle: { ...type.bodyStrong, color: colors.text },
+  tileMeta: { ...type.caption, color: colors.textMuted },
 
   sortBar: {
     alignSelf: 'flex-start',

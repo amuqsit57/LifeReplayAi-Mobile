@@ -66,10 +66,21 @@ export function useTour() {
 export default function Tour({ onDismiss, onStart }) {
   const [index, setIndex] = useState(0);
   const fade = useRef(new Animated.Value(0)).current;
+  const pager = useRef(null);
+  // Measured rather than derived from the window, so the page width matches the
+  // card whatever padding it ends up with.
+  const [pageWidth, setPageWidth] = useState(width - spacing.lg * 2);
 
   useEffect(() => {
     Animated.timing(fade, { toValue: 1, duration: 320, useNativeDriver: true }).start();
   }, [fade]);
+
+  // Next only moved the state; the pager stayed where it was, so the words never
+  // changed. Moving the scroller is what actually advances it.
+  const goTo = (next) => {
+    setIndex(next);
+    pager.current?.scrollTo({ x: next * pageWidth, animated: true });
+  };
 
   const step = STEPS[index];
   const last = index === STEPS.length - 1;
@@ -90,16 +101,18 @@ export default function Tour({ onDismiss, onStart }) {
         </View>
 
         <ScrollView
+          ref={pager}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          onLayout={(event) => setPageWidth(event.nativeEvent.layout.width)}
           onMomentumScrollEnd={(event) =>
-            setIndex(Math.round(event.nativeEvent.contentOffset.x / (width - spacing.lg * 2)))
+            setIndex(Math.round(event.nativeEvent.contentOffset.x / pageWidth))
           }
           style={{ marginHorizontal: -spacing.lg }}
         >
           {STEPS.map((entry) => (
-            <View key={entry.title} style={[styles.page, { width: width - spacing.lg * 2 }]}>
+            <View key={entry.title} style={[styles.page, { width: pageWidth }]}>
               <View style={[styles.badge, { backgroundColor: entry.tint + '1A' }]}>
                 <Feather name={entry.icon} size={19} color={entry.tint} />
               </View>
@@ -124,7 +137,7 @@ export default function Tour({ onDismiss, onStart }) {
 
           <Pressable
             style={[styles.cta, { backgroundColor: last ? colors.primary : colors.surfaceAlt }]}
-            onPress={() => (last ? onStart?.() : setIndex(Math.min(index + 1, STEPS.length - 1)))}
+            onPress={() => (last ? onStart?.() : goTo(Math.min(index + 1, STEPS.length - 1)))}
           >
             <Text style={[styles.ctaText, { color: last ? '#fff' : colors.text }]}>
               {last ? 'Make my first event' : 'Next'}

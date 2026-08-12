@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
@@ -70,6 +71,34 @@ function AlbumTile({ album, cover, onPress }) {
   );
 }
 
+/** The newest album, full width, so the grid has a place to start. */
+function FeaturedAlbum({ album, cover, onPress }) {
+  const count = album.album_memories?.[0]?.count ?? 0;
+
+  return (
+    <Tappable onPress={onPress} haptic scaleTo={0.985} style={styles.feature}>
+      {cover ? (
+        <Image source={{ uri: cover }} style={styles.featureCover} contentFit="cover" transition={160} />
+      ) : (
+        <View style={[styles.featureCover, styles.coverEmpty]}>
+          <Feather name="folder" size={26} color={colors.textMuted} />
+        </View>
+      )}
+      <LinearGradient colors={colors.posterScrim} style={styles.featureScrim} pointerEvents="none" />
+
+      <View style={styles.featureText}>
+        <Text style={styles.featureTitle} numberOfLines={1}>
+          {album.title}
+        </Text>
+        <Text style={styles.featureMeta} numberOfLines={1}>
+          {album.events?.title ?? 'An event'} · {count} {count === 1 ? 'item' : 'items'} ·{' '}
+          {modified(album.created_at).replace('Last modified ', '')}
+        </Text>
+      </View>
+    </Tappable>
+  );
+}
+
 function NewAlbumTile({ onPress }) {
   return (
     <Tappable onPress={onPress} haptic style={styles.tile}>
@@ -115,9 +144,13 @@ export default function AlbumsScreen() {
     return applySort(filtered, sort, 'albums');
   }, [all, query, sort]);
 
-  // The "new" tile rides at the end of the same grid rather than sitting apart,
-  // so the affordance is where the albums are.
-  const cells = useMemo(() => [...list, { id: '__new__', isNew: true }], [list]);
+  // The newest runs full width; the rest go two abreast, with the "new" tile
+  // riding at the end of the grid so the affordance is where the albums are.
+  const featured = list[0] ?? null;
+  const cells = useMemo(
+    () => [...list.slice(1), { id: '__new__', isNew: true }],
+    [list]
+  );
   const sortLabel = SORTS.albums.find((s) => s.value === sort)?.label ?? 'Newest first';
 
   return (
@@ -163,12 +196,23 @@ export default function AlbumsScreen() {
             )
           }
           ListHeaderComponent={
-            list.length === 0 && !query ? (
-              <Text style={styles.hint}>
-                Open an event, hold a photo to start selecting, then choose Album. Each one gets
-                its own films.
-              </Text>
-            ) : null
+            <View>
+              {list.length === 0 && !query ? (
+                <Text style={styles.hint}>
+                  Open an event, hold a photo to start selecting, then choose Album. Each one gets
+                  its own films.
+                </Text>
+              ) : null}
+              {featured ? (
+                <View style={{ marginBottom: spacing.xl }}>
+                  <FeaturedAlbum
+                    album={featured}
+                    cover={covers.data?.[featured.event_id]}
+                    onPress={() => router.push(`/album/${featured.id}`)}
+                  />
+                </View>
+              ) : null}
+            </View>
           }
           initialNumToRender={6}
           windowSize={5}
@@ -204,6 +248,20 @@ const styles = StyleSheet.create({
   sortText: { ...type.label, color: colors.primary },
 
   hint: { ...type.caption, color: colors.textMuted, marginBottom: spacing.lg },
+
+  feature: {
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    ...shadow.card,
+  },
+  featureCover: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.mediaPlaceholder },
+  featureScrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '70%' },
+  featureText: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.md, gap: 2 },
+  featureTitle: { ...type.title, color: '#fff' },
+  featureMeta: { ...type.caption, color: 'rgba(255,255,255,0.85)' },
 
   tile: { flex: 1, gap: 6 },
   coverWrap: { borderRadius: radius.md, overflow: 'hidden' },

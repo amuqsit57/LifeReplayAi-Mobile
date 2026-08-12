@@ -75,7 +75,7 @@ export default function PostCard({ post, media, liked, onToggleLike, onOpen, onO
         </View>
 
         <View style={styles.play}>
-          <Feather name="play" size={19} color={colors.text} style={{ marginLeft: 3 }} />
+          <Feather name="play" size={19} color="#fff" style={{ marginLeft: 3 }} />
         </View>
 
       </Pressable>
@@ -165,8 +165,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   slateBar: { width: 4, alignSelf: 'stretch', marginRight: 4 },
-  slateText: { ...type.slate, color: colors.text },
-  slateDim: { ...type.slate, color: colors.textSoft },
+  // Fixed white, not the text token. These sit on a dark chip over a photograph,
+  // and the token went back to near-black with the light theme — which made the
+  // style name and the runtime invisible.
+  slateText: { ...type.slate, color: '#fff' },
+  slateDim: { ...type.slate, color: 'rgba(255,255,255,0.75)' },
 
   play: {
     position: 'absolute',
@@ -175,11 +178,11 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: 'rgba(246,240,232,0.16)',
+    backgroundColor: 'rgba(16,12,26,0.42)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(246,240,232,0.4)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.55)',
   },
 
   caption: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: 2 },
