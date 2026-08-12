@@ -112,6 +112,9 @@ export default function EditorScreen() {
   const player = useVideoPlayer(null, (instance) => {
     instance.loop = false;
     instance.muted = true;
+    // It makes no sound, so it has no business holding the audio session — the
+    // music sheet's player needs it to be audible.
+    instance.audioMixingMode = 'mixWithOthers';
   });
 
   // Read inside listeners and timers without making every edit restart playback.

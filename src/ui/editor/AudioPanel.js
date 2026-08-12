@@ -3,7 +3,7 @@ import { useEventListener } from 'expo';
 import * as DocumentPicker from 'expo-document-picker';
 import { useVideoPlayer } from 'expo-video';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -70,8 +70,17 @@ export default function AudioPanel({
 
   // One player for the whole sheet. Several would mean two tracks at once the
   // first time somebody taps a second play button.
+  //
+  // expo-video plays an audio-only file perfectly well and no view is rendered
+  // for it — this exists to make a sound, not a picture. `doNotMix` because the
+  // editor's own (muted) player is alive on the screen behind this sheet, and on
+  // iOS whichever player holds the audio session decides whether anything is
+  // audible.
   const player = useVideoPlayer(null, (instance) => {
     instance.loop = true;
+    instance.muted = false;
+    instance.volume = 1;
+    instance.audioMixingMode = 'doNotMix';
   });
 
   useEventListener(player, 'playingChange', ({ isPlaying }) => setPlaying(isPlaying));
@@ -83,19 +92,36 @@ export default function AudioPanel({
     }
   }, [visible, player]);
 
+  // Which track the play button was last pointed at. Compared on arrival so a
+  // slow load cannot start playing after you have already tapped another one.
+  const wanted = useRef(null);
+
   const audition = (key, uri) => {
     if (!uri) return;
     if (nowPlaying === key && playing) {
       player.pause();
       return;
     }
-    try {
-      player.replace({ uri });
-      player.play();
-      setNowPlaying(key);
-    } catch {
-      setError('That track would not play.');
-    }
+
+    setNowPlaying(key);
+    wanted.current = key;
+    setError(null);
+
+    // Load, *then* play. Calling play() straight after replace() asks a player
+    // that has nothing loaded to start, and it quietly does nothing — which is
+    // exactly why no music came out.
+    player
+      .replaceAsync({ uri })
+      .then(() => {
+        if (wanted.current !== key) return;
+        player.currentTime = 0;
+        player.play();
+      })
+      .catch(() => {
+        if (wanted.current !== key) return;
+        setNowPlaying(null);
+        setError('That track would not play.');
+      });
   };
 
   const isOn = (key) => nowPlaying === key && playing;
