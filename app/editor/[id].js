@@ -20,6 +20,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../src/lib/api';
+import { useClipCache } from '../../src/lib/clips';
 import {
   SPEED_RATE,
   addClips,
@@ -110,10 +111,43 @@ export default function EditorScreen() {
   // soundtrack that does not exist.
   const [playing, setPlaying] = useState(false);
 
-  const sourceUri = memory?.kind === 'video' ? memory.url ?? null : null;
+  // ---- having the clips before they are needed ---------------------------
+  // Every video the edit uses, in the order it uses them, fetched to disk as
+  // soon as the edit opens. A two second shot cannot download a five megabyte
+  // file inside its own two seconds, so waiting until its turn was always going
+  // to stall — however gracefully the waiting was handled.
+  const videos = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    for (const shot of clips) {
+      const source = byId[shot.memory_id];
+      if (source?.kind === 'video' && source.url && !seen.has(source.id)) {
+        seen.add(source.id);
+        out.push({ id: source.id, url: source.url });
+      }
+    }
+    return out;
+  }, [clips, byId]);
 
-  // Cached, so a clip reached a second time — scrubbing back, playing again —
-  // does not download again.
+  const cache = useClipCache(videos);
+
+  // The file this shot plays from, chosen when the shot comes up and then left
+  // alone. Swapping a remote URL for a local copy the moment the download lands
+  // would rebuild the player underneath a shot that is already on screen and
+  // restart it — so the choice only moves while nothing is playing.
+  const [sourceUri, setSourceUri] = useState(null);
+
+  useEffect(() => {
+    if (playing) return;
+    if (memory?.kind !== 'video' || !memory.url) {
+      setSourceUri(null);
+      return;
+    }
+    setSourceUri(cache.local[memory.id] ?? memory.url);
+  }, [memory?.id, memory?.kind, memory?.url, cache.local, playing]);
+
+  // Cached by the player too, so a clip reached a second time within a session
+  // costs nothing even before its file has landed.
   const asVideo = (uri) => (uri ? { uri, useCaching: true } : null);
 
   // The source goes into the hook rather than being pushed in afterwards.
@@ -142,10 +176,10 @@ export default function EditorScreen() {
   const upcoming = useMemo(() => {
     for (let i = selected + 1; i < clips.length; i += 1) {
       const next = byId[clips[i].memory_id];
-      if (next?.kind === 'video' && next.url) return next.url;
+      if (next?.kind === 'video' && next.url) return cache.local[next.id] ?? next.url;
     }
     return null;
-  }, [clips, byId, selected]);
+  }, [clips, byId, selected, cache.local]);
 
   useVideoPlayer(asVideo(upcoming), (instance) => {
     instance.muted = true;
@@ -447,6 +481,18 @@ export default function EditorScreen() {
         onTogglePlay={() => setPlaying((on) => !on)}
       />
 
+      {/* Quiet, and only while it is true. The edit is usable throughout — this
+          says why the first pass over a video may still pause. */}
+      {cache.busy && cache.total ? (
+        <View style={styles.prep}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.prepText}>
+            Getting {cache.total === 1 ? 'the clip' : `${cache.total} clips`} ready ·{' '}
+            {cache.done}/{cache.total}
+          </Text>
+        </View>
+      ) : null}
+
       <Tracks
         clips={clips}
         byId={byId}
@@ -609,6 +655,16 @@ const styles = StyleSheet.create({
   headActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   save: { ...type.label, color: colors.primary },
   saveOff: { color: colors.borderStrong },
+
+  prep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 6,
+    backgroundColor: colors.primarySoft,
+  },
+  prepText: { ...type.caption, color: colors.primary },
 
   bar: {
     flexDirection: 'row',
