@@ -17,7 +17,16 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
  * deliberately small — enough to register in the hand, not enough to notice as
  * an animation.
  */
-export function Tappable({ children, onPress, onLongPress, scaleTo = 0.97, haptic, style, disabled }) {
+export function Tappable({
+  children,
+  onPress,
+  onLongPress,
+  scaleTo = 0.97,
+  haptic,
+  style,
+  disabled,
+  fill,
+}) {
   const scale = useRef(new Animated.Value(1)).current;
 
   const spring = (toValue) =>
@@ -30,6 +39,11 @@ export function Tappable({ children, onPress, onLongPress, scaleTo = 0.97, hapti
 
   return (
     <Pressable
+      // `fill` puts the flex on the Pressable, which is the element a row or a
+      // grid column actually lays out. Without it a `flex: 1` in `style` lands on
+      // the inner animated view, the Pressable sizes to its content, and two
+      // tiles that should share a row do not.
+      style={fill ? styles.fill : undefined}
       disabled={disabled}
       onPressIn={() => spring(scaleTo)}
       onPressOut={() => spring(1)}
@@ -163,6 +177,7 @@ export function Segmented({ options, value, onChange }) {
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   action: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -95,7 +95,7 @@ function EventTile({ event, cover, onPress }) {
   const count = event.memories?.[0]?.count ?? 0;
 
   return (
-    <Tappable onPress={onPress} haptic scaleTo={0.97} style={styles.tile}>
+    <Tappable onPress={onPress} haptic scaleTo={0.97} fill style={styles.tile}>
       <View style={styles.tileCoverWrap}>
         {cover ? (
           <Image
@@ -160,16 +160,25 @@ export default function EventsScreen() {
   // The newest event runs full width; everything after it goes two abreast. One
   // large card gives the list a place to start, and twenty identical rows do not.
   const featured = list[0] ?? null;
-  const rest = useMemo(() => list.slice(1), [list]);
+
+  // An odd tail leaves one tile alone on the last row, and a flexed child on its
+  // own fills the whole width — so it is balanced with an invisible partner.
+  const rest = useMemo(() => {
+    const tail = list.slice(1);
+    return tail.length % 2 ? [...tail, { id: '__spacer__', spacer: true }] : tail;
+  }, [list]);
 
   const renderItem = useCallback(
-    ({ item }) => (
-      <EventTile
-        event={item}
-        cover={covers.data?.[item.id]}
-        onPress={() => router.push(`/event/${item.id}`)}
-      />
-    ),
+    ({ item }) =>
+      item.spacer ? (
+        <View style={styles.tile} />
+      ) : (
+        <EventTile
+          event={item}
+          cover={covers.data?.[item.id]}
+          onPress={() => router.push(`/event/${item.id}`)}
+        />
+      ),
     [covers.data, router]
   );
 
@@ -229,7 +238,9 @@ export default function EventsScreen() {
                 />
               </View>
             ) : null}
-            {rest.length ? <Text style={styles.section}>Earlier</Text> : null}
+            {rest.filter((item) => !item.spacer).length ? (
+              <Text style={styles.section}>Earlier</Text>
+            ) : null}
           </View>
         }
         ListEmptyComponent={

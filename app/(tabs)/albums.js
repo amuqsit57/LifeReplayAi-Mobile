@@ -38,7 +38,7 @@ function AlbumTile({ album, cover, onPress }) {
   const count = album.album_memories?.[0]?.count ?? 0;
 
   return (
-    <Tappable onPress={onPress} haptic style={styles.tile}>
+    <Tappable onPress={onPress} haptic fill style={styles.tile}>
       <View style={styles.coverWrap}>
         {cover ? (
           <Image
@@ -101,7 +101,7 @@ function FeaturedAlbum({ album, cover, onPress }) {
 
 function NewAlbumTile({ onPress }) {
   return (
-    <Tappable onPress={onPress} haptic style={styles.tile}>
+    <Tappable onPress={onPress} haptic fill style={styles.tile}>
       <View style={[styles.cover, styles.newTile]}>
         <View style={styles.newIcon}>
           <Feather name="folder-plus" size={19} color={colors.primary} />
@@ -147,10 +147,12 @@ export default function AlbumsScreen() {
   // The newest runs full width; the rest go two abreast, with the "new" tile
   // riding at the end of the grid so the affordance is where the albums are.
   const featured = list[0] ?? null;
-  const cells = useMemo(
-    () => [...list.slice(1), { id: '__new__', isNew: true }],
-    [list]
-  );
+  const cells = useMemo(() => {
+    const tail = [...list.slice(1), { id: '__new__', isNew: true }];
+    // An odd tail leaves one tile alone on the last row, and a flexed child on
+    // its own fills the whole width — balanced with an invisible partner.
+    return tail.length % 2 ? [...tail, { id: '__spacer__', spacer: true }] : tail;
+  }, [list]);
   const sortLabel = SORTS.albums.find((s) => s.value === sort)?.label ?? 'Newest first';
 
   return (
@@ -185,7 +187,9 @@ export default function AlbumsScreen() {
           numColumns={2}
           columnWrapperStyle={styles.row}
           renderItem={({ item }) =>
-            item.isNew ? (
+            item.spacer ? (
+              <View style={styles.tile} />
+            ) : item.isNew ? (
               <NewAlbumTile onPress={() => router.push('/(tabs)/events')} />
             ) : (
               <AlbumTile
