@@ -78,7 +78,14 @@ export function ActionCount({ icon, count, label, active, onPress, tint }) {
       accessibilityLabel={label}
       style={({ pressed }) => [styles.action, pressed && { opacity: 0.55 }]}
     >
-      <Feather name={icon} size={19} color={colour} />
+      <Feather
+        name={icon}
+        size={19}
+        color={colour}
+        // A liked heart is filled, not just recoloured — colour alone is a weak
+        // signal and useless to anyone who cannot see the difference.
+        style={active && icon === 'heart' ? { textShadowColor: colour, textShadowRadius: 6 } : null}
+      />
       {count > 0 ? (
         <Text style={[styles.actionCount, active && { color: colour }]}>{count}</Text>
       ) : null}

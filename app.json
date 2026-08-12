@@ -34,7 +34,8 @@
           "photosPermission": "Life Replay needs access to your photos so you can add memories to your family's events."
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-font"
     ]
   }
 }
