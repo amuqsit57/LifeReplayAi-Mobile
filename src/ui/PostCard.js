@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../theme';
+import { Tappable } from './press';
 import { ActionCount, Avatar } from './social';
 
 function when(iso) {
@@ -23,7 +24,18 @@ function runtime(seconds) {
   return `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
 }
 
-/** A film in the feed: its poster, what it is, and who made it. */
+/**
+ * A film in the feed.
+ *
+ * The picture carries everything: what kind of film it is at the top, what it is
+ * called at the bottom, how long it runs and a control to play it. Chrome on the
+ * image rather than in bands above and below means the poster gets the whole
+ * card, which is the only thing on screen worth the space.
+ *
+ * Everything drawn on the picture is white on a gradient, and fixed white at
+ * that — never a theme token, since those follow the page and this sits on a
+ * photograph.
+ */
 export default function PostCard({ post, media, liked, onToggleLike, onOpen, onOpenEvent }) {
   const meta = STYLE_META[post.style] ?? {};
   const author = post.profiles ?? {};
@@ -50,49 +62,59 @@ export default function PostCard({ post, media, liked, onToggleLike, onOpen, onO
 
   return (
     <View style={styles.card}>
-      <Pressable onPress={onOpen} style={styles.stage}>
-        {media?.thumbnail_url ? (
-          <Image
-            source={{ uri: media.thumbnail_url }}
-            style={styles.poster}
-            contentFit="cover"
-            transition={200}
-            recyclingKey={post.id}
-          />
-        ) : (
-          <View style={[styles.poster, styles.posterEmpty]}>
-            <Feather name={meta.icon ?? 'film'} size={28} color={colors.textMuted} />
+      <Tappable onPress={onOpen} scaleTo={0.985} haptic>
+        <View style={styles.stage}>
+          {media?.thumbnail_url ? (
+            <Image
+              source={{ uri: media.thumbnail_url }}
+              style={styles.poster}
+              contentFit="cover"
+              transition={200}
+              recyclingKey={post.id}
+            />
+          ) : (
+            <View style={[styles.poster, styles.posterEmpty]}>
+              <Feather name={meta.icon ?? 'film'} size={30} color={colors.textMuted} />
+            </View>
+          )}
+
+          <LinearGradient colors={colors.posterScrim} style={styles.scrim} pointerEvents="none" />
+
+          {/* What kind of film, and what it was made from. */}
+          <View style={styles.topRow}>
+            <View style={styles.chip}>
+              <View style={[styles.chipDot, { backgroundColor: meta.tint ?? colors.primary }]} />
+              <Text style={styles.chipText}>{meta.label ?? post.style}</Text>
+            </View>
+            {shots ? (
+              <View style={styles.chip}>
+                <Feather name="scissors" size={10} color="#fff" />
+                <Text style={styles.chipText}>{shots}</Text>
+              </View>
+            ) : null}
           </View>
-        )}
 
-        <LinearGradient colors={colors.posterScrim} style={styles.scrim} pointerEvents="none" />
+          {/* Title left, runtime and the play control right, on one baseline. */}
+          <View style={styles.bottomRow}>
+            <View style={styles.titleBlock}>
+              <Text style={styles.eyebrow} numberOfLines={1}>
+                {event.title ?? 'An event'}
+                {post.albums?.title ? ` · ${post.albums.title}` : ''}
+              </Text>
+              <Text style={styles.filmTitle} numberOfLines={2}>
+                {post.editing_plan?.title || event.title || 'A film'}
+              </Text>
+            </View>
 
-        {/* A slate, the way a shot is marked before it is filmed. */}
-        <View style={styles.slate}>
-          <View style={[styles.slateBar, { backgroundColor: meta.tint ?? colors.primary }]} />
-          <Text style={styles.slateText}>{(meta.label ?? post.style).toUpperCase()}</Text>
-          {length ? <Text style={styles.slateDim}>{length}</Text> : null}
+            <View style={styles.playBlock}>
+              {length ? <Text style={styles.runtime}>{length}</Text> : null}
+              <View style={styles.play}>
+                <Feather name="play" size={17} color={colors.text} style={{ marginLeft: 2 }} />
+              </View>
+            </View>
+          </View>
         </View>
-
-        <View style={styles.play}>
-          <Feather name="play" size={19} color="#fff" style={{ marginLeft: 3 }} />
-        </View>
-
-      </Pressable>
-
-      {/* Title below the picture rather than over it. White text on a poster is
-          only readable when the picture underneath happens to be dark, and half
-          of these are not. */}
-      <Pressable onPress={onOpen} style={styles.caption}>
-        <Text style={styles.filmTitle} numberOfLines={2}>
-          {post.editing_plan?.title || event.title || 'A film'}
-        </Text>
-        <Text style={styles.creditsLine} numberOfLines={1}>
-          {event.title}
-          {post.albums?.title ? ` · ${post.albums.title}` : ''}
-          {shots ? ` · ${shots} shots` : ''}
-        </Text>
-      </Pressable>
+      </Tappable>
 
       <View style={styles.foot}>
         <Pressable style={styles.by} onPress={onOpenEvent}>
@@ -111,7 +133,7 @@ export default function PostCard({ post, media, liked, onToggleLike, onOpen, onO
               count={likes}
               label="Like"
               active={liked}
-              tint={colors.primary}
+              tint={colors.accent}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 onToggleLike(post.id, !liked);
@@ -146,48 +168,55 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   stage: { backgroundColor: colors.mediaPlaceholder },
-  poster: { width: '100%', aspectRatio: 3 / 4, backgroundColor: colors.mediaPlaceholder },
+  poster: { width: '100%', aspectRatio: 4 / 5, backgroundColor: colors.mediaPlaceholder },
   posterEmpty: { alignItems: 'center', justifyContent: 'center' },
-  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '60%' },
+  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%' },
 
-  slate: {
+  topRow: {
     position: 'absolute',
     top: spacing.md,
     left: spacing.md,
     flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.sm,
-    paddingRight: spacing.md,
-    paddingVertical: 5,
-    paddingLeft: 0,
-    borderRadius: radius.sm,
-    backgroundColor: 'rgba(8,6,5,0.62)',
-    overflow: 'hidden',
   },
-  slateBar: { width: 4, alignSelf: 'stretch', marginRight: 4 },
-  // Fixed white, not the text token. These sit on a dark chip over a photograph,
-  // and the token went back to near-black with the light theme — which made the
-  // style name and the runtime invisible.
-  slateText: { ...type.slate, color: '#fff' },
-  slateDim: { ...type.slate, color: 'rgba(255,255,255,0.75)' },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(16,12,26,0.55)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  chipDot: { width: 6, height: 6, borderRadius: 3 },
+  chipText: { ...type.tiny, color: '#fff' },
 
-  play: {
+  bottomRow: {
     position: 'absolute',
-    alignSelf: 'center',
-    top: '38%',
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: 'rgba(16,12,26,0.42)',
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.md,
+  },
+  titleBlock: { flex: 1, gap: 2 },
+  eyebrow: { ...type.caption, color: 'rgba(255,255,255,0.78)' },
+  filmTitle: { ...type.title, color: '#fff' },
+
+  playBlock: { alignItems: 'center', gap: 6 },
+  runtime: { ...type.tiny, color: 'rgba(255,255,255,0.9)' },
+  // Solid rather than translucent, so it reads as a control on any picture.
+  play: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.94)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.55)',
   },
-
-  caption: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: 2 },
-  filmTitle: { ...type.title, color: colors.text },
-  creditsLine: { ...type.caption, color: colors.textMuted },
 
   foot: {
     flexDirection: 'row',

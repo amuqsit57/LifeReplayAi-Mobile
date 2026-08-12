@@ -5,6 +5,12 @@ import { colors, radius, shadow, spacing, type } from '../theme';
 
 /** Ways to order a list. Newest first everywhere by default. */
 export const SORTS = {
+  films: [
+    { value: 'recent', label: 'Newest first', icon: 'arrow-down', hint: 'Most recently finished' },
+    { value: 'oldest', label: 'Oldest first', icon: 'arrow-up', hint: 'In the order they were made' },
+    { value: 'liked', label: 'Most liked', icon: 'heart', hint: 'What people came back to' },
+    { value: 'longest', label: 'Longest', icon: 'clock', hint: 'The fuller cuts first' },
+  ],
   events: [
     { value: 'recent', label: 'Newest first', icon: 'arrow-down', hint: 'Most recently created' },
     { value: 'oldest', label: 'Oldest first', icon: 'arrow-up', hint: 'How the year happened' },
@@ -25,7 +31,10 @@ export function applySort(rows, sort, kind) {
     kind === 'albums'
       ? row.album_memories?.[0]?.count ?? 0
       : row.memories?.[0]?.count ?? 0;
-  const made = (row) => new Date(row.created_at ?? 0).getTime();
+  // A film's date is when it finished, not when it was asked for — a render
+  // queued yesterday and finished today belongs at the top.
+  const made = (row) =>
+    new Date((kind === 'films' ? row.completed_at : null) ?? row.created_at ?? 0).getTime();
 
   const sorted = [...rows];
   switch (sort) {
@@ -33,6 +42,12 @@ export function applySort(rows, sort, kind) {
       return sorted.sort((a, b) => made(a) - made(b));
     case 'largest':
       return sorted.sort((a, b) => count(b) - count(a));
+    case 'liked':
+      return sorted.sort(
+        (a, b) => (b.replay_likes?.[0]?.count ?? 0) - (a.replay_likes?.[0]?.count ?? 0)
+      );
+    case 'longest':
+      return sorted.sort((a, b) => (b.duration_seconds ?? 0) - (a.duration_seconds ?? 0));
     case 'name':
       return sorted.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''));
     default:

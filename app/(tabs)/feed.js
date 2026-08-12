@@ -1,11 +1,12 @@
+import { Feather } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { api } from '../../src/lib/api';
 import { feed, myLikes, setLike } from '../../src/lib/data';
-import { STYLE_META, colors, spacing } from '../../src/theme';
+import { STYLE_META, colors, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
 import { Wordmark } from '../../src/ui/brand';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
@@ -13,6 +14,7 @@ import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
 import PostCard from '../../src/ui/PostCard';
 import Rise from '../../src/ui/Rise';
 import { FeedSkeleton } from '../../src/ui/Skeleton';
+import SortSheet, { SORTS, applySort } from '../../src/ui/SortSheet';
 import Tour, { useTour } from '../../src/ui/Tour';
 export default function FeedScreen() {
   const queryClient = useQueryClient();
@@ -20,6 +22,8 @@ export default function FeedScreen() {
   const [optimistic, setOptimistic] = useState({});
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState('');
+  const [sorting, setSorting] = useState(false);
+  const [sort, setSort] = useState('recent');
   const tour = useTour();
 
   const posts = useQuery({ queryKey: ['feed'], queryFn: feed });
@@ -28,13 +32,20 @@ export default function FeedScreen() {
 
   const list = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return all;
-    return all.filter((post) =>
-      [post.events?.title, post.albums?.title, post.profiles?.full_name, STYLE_META[post.style]?.label]
-        .filter(Boolean)
-        .some((field) => field.toLowerCase().includes(needle))
-    );
-  }, [all, query]);
+    const filtered = needle
+      ? all.filter((post) =>
+          [
+            post.events?.title,
+            post.albums?.title,
+            post.profiles?.full_name,
+            STYLE_META[post.style]?.label,
+          ]
+            .filter(Boolean)
+            .some((field) => field.toLowerCase().includes(needle))
+        )
+      : all;
+    return applySort(filtered, sort, 'films');
+  }, [all, query, sort]);
 
   const ids = useMemo(() => all.map((p) => p.id), [all]);
   const idKey = ids.join(',');
@@ -53,6 +64,7 @@ export default function FeedScreen() {
   });
 
   const likedSet = useMemo(() => new Set(liked.data ?? []), [liked.data]);
+  const sortLabel = SORTS.films.find((option) => option.value === sort)?.label ?? 'Newest first';
 
   // Anything finished in the last day counts as something you have not seen yet.
   const fresh = useMemo(
@@ -111,6 +123,17 @@ export default function FeedScreen() {
           onClear={() => setQuery('')}
           placeholder="Search films, events, people"
         />
+        {all.length > 1 ? (
+          <View style={styles.sortRow}>
+            <Text style={styles.count}>
+              {list.length} {list.length === 1 ? 'film' : 'films'}
+            </Text>
+            <Pressable style={styles.sortBtn} onPress={() => setSorting(true)} hitSlop={8}>
+              <Feather name="sliders" size={13} color={colors.primary} />
+              <Text style={styles.sortText}>{sortLabel}</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </ScreenHeader>
 
       <FlatList
@@ -161,6 +184,13 @@ export default function FeedScreen() {
       />
 
       <CreateEventSheet visible={creating} onClose={() => setCreating(false)} />
+      <SortSheet
+        visible={sorting}
+        onClose={() => setSorting(false)}
+        options={SORTS.films}
+        value={sort}
+        onChange={setSort}
+      />
     </View>
   );
 }
@@ -172,4 +202,8 @@ const styles = StyleSheet.create({
   content: { paddingTop: spacing.md, paddingBottom: spacing.xxxl },
   headActions: { flexDirection: 'row', gap: spacing.sm },
   postWrap: { paddingHorizontal: spacing.lg },
+  sortRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  count: { ...type.caption, color: colors.textMuted },
+  sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  sortText: { ...type.label, color: colors.primary },
 });
