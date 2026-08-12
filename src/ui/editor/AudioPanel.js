@@ -68,60 +68,70 @@ export default function AudioPanel({
     staleTime: 60_000,
   });
 
-  // One player for the whole sheet. Several would mean two tracks at once the
-  // first time somebody taps a second play button.
+  // Which track the play button is pointed at. The URI goes into the hook rather
+  // than being pushed into a player held at null: `useVideoPlayer` keys the
+  // player on its source and rebuilds it when that changes, so replacing by hand
+  // works against the hook instead of with it. Doing that is what left both this
+  // and the editor's video silent and still.
   //
-  // expo-video plays an audio-only file perfectly well and no view is rendered
-  // for it — this exists to make a sound, not a picture. `doNotMix` because the
-  // editor's own (muted) player is alive on the screen behind this sheet, and on
-  // iOS whichever player holds the audio session decides whether anything is
-  // audible.
-  const player = useVideoPlayer(null, (instance) => {
+  // expo-video plays an audio-only file perfectly well, and no view is rendered
+  // for it — this exists to make a sound, not a picture.
+  const [cue, setCue] = useState(null);
+  const wantPlay = useRef(false);
+
+  const player = useVideoPlayer(cue?.uri ?? null, (instance) => {
     instance.loop = true;
     instance.muted = false;
     instance.volume = 1;
-    instance.audioMixingMode = 'doNotMix';
+    // Mixes rather than interrupts: the editor's own players are alive on the
+    // screen behind this sheet.
+    instance.audioMixingMode = 'mixWithOthers';
   });
 
   useEventListener(player, 'playingChange', ({ isPlaying }) => setPlaying(isPlaying));
 
+  // A fresh player starts paused, so it is told to start once it can.
+  useEventListener(player, 'statusChange', ({ status }) => {
+    if (status === 'readyToPlay' && wantPlay.current) {
+      try {
+        player.play();
+      } catch {
+        // Torn down between the event and here.
+      }
+    }
+  });
+
   useEffect(() => {
     if (!visible) {
-      player.pause();
+      wantPlay.current = false;
+      try {
+        player.pause();
+      } catch {
+        // Nothing loaded.
+      }
       setNowPlaying(null);
     }
   }, [visible, player]);
 
-  // Which track the play button was last pointed at. Compared on arrival so a
-  // slow load cannot start playing after you have already tapped another one.
-  const wanted = useRef(null);
-
   const audition = (key, uri) => {
     if (!uri) return;
-    if (nowPlaying === key && playing) {
-      player.pause();
+
+    if (nowPlaying === key) {
+      // Same track: toggle it rather than reloading it.
+      wantPlay.current = !playing;
+      try {
+        if (playing) player.pause();
+        else player.play();
+      } catch {
+        // Not loaded yet; the ready event will start it.
+      }
       return;
     }
 
-    setNowPlaying(key);
-    wanted.current = key;
     setError(null);
-
-    // Load, *then* play. Calling play() straight after replace() asks a player
-    // that has nothing loaded to start, and it quietly does nothing — which is
-    // exactly why no music came out.
-    player
-      .replaceAsync({ uri })
-      .then(() => {
-        if (wanted.current !== key) return;
-        player.currentTime = 0;
-        player.play();
-      })
-      .catch(() => {
-        if (wanted.current !== key) return;
-        setNowPlaying(null);
-        setError('That track would not play.');
-      });
+    setNowPlaying(key);
+    wantPlay.current = true;
+    setCue({ key, uri });
   };
 
   const isOn = (key) => nowPlaying === key && playing;
@@ -153,7 +163,12 @@ export default function AudioPanel({
   };
 
   const use = (track) => {
-    onChange({ mode: 'track', path: track.storage_path, name: track.name, prompt: track.prompt });
+    // The URL travels with the choice so the preview can play it at once,
+    // rather than waiting for the edit to be refetched to learn about it.
+    onChange(
+      { mode: 'track', path: track.storage_path, name: track.name, prompt: track.prompt },
+      track.url
+    );
   };
 
   // ---- a file off the phone ----------------------------------------------
@@ -178,7 +193,7 @@ export default function AudioPanel({
       // thing in this API big enough to be worth not proxying.
       await uploadToSignedUrl(permission.upload_url, file.uri, file.mimeType ?? 'audio/mpeg');
 
-      onChange({ mode: 'track', path: permission.storage_path, name: file.name });
+      onChange({ mode: 'track', path: permission.storage_path, name: file.name }, file.uri);
       // Play from the local copy — instant, and it does not wait on a signed URL
       // for a file that is already on this phone.
       audition('uploaded', file.uri);
@@ -232,7 +247,10 @@ export default function AudioPanel({
                     onPress={() => {
                       setOpen(expanded ? null : option.value);
                       if (option.value === 'ai' || option.value === 'none') {
-                        onChange({ mode: option.value });
+                        onChange(
+                        { mode: option.value },
+                        option.value === 'ai' ? score?.url ?? null : null
+                      );
                       }
                     }}
                   >

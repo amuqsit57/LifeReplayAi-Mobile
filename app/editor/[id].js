@@ -109,11 +109,22 @@ export default function EditorScreen() {
   // renderer drops clip audio entirely — so playing it here would preview a
   // soundtrack that does not exist.
   const [playing, setPlaying] = useState(false);
-  const player = useVideoPlayer(null, (instance) => {
+
+  const sourceUri = memory?.kind === 'video' ? memory.url ?? null : null;
+
+  // The source goes into the hook rather than being pushed in afterwards.
+  //
+  // `useVideoPlayer` keys the player on the source and rebuilds it when that
+  // changes, so holding it at null and calling replaceAsync by hand was working
+  // against the hook rather than with it — which is why a video shot sat on its
+  // thumbnail and never played. This is the same shape the replay screen uses,
+  // and that one has always worked.
+  const player = useVideoPlayer(sourceUri, (instance) => {
     instance.loop = false;
+    // The finished film carries music and nothing else — the renderer drops clip
+    // audio — so hearing it here would preview a soundtrack that does not exist.
     instance.muted = true;
-    // It makes no sound, so it has no business holding the audio session — the
-    // music sheet's player needs it to be audible.
+    // Silent, so it has no business claiming the audio session from the music.
     instance.audioMixingMode = 'mixWithOthers';
   });
 
@@ -121,48 +132,7 @@ export default function EditorScreen() {
   const live = useRef({});
   live.current = { clips, byId, selected, playing };
 
-  const sourceUri = memory?.kind === 'video' ? memory.url ?? null : null;
-
-  // Load first. The previous version replaced the source and then seeked and
-  // played in the same breath — the file had not loaded, so both were dropped on
-  // the floor and the picture sat there frozen.
-  //
-  // `replaceAsync` rather than `replace`: the synchronous one loads on the main
-  // thread, which freezes the UI while a shot swaps and is on its way out.
-  useEffect(() => {
-    let stale = false;
-
-    if (!sourceUri) {
-      try {
-        player.pause();
-      } catch {
-        // Nothing loaded to stop.
-      }
-      return undefined;
-    }
-
-    player
-      .replaceAsync({ uri: sourceUri })
-      .then(() => {
-        // The shot moved on while this was loading; whatever is current now has
-        // its own load in flight and should not be overruled by this one.
-        if (stale) return;
-        const current = live.current.clips[live.current.selected];
-        if (!current) return;
-        player.currentTime = Number(current.start_at) || 0;
-        player.playbackRate = SPEED_RATE[current.speed] ?? 1;
-        if (live.current.playing) player.play();
-      })
-      .catch(() => {
-        // A shot that will not load must not stop the run-through.
-      });
-
-    return () => {
-      stale = true;
-    };
-  }, [sourceUri, player]);
-
-  // Then seek and play, once it is actually ready to do either.
+  // Seek and play, once it is actually ready to do either.
   useEventListener(player, 'statusChange', ({ status }) => {
     if (status !== 'readyToPlay') return;
     const { clips: reel, selected: at, playing: running } = live.current;
@@ -209,6 +179,53 @@ export default function EditorScreen() {
 
     return () => clearTimeout(timer);
   }, [playing, selected, player]);
+
+  // ---- the music, under the picture --------------------------------------
+  // A cut is judged against its music or it is not really being judged. The
+  // track will not line up frame for frame with the render — the film opens on
+  // the first bar and this opens wherever you pressed play — but hearing the
+  // shape of it against the shape of the edit is most of the value.
+  //
+  // Held locally as well as read from the server so a track chosen a second ago
+  // is audible without waiting for the edit to be refetched.
+  const [pickedMusic, setPickedMusic] = useState(null);
+  const musicUri =
+    plan?.music?.mode === 'none'
+      ? null
+      : pickedMusic ??
+        (plan?.music?.mode === 'track' ? source.data?.music_url : source.data?.score?.url) ??
+        null;
+
+  const score = useVideoPlayer(musicUri, (instance) => {
+    instance.loop = true;
+    instance.muted = false;
+    instance.volume = 1;
+    instance.audioMixingMode = 'mixWithOthers';
+  });
+
+  useEffect(() => {
+    if (!musicUri) return;
+    try {
+      if (playing) score.play();
+      else score.pause();
+    } catch {
+      // Not loaded yet; the next toggle catches it.
+    }
+  }, [playing, musicUri, score]);
+
+  // Back to the top of the track when the run-through restarts from the first
+  // shot, so a second play does not resume halfway through the music.
+  useEffect(() => {
+    if (playing && selected === 0 && musicUri) {
+      try {
+        score.currentTime = 0;
+      } catch {
+        // Not loaded yet.
+      }
+    }
+    // Deliberately only on the transition into playing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing]);
 
   // Touching anything mid-playback stops it, rather than fighting the timer.
   const stop = useCallback(() => setPlaying(false), []);
@@ -487,7 +504,12 @@ export default function EditorScreen() {
         style={source.data?.replay?.style}
         music={plan.music}
         score={source.data?.score}
-        onChange={(music) => edit((p) => setMusic(p, music))}
+        // The panel knows the URL of whatever was just chosen; keeping it here
+        // means the preview can play it without waiting for a refetch.
+        onChange={(music, url) => {
+          setPickedMusic(url ?? null);
+          edit((p) => setMusic(p, music));
+        }}
       />
     </KeyboardAvoidingView>
   );
