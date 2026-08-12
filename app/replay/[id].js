@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -64,6 +65,22 @@ export default function ReplayScreen() {
     instance.loop = true;
     instance.play();
   });
+
+  // A player carries on running when the screen stops being the one you are
+  // looking at — navigating to the editor left the previous film playing, music
+  // and all, underneath it.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        try {
+          player.pause();
+        } catch {
+          // Already torn down; nothing to stop.
+        }
+      },
+      [player]
+    )
+  );
 
   const ready = data?.status === 'succeeded' && data.url;
 

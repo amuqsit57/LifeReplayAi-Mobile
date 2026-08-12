@@ -353,6 +353,13 @@ export default function EventScreen() {
               </View>
             ) : null}
 
+            <View style={styles.editsHead}>
+              <Text style={styles.editsTitle}>AI generated films</Text>
+              <Text style={styles.hint}>
+                One cut per style, chosen and assembled for you. Asking again replaces it.
+              </Text>
+            </View>
+
             {Object.keys(STYLE_META).map((style) => {
               const existing = eventFilms.find((r) => r.style === style);
               return (
@@ -368,10 +375,11 @@ export default function EventScreen() {
 
             {/* -------------------------------------------------- by hand */}
             <View style={styles.editsHead}>
-              <Text style={styles.editsTitle}>Cut it yourself</Text>
+              <Text style={styles.editsTitle}>Custom films</Text>
               <Text style={styles.hint}>
-                Choose the shots, how long each holds, how it is graded and what it is scored
-                with. Open a film above to start from its cut instead of a blank timeline.
+                Cut them yourself: the shots, how long each holds, how it is graded and what it
+                is scored with. Open a film above to start from its cut rather than a blank
+                timeline. You can keep as many of these as you like.
               </Text>
             </View>
 

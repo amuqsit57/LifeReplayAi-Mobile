@@ -31,6 +31,40 @@ export const GRADES = [
   { value: 'bw', label: 'Black & white', swatch: '#8E8E96', hint: 'No colour' },
 ];
 
+/**
+ * The grades again, as something the phone can actually draw.
+ *
+ * React Native 0.81 on the New Architecture supports the `filter` style prop, so
+ * these are real colour operations rather than a coloured sheet laid over the
+ * picture — grayscale is grayscale, not grey paint at 40%.
+ *
+ * They approximate what FFmpeg does rather than reproduce it. The renderer uses
+ * curves and per-channel levels that no single filter chain matches, so this is
+ * close enough to choose by and never exactly what comes out. `null` means leave
+ * the picture alone.
+ */
+export const GRADE_FILTER = {
+  natural: null,
+  warm: [{ sepia: 0.28 }, { saturate: 1.16 }, { brightness: 1.03 }],
+  golden: [{ sepia: 0.42 }, { saturate: 1.22 }, { brightness: 1.06 }],
+  sunlit: [{ brightness: 1.12 }, { sepia: 0.18 }, { saturate: 1.1 }],
+  cool: [{ 'hue-rotate': '-14deg' }, { saturate: 1.06 }, { brightness: 0.99 }],
+  soft: [{ contrast: 0.88 }, { brightness: 1.06 }, { saturate: 0.96 }],
+  vivid: [{ saturate: 1.55 }, { contrast: 1.12 }],
+  muted: [{ saturate: 0.62 }, { contrast: 0.98 }],
+  vintage: [{ sepia: 0.5 }, { saturate: 0.86 }, { contrast: 0.94 }],
+  faded_film: [{ saturate: 0.78 }, { contrast: 0.82 }, { brightness: 1.1 }],
+  moody: [{ saturate: 0.74 }, { contrast: 1.22 }, { brightness: 0.82 }],
+  teal_orange: [{ 'hue-rotate': '-10deg' }, { saturate: 1.3 }, { contrast: 1.1 }],
+  dreamy: [{ saturate: 1.12 }, { brightness: 1.1 }, { contrast: 0.9 }],
+  noir: [{ grayscale: 1 }, { contrast: 1.45 }, { brightness: 0.92 }],
+  bw: [{ grayscale: 1 }],
+};
+
+/** Textures are grain and light bleed — there is no honest way to draw those
+ *  without the noise plate the renderer uses, so the preview says so instead. */
+export const TEXTURE_PREVIEWABLE = false;
+
 /** Film grain and light bloom. Sparingly — on every shot it reads as a filter. */
 export const TEXTURES = [
   { value: 'none', label: 'Clean', hint: 'No texture' },
