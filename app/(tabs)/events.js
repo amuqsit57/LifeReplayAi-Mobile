@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
@@ -8,9 +9,10 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 import { api } from '../../src/lib/api';
 import { listEvents } from '../../src/lib/data';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
-import { Empty } from '../../src/ui';
+import CreateCard from '../../src/ui/CreateCard';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
 import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
+import { Tappable } from '../../src/ui/press';
 import { RowSkeleton } from '../../src/ui/Skeleton';
 import SortSheet, { SORTS, applySort } from '../../src/ui/SortSheet';
 
@@ -24,37 +26,67 @@ function ago(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 }
 
+/**
+ * An event, led by its own photograph.
+ *
+ * The list used to be a row of small thumbnails beside text, which made
+ * twenty-seven events look like twenty-seven identical rows. A wide cover with
+ * the title over it makes them tell each other apart at a glance — which is the
+ * only job a list of events has.
+ */
 function EventCard({ event, cover, onPress }) {
   const count = event.memories?.[0]?.count ?? 0;
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}>
-      {cover ? (
-        <Image source={{ uri: cover }} style={styles.cover} contentFit="cover" transition={140} recyclingKey={event.id} />
-      ) : (
-        <View style={[styles.cover, styles.coverEmpty]}>
-          <Feather name="image" size={18} color={colors.textMuted} />
-        </View>
-      )}
+    <Tappable onPress={onPress} haptic scaleTo={0.985} style={styles.card}>
+      <View style={styles.coverWrap}>
+        {cover ? (
+          <Image
+            source={{ uri: cover }}
+            style={styles.cover}
+            contentFit="cover"
+            transition={160}
+            recyclingKey={event.id}
+          />
+        ) : (
+          <View style={[styles.cover, styles.coverEmpty]}>
+            <Feather name="image" size={22} color={colors.textMuted} />
+          </View>
+        )}
 
-      <View style={styles.body}>
-        <Text style={styles.title} numberOfLines={1}>
-          {event.title}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {count} {count === 1 ? 'item' : 'items'} · {ago(event.created_at)}
-          {event.location ? ` · ${event.location}` : ''}
-        </Text>
+        <LinearGradient colors={colors.posterScrim} style={styles.scrim} pointerEvents="none" />
+
         {event.invite_code ? (
           <View style={styles.code}>
-            <Feather name="hash" size={10} color={colors.primary} />
+            <Feather name="hash" size={10} color="#fff" />
             <Text style={styles.codeText}>{event.invite_code}</Text>
           </View>
         ) : null}
-      </View>
 
-      <Feather name="chevron-right" size={18} color={colors.textMuted} />
-    </Pressable>
+        <View style={styles.overlay}>
+          <Text style={styles.title} numberOfLines={1}>
+            {event.title}
+          </Text>
+          <View style={styles.metaRow}>
+            <Feather name="layers" size={11} color="rgba(255,255,255,0.85)" />
+            <Text style={styles.meta}>
+              {count} {count === 1 ? 'item' : 'items'}
+            </Text>
+            <Text style={styles.sep}>·</Text>
+            <Text style={styles.meta}>{ago(event.created_at)}</Text>
+            {event.location ? (
+              <>
+                <Text style={styles.sep}>·</Text>
+                <Feather name="map-pin" size={11} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.meta} numberOfLines={1}>
+                  {event.location}
+                </Text>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </View>
+    </Tappable>
   );
 }
 
@@ -68,7 +100,6 @@ export default function EventsScreen() {
   const events = useQuery({ queryKey: ['events'], queryFn: listEvents });
   const all = events.data ?? [];
 
-  // One call for every cover, rather than a full memory listing per card.
   const ids = useMemo(() => all.map((e) => e.id), [all]);
   const covers = useQuery({
     queryKey: ['eventCovers', ids.join(',')],
@@ -101,27 +132,36 @@ export default function EventsScreen() {
   );
 
   const sortLabel = SORTS.events.find((s) => s.value === sort)?.label ?? 'Newest first';
+  const total = all.reduce((sum, event) => sum + (event.memories?.[0]?.count ?? 0), 0);
 
   return (
     <View style={styles.screen}>
       <ScreenHeader
         title="Events"
-        subtitle={`${all.length} ${all.length === 1 ? 'event' : 'events'} you can add to`}
+        subtitle={
+          all.length
+            ? `${all.length} ${all.length === 1 ? 'event' : 'events'} · ${total} memories`
+            : 'Nothing yet'
+        }
         right={
           <RoundButton name="plus" tone="filled" label="New event" onPress={() => setCreating(true)} />
         }
       >
-        <SearchBar
-          value={query}
-          onChangeText={setQuery}
-          onClear={() => setQuery('')}
-          placeholder="Search events or codes"
-        />
-        <Pressable style={styles.sortBar} onPress={() => setSorting(true)}>
-          <Feather name="sliders" size={13} color={colors.textSoft} />
-          <Text style={styles.sortText}>{sortLabel}</Text>
-          <Feather name="chevron-down" size={13} color={colors.textMuted} />
-        </Pressable>
+        {all.length > 2 ? (
+          <>
+            <SearchBar
+              value={query}
+              onChangeText={setQuery}
+              onClear={() => setQuery('')}
+              placeholder="Search events or codes"
+            />
+            <Pressable style={styles.sortBar} onPress={() => setSorting(true)}>
+              <Feather name="sliders" size={13} color={colors.textSoft} />
+              <Text style={styles.sortText}>{sortLabel}</Text>
+              <Feather name="chevron-down" size={13} color={colors.textMuted} />
+            </Pressable>
+          </>
+        ) : null}
       </ScreenHeader>
 
       <FlatList
@@ -129,26 +169,23 @@ export default function EventsScreen() {
         data={list}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
+        ListHeaderComponent={
+          !query ? (
+            <View style={styles.lead}>
+              <CreateCard onPress={() => setCreating(true)} />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           events.isLoading ? (
-            <RowSkeleton count={5} />
-          ) : (
-            <Empty
-              icon="▦"
-              title={query ? 'Nothing matches' : 'No events yet'}
-              body={
-                query
-                  ? `No events for “${query}”.`
-                  : 'Create one for a wedding, a trip, a birthday — then share the code with everyone who was there.'
-              }
-            />
-          )
+            <RowSkeleton count={3} />
+          ) : query ? (
+            <Text style={styles.none}>No events match “{query}”.</Text>
+          ) : null
         }
-        // Only what is near the fold stays mounted, so a long list of events
-        // never has more than a handful of covers decoding at once.
-        initialNumToRender={6}
-        maxToRenderPerBatch={6}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
         windowSize={5}
         removeClippedSubviews
         refreshControl={
@@ -175,6 +212,7 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  lead: { marginBottom: spacing.xl },
 
   sortBar: {
     alignSelf: 'flex-start',
@@ -187,39 +225,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   sortText: { ...type.caption, color: colors.textSoft },
+  none: { ...type.caption, color: colors.textMuted },
 
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
+    overflow: 'hidden',
     ...shadow.card,
   },
-  cover: {
-    width: 60,
-    height: 60,
-    borderRadius: radius.sm,
-    backgroundColor: colors.mediaPlaceholder,
-  },
+  coverWrap: { position: 'relative' },
+  cover: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.mediaPlaceholder },
   coverEmpty: { alignItems: 'center', justifyContent: 'center' },
-
-  body: { flex: 1, gap: 4 },
-  title: { ...type.heading, color: colors.text },
-  meta: { ...type.caption, color: colors.textMuted },
+  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '75%' },
 
   code: {
-    alignSelf: 'flex-start',
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: radius.sm,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: 'rgba(16,12,26,0.55)',
   },
-  codeText: { ...type.tiny, color: colors.primary, letterSpacing: 1 },
+  codeText: { ...type.tiny, color: '#fff', letterSpacing: 1 },
+
+  overlay: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.md, gap: 3 },
+  title: { ...type.title, color: '#fff' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  meta: { ...type.caption, color: 'rgba(255,255,255,0.85)', flexShrink: 1 },
+  sep: { ...type.caption, color: 'rgba(255,255,255,0.5)' },
 });

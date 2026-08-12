@@ -8,18 +8,19 @@ import { feed, myLikes, setLike } from '../../src/lib/data';
 import { STYLE_META, colors, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
 import { Wordmark } from '../../src/ui/brand';
-import CreateCard from '../../src/ui/CreateCard';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
 import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
 import PostCard from '../../src/ui/PostCard';
 import Rise from '../../src/ui/Rise';
 import { FeedSkeleton } from '../../src/ui/Skeleton';
+import Tour, { useTour } from '../../src/ui/Tour';
 export default function FeedScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const [optimistic, setOptimistic] = useState({});
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState('');
+  const tour = useTour();
 
   const posts = useQuery({ queryKey: ['feed'], queryFn: feed });
   const all = posts.data ?? [];
@@ -119,9 +120,19 @@ export default function FeedScreen() {
         renderItem={renderItem}
         ListHeaderComponent={
           !query ? (
-            <View style={styles.postWrap}>
-              <CreateCard onPress={() => setCreating(true)} />
-              {list.length ? <Text style={styles.section}>Recent films</Text> : null}
+            <View>
+              {tour.show ? (
+                <Tour
+                  onDismiss={tour.dismiss}
+                  onStart={() => {
+                    tour.dismiss();
+                    setCreating(true);
+                  }}
+                />
+              ) : null}
+              {list.length ? (
+                <Text style={[styles.postWrap, styles.section]}>Recent films</Text>
+              ) : null}
             </View>
           ) : null
         }
