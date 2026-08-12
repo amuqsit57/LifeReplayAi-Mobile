@@ -1,6 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { useState } from 'react';
+import { useEventListener } from 'expo';
+import { useVideoPlayer } from 'expo-video';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -33,11 +35,36 @@ const IDEAS = [
  * never been able to run silent by choice before — silence was only ever what a
  * failed generation left behind — so "No music" is a real option here.
  */
-export default function AudioPanel({ visible, onClose, replayId, music, onChange }) {
+export default function AudioPanel({ visible, onClose, replayId, music, musicUrl, onChange }) {
   const mode = music?.mode ?? 'ai';
   const [prompt, setPrompt] = useState(music?.prompt ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // The file straight off the picker, so a track can be auditioned the moment it
+  // is chosen rather than after a round trip to fetch a signed URL for it.
+  const [localUri, setLocalUri] = useState(null);
+  const [playing, setPlaying] = useState(false);
+
+  const audible = localUri ?? musicUrl ?? null;
+  // expo-video plays an audio-only file perfectly well, and no view is rendered
+  // for it — this exists to make a sound, not a picture.
+  const player = useVideoPlayer(audible, (instance) => {
+    instance.loop = true;
+  });
+
+  useEventListener(player, 'playingChange', ({ isPlaying }) => setPlaying(isPlaying));
+
+  // Leaving a track playing behind a closed sheet is the kind of thing that gets
+  // noticed halfway through a meeting.
+  useEffect(() => {
+    if (!visible && playing) player.pause();
+  }, [visible, playing, player]);
+
+  const audition = () => {
+    if (!audible) return;
+    if (playing) player.pause();
+    else player.play();
+  };
 
   const pick = async () => {
     setError(null);
@@ -60,6 +87,7 @@ export default function AudioPanel({ visible, onClose, replayId, music, onChange
       // thing in this API big enough to be worth not proxying.
       await uploadToSignedUrl(permission.upload_url, file.uri, file.mimeType ?? 'audio/mpeg');
 
+      setLocalUri(file.uri);
       onChange({ mode: 'track', path: permission.storage_path, name: file.name });
     } catch (problem) {
       setError(problem.message ?? 'That file would not upload.');
@@ -98,17 +126,34 @@ export default function AudioPanel({ visible, onClose, replayId, music, onChange
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.label, on && { color: colors.primary }]}>
-                      {option.label}
-                    </Text>
+                    <View style={styles.labelRow}>
+                      <Text style={[styles.label, on && { color: colors.primary }]}>
+                        {option.label}
+                      </Text>
+                      {option.recommended ? (
+                        <View style={styles.badge}>
+                          <Text style={styles.badgeText}>Recommended</Text>
+                        </View>
+                      ) : null}
+                    </View>
                     <Text style={styles.hint}>
                       {option.value === 'track' && music?.name && on
                         ? music.name
                         : option.hint}
                     </Text>
                   </View>
+
                   {busy && option.value === 'track' ? (
                     <ActivityIndicator size="small" color={colors.primary} />
+                  ) : option.value === 'track' && on && audible ? (
+                    <Pressable
+                      style={styles.audition}
+                      hitSlop={8}
+                      onPress={audition}
+                      accessibilityLabel={playing ? 'Stop' : 'Play this track'}
+                    >
+                      <Feather name={playing ? 'pause' : 'play'} size={15} color="#fff" />
+                    </Pressable>
                   ) : on ? (
                     <Feather name="check" size={17} color={colors.primary} />
                   ) : null}
@@ -193,8 +238,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   label: { ...type.bodyStrong, color: colors.text },
   hint: { ...type.caption, color: colors.textMuted },
+  badge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.successSoft,
+  },
+  badgeText: { ...type.tiny, fontSize: 9.5, color: colors.success },
+  audition: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   promptBox: { gap: spacing.sm, paddingTop: spacing.sm },
   input: {

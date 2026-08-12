@@ -14,7 +14,7 @@ import {
   transitionLabel,
 } from '../../lib/plan';
 import { colors, radius, spacing, type } from '../../theme';
-import { ChipRow, Group, GroupedSheet, Slider, SwatchRow } from './controls';
+import { ChipRow, Group, GroupedSheet, Section, Slider, SwatchRow } from './controls';
 
 const TABS = [
   { value: 'shot', label: 'Shot', icon: 'crop' },
@@ -82,6 +82,7 @@ export default function Inspector({
       >
         {tab === 'shot' ? (
           <>
+            <Section title="Timing" icon="clock" hint="How much screen time this shot gets." />
             <Group
               title="How long it holds"
               action={<Text style={styles.readout}>{Number(clip.seconds).toFixed(1)}s</Text>}
@@ -130,14 +131,20 @@ export default function Inspector({
               </Group>
             ) : null}
 
-            <Group title="Join into the next shot" hint="Cut is right more often than not.">
+            <Section
+              title="Transition"
+              icon="git-commit"
+              hint="How this shot joins the next one. A straight cut is right more often than not."
+            />
+            <Group title="Transition">
               <Pressable style={styles.select} onPress={() => setPicking(true)}>
                 <Text style={styles.selectText}>{transitionLabel(clip.transition)}</Text>
                 <Feather name="chevron-right" size={17} color={colors.textMuted} />
               </Pressable>
             </Group>
 
-            <Group title="Order">
+            <Section title="Order" icon="move" hint="Where this shot sits in the film." />
+            <Group title="Move it">
               <View style={styles.actions}>
                 <Tool
                   icon="arrow-left"
@@ -160,6 +167,11 @@ export default function Inspector({
 
         {tab === 'look' ? (
           <>
+            <Section
+              title="Effects"
+              icon="droplet"
+              hint="Colour, film texture and camera move — applied to this shot when it renders."
+            />
             <Group
               title="Grade"
               action={
@@ -211,6 +223,8 @@ export default function Inspector({
         ) : null}
 
         {tab === 'sound' ? (
+          <>
+          <Section title="Mix" icon="volume-2" hint="Music is set for the whole film — that lives under Music, below the timeline." />
           <Group
             title="This shot's own sound"
             hint={
@@ -227,9 +241,12 @@ export default function Inspector({
               />
             ) : null}
           </Group>
+          </>
         ) : null}
 
         {tab === 'text' ? (
+          <>
+          <Section title="Titles" icon="type" hint="Words drawn over this shot." />
           <Group
             title="Label"
             hint="Set as a title over the shot. A few words — a place, a name, a year."
@@ -244,6 +261,7 @@ export default function Inspector({
               returnKeyType="done"
             />
           </Group>
+          </>
         ) : null}
       </ScrollView>
 

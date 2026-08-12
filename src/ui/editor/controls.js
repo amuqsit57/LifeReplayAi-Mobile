@@ -13,6 +13,25 @@ import {
 
 import { colors, radius, shadow, spacing, type } from '../../theme';
 
+/**
+ * A band across the panel naming what is below it.
+ *
+ * Louder than a group heading on purpose. Without these the panel is a run of
+ * small grey captions and there is no way to tell, at a glance, that scrolling
+ * further gets you the effects.
+ */
+export function Section({ title, hint, icon }) {
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHead}>
+        {icon ? <Feather name={icon} size={13} color={colors.primary} /> : null}
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {hint ? <Text style={styles.sectionHint}>{hint}</Text> : null}
+    </View>
+  );
+}
+
 /** A labelled group inside a control panel. */
 export function Group({ title, hint, children, action }) {
   return (
@@ -206,6 +225,16 @@ export function GroupedSheet({ visible, onClose, title, groups, value, onChange 
 }
 
 const styles = StyleSheet.create({
+  section: {
+    gap: 2,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs,
+  },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionTitle: { ...type.heading, fontSize: 15, color: colors.text },
+  sectionHint: { ...type.caption, color: colors.textMuted },
+
   group: { gap: spacing.sm, paddingVertical: spacing.sm },
   groupHead: {
     flexDirection: 'row',

@@ -3,10 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -19,15 +21,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../src/lib/api';
 import {
+  SPEED_RATE,
   addClips,
   applyToAll,
   duplicateClip,
   formatSeconds,
   gradeLabel,
+  motionLabel,
   moveClip,
   planSeconds,
   removeClip,
   setMusic,
+  shotMillis,
+  textureLabel,
   transitionLabel,
   updateClip,
 } from '../../src/lib/plan';
@@ -36,6 +42,10 @@ import AddShots from '../../src/ui/editor/AddShots';
 import AudioPanel from '../../src/ui/editor/AudioPanel';
 import Inspector from '../../src/ui/editor/Inspector';
 import Timeline from '../../src/ui/editor/Timeline';
+
+// A third of the screen for the picture. An even split with the panel below left
+// the effects two rows tall on a normal phone, which read as them not being there.
+const STAGE_HEIGHT = Math.round(Dimensions.get('window').height * 0.32);
 
 /**
  * The editor.
@@ -91,6 +101,59 @@ export default function EditorScreen() {
   const clip = clips[selected];
   const memory = clip ? byId[clip.memory_id] : null;
   const seconds = planSeconds(plan);
+
+  // ---- playing it back ---------------------------------------------------
+  // Not the finished film — transitions, grades and textures are FFmpeg's work
+  // and happen at render. This runs the cut: the right shots, in the right
+  // order, each held for as long as it was given, video playing from its own
+  // in-point. That is the part you cannot judge from a row of thumbnails.
+  const [playing, setPlaying] = useState(false);
+  const player = useVideoPlayer(null, (instance) => {
+    instance.loop = false;
+    instance.muted = true;
+  });
+
+  // Read inside the timer without making every edit restart playback.
+  const live = useRef({ clips, byId });
+  live.current = { clips, byId };
+
+  useEffect(() => {
+    if (!playing) {
+      player.pause();
+      return undefined;
+    }
+
+    const { clips: reel, byId: shelf } = live.current;
+    const current = reel[selected];
+    if (!current) {
+      setPlaying(false);
+      return undefined;
+    }
+
+    const source = shelf[current.memory_id];
+    if (source?.kind === 'video' && source.url) {
+      try {
+        player.replace({ uri: source.url });
+        player.currentTime = Number(current.start_at) || 0;
+        player.playbackRate = SPEED_RATE[current.speed] ?? 1;
+        player.play();
+      } catch {
+        // A shot that will not load should not stop the run-through.
+      }
+    } else {
+      player.pause();
+    }
+
+    const timer = setTimeout(() => {
+      if (selected + 1 < reel.length) setSelected(selected + 1);
+      else setPlaying(false);
+    }, shotMillis(current));
+
+    return () => clearTimeout(timer);
+  }, [playing, selected, player]);
+
+  // Touching anything mid-playback stops it, rather than fighting the timer.
+  const stop = useCallback(() => setPlaying(false), []);
 
   /** Every change goes through here, so undo and the dirty flag cannot be forgotten. */
   const edit = useCallback((next, { snapshot = true } = {}) => {
@@ -212,9 +275,13 @@ export default function EditorScreen() {
         </View>
       </View>
 
-      {/* The shot under the cursor, big enough to judge. */}
-      <View style={styles.stage}>
-        {memory?.thumbnail_url ? (
+      {/* The shot under the cursor. A fixed share of the screen rather than an
+          even split, so the controls below always have room to be seen — an
+          inspector squeezed to two rows is why the effects looked absent. */}
+      <View style={[styles.stage, { height: Math.max(190, STAGE_HEIGHT) }]}>
+        {playing && memory?.kind === 'video' && memory?.url ? (
+          <VideoView player={player} style={styles.preview} contentFit="contain" />
+        ) : memory?.thumbnail_url ? (
           <Image
             source={{ uri: memory.thumbnail_url }}
             style={styles.preview}
@@ -231,11 +298,36 @@ export default function EditorScreen() {
           </View>
         )}
 
+        {clips.length ? (
+          <Pressable
+            style={styles.playBtn}
+            onPress={() => setPlaying((on) => !on)}
+            hitSlop={10}
+            accessibilityLabel={playing ? 'Stop' : 'Play the edit from here'}
+          >
+            <Feather
+              name={playing ? 'pause' : 'play'}
+              size={20}
+              color={colors.text}
+              style={playing ? null : { marginLeft: 2 }}
+            />
+          </Pressable>
+        ) : null}
+
         {clip ? (
           <View style={styles.stageBar}>
             <Text style={styles.stageText} numberOfLines={1}>
-              Shot {selected + 1} of {clips.length} · {gradeLabel(clip.grade)} ·{' '}
+              Shot {selected + 1} of {clips.length} · {Number(clip.seconds).toFixed(1)}s ·{' '}
+              {gradeLabel(clip.grade)}
+              {clip.texture && clip.texture !== 'none' ? ` · ${textureLabel(clip.texture)}` : ''}
+              {memory?.kind === 'photo' ? ` · ${motionLabel(clip.motion)}` : ''} ·{' '}
               {transitionLabel(clip.transition)} out
+            </Text>
+            {/* Grades and textures are applied by FFmpeg when the film is cut, so
+                there is nothing to see here until then. Saying so is better than
+                letting the picture look like the setting did not take. */}
+            <Text style={styles.stageNote}>
+              Effects are applied when you render — this is the cut, not the look.
             </Text>
           </View>
         ) : null}
@@ -245,10 +337,16 @@ export default function EditorScreen() {
         clips={clips}
         byId={byId}
         selected={selected}
-        onSelect={setSelected}
-        // Tapping a join selects the shot it belongs to and opens straight on the
-        // tab that holds it, which is what tapping a join is asking for.
-        onSelectJoin={(index) => setSelected(index)}
+        onSelect={(index) => {
+          stop();
+          setSelected(index);
+        }}
+        // Tapping a join selects the shot it belongs to — the transition lives on
+        // the shot it leaves, which is what tapping a join is asking for.
+        onSelectJoin={(index) => {
+          stop();
+          setSelected(index);
+        }}
         onAdd={() => setAdding(true)}
       />
 
@@ -257,16 +355,20 @@ export default function EditorScreen() {
           <Feather name="plus-square" size={16} color={colors.textSoft} />
           <Text style={styles.barText}>Add</Text>
         </Pressable>
-        <Pressable style={styles.barItem} onPress={() => setScoring(true)}>
+        <Pressable
+          style={styles.barItem}
+          onPress={() => {
+            stop();
+            setScoring(true);
+          }}
+        >
           <Feather name="music" size={16} color={colors.textSoft} />
           <Text style={styles.barText}>
             {plan.music?.mode === 'none'
               ? 'Silent'
               : plan.music?.mode === 'track'
                 ? 'My track'
-                : plan.music?.mode === 'prompt'
-                  ? 'My brief'
-                  : 'Music'}
+                : 'Music'}
           </Text>
         </Pressable>
         <Pressable
@@ -335,6 +437,7 @@ export default function EditorScreen() {
         onClose={() => setScoring(false)}
         replayId={id}
         music={plan.music}
+        musicUrl={source.data?.music_url}
         onChange={(music) => edit((p) => setMusic(p, music))}
       />
     </KeyboardAvoidingView>
@@ -376,10 +479,20 @@ const styles = StyleSheet.create({
 
   // Dark behind the preview: it is the one place in the app showing a frame
   // rather than a page, and a white surround changes how a grade reads.
-  stage: { flex: 1, backgroundColor: '#100C1A', justifyContent: 'center' },
+  stage: { backgroundColor: '#100C1A', justifyContent: 'center' },
   preview: { width: '100%', height: '100%' },
   previewEmpty: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm, flex: 1 },
   previewText: { ...type.caption, color: colors.textMuted },
+  playBtn: {
+    position: 'absolute',
+    alignSelf: 'center',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   stageBar: {
     position: 'absolute',
     left: 0,
@@ -387,9 +500,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    backgroundColor: 'rgba(12,9,20,0.55)',
+    backgroundColor: 'rgba(12,9,20,0.6)',
   },
-  stageText: { ...type.caption, color: 'rgba(255,255,255,0.86)' },
+  // On a photograph, so fixed white rather than a theme token.
+  stageText: { ...type.caption, color: 'rgba(255,255,255,0.9)' },
+  stageNote: { ...type.caption, fontSize: 11, color: 'rgba(255,255,255,0.62)' },
 
   bar: {
     flexDirection: 'row',

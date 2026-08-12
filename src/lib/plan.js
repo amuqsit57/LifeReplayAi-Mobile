@@ -155,11 +155,24 @@ export const SOUNDS = [
 ];
 
 export const MUSIC_MODES = [
-  { value: 'ai', label: 'Composed for this', icon: 'zap', hint: 'Scored from what happened' },
-  { value: 'prompt', label: 'Describe it', icon: 'edit-3', hint: 'Compose from your words' },
+  {
+    value: 'ai',
+    label: 'Generate from AI',
+    icon: 'zap',
+    hint: 'Considering the vibe of the event, this music was generated',
+    recommended: true,
+  },
+  { value: 'prompt', label: 'Describe it yourself', icon: 'edit-3', hint: 'Written from your words' },
   { value: 'track', label: 'My own track', icon: 'upload', hint: 'Use a file you have' },
   { value: 'none', label: 'No music', icon: 'volume-x', hint: 'Silent' },
 ];
+
+/** How much wall time a shot occupies, once its speed is taken into account. */
+export function shotMillis(clip) {
+  return Math.max(200, (Number(clip?.seconds) || 0) * 1000);
+}
+
+export const SPEED_RATE = { normal: 1, slight_slow: 0.8, slow: 0.5, quick: 1.3 };
 
 export const MIN_SECONDS = 0.4;
 export const MAX_SECONDS = 15;
