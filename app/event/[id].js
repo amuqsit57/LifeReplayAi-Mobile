@@ -22,7 +22,7 @@ import { createAlbum, eventPeople, getEvent, listAlbums, myProfile } from '../..
 import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
-import { Segmented } from '../../src/ui/brand';
+import { Segmented, Tappable } from '../../src/ui/press';
 import FilmCard from '../../src/ui/FilmCard';
 import { GridSkeleton } from '../../src/ui/Skeleton';
 import UploadSheet from '../../src/ui/UploadSheet';
@@ -232,14 +232,15 @@ export default function EventScreen() {
           {/* Anchored to the bottom corner of the title block and hanging over
               its edge, so adding reads as belonging to this event rather than to
               whichever tab happens to be open. */}
-          <Pressable
+          <Tappable
             onPress={addMemories}
             disabled={Boolean(progress)}
-            accessibilityLabel="Add photos and videos"
-            style={({ pressed }) => [styles.addRound, pressed && { opacity: 0.85 }]}
+            haptic
+            scaleTo={0.9}
+            style={styles.addRound}
           >
             <Feather name={progress ? 'upload-cloud' : 'plus'} size={22} color="#fff" />
-          </Pressable>
+          </Tappable>
         </View>
 
         <View style={styles.heroSpacer} />

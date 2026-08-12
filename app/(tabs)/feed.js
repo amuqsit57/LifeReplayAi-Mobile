@@ -4,11 +4,12 @@ import { useCallback, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { api } from '../../src/lib/api';
-import { feed, myLikes, setLike } from '../../src/lib/data';
+import { feed, listEvents, myLikes, setLike } from '../../src/lib/data';
 import { STYLE_META, colors, spacing } from '../../src/theme';
 import { Empty } from '../../src/ui';
 import { Wordmark } from '../../src/ui/brand';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
+import EventRail from '../../src/ui/EventRail';
 import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
 import PostCard from '../../src/ui/PostCard';
 import Rise from '../../src/ui/Rise';
@@ -22,6 +23,15 @@ export default function FeedScreen() {
 
   const posts = useQuery({ queryKey: ['feed'], queryFn: feed });
   const all = posts.data ?? [];
+
+  const events = useQuery({ queryKey: ['events'], queryFn: listEvents });
+  const eventIds = useMemo(() => (events.data ?? []).map((e) => e.id), [events.data]);
+  const eventCovers = useQuery({
+    queryKey: ['eventCovers', eventIds.join(',')],
+    queryFn: () => api.eventCovers(eventIds),
+    enabled: eventIds.length > 0,
+    staleTime: 30 * 60 * 1000,
+  });
 
   const list = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -81,7 +91,7 @@ export default function FeedScreen() {
 
   const renderItem = useCallback(
     ({ item, index }) => (
-      <Rise index={index}>
+      <Rise index={index} style={styles.postWrap}>
         <PostCard
           post={item}
           media={media.data?.[item.id]}
@@ -122,6 +132,16 @@ export default function FeedScreen() {
 
       <FlatList
         contentContainerStyle={styles.content}
+        ListHeaderComponent={
+          !query && (events.data ?? []).length ? (
+            <EventRail
+              events={events.data ?? []}
+              covers={eventCovers.data ?? {}}
+              onOpen={(eventId) => router.push(`/event/${eventId}`)}
+              onCreate={() => setCreating(true)}
+            />
+          ) : null
+        }
         data={list}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
@@ -159,6 +179,9 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  // The rail runs edge to edge, so the gutter lives on the cards rather than the
+  // list. Posts carry their own horizontal margin.
+  content: { paddingTop: spacing.md, paddingBottom: spacing.xxxl },
   headActions: { flexDirection: 'row', gap: spacing.sm },
+  postWrap: { paddingHorizontal: spacing.lg },
 });

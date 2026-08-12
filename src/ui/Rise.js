@@ -12,7 +12,7 @@ import { Animated } from 'react-native';
  * The stagger is capped: on the twentieth card a per-index delay would be a
  * second and a half of nothing.
  */
-export default function Rise({ children, index = 0, distance = 14 }) {
+export default function Rise({ children, index = 0, distance = 14, style }) {
   const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -29,17 +29,20 @@ export default function Rise({ children, index = 0, distance = 14 }) {
 
   return (
     <Animated.View
-      style={{
-        opacity: progress,
-        transform: [
-          {
-            translateY: progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [distance, 0],
-            }),
-          },
-        ],
-      }}
+      style={[
+        style,
+        {
+          opacity: progress,
+          transform: [
+            {
+              translateY: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+          ],
+        },
+      ]}
     >
       {children}
     </Animated.View>

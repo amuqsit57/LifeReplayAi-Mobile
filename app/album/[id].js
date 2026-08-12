@@ -24,7 +24,7 @@ import {
   removeFromAlbum,
 } from '../../src/lib/data';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
-import { Segmented } from '../../src/ui/brand';
+import { Segmented } from '../../src/ui/press';
 import FilmCard from '../../src/ui/FilmCard';
 import { RoundButton } from '../../src/ui/Header';
 import { MediaTile } from '../../src/ui/social';

@@ -12,41 +12,42 @@
  * what most of this footage is lit by anyway.
  */
 export const colors = {
-  background: '#14110F',
-  surface: '#1C1815',
-  surfaceAlt: '#241F1B',
-  surfaceSunk: '#0E0C0A',
-  border: '#2E2823',
-  borderStrong: '#463D35',
+  // Paper rather than screen white: a hair of warmth, so photographs sit on it
+  // instead of being cut out against it.
+  background: '#FDFCFA',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F4F1EC',
+  surfaceSunk: '#EBE6DF',
+  border: '#E8E3DB',
+  borderStrong: '#D2C9BC',
 
-  text: '#F6F0E8',
-  textSoft: '#C4B8AC',
-  textMuted: '#8A7D72',
-  textOnAccent: '#1A1310',
+  text: '#1A1512',
+  textSoft: '#544B44',
+  textMuted: '#8C8079',
+  textOnAccent: '#FFFFFF',
 
-  // One warm accent, used sparingly. Everything else is neutral so it keeps its
-  // meaning when it does appear.
-  primary: '#E8663D',
-  primarySoft: '#33201A',
-  primaryPress: '#CF5631',
+  // An ember. Warm enough to belong beside family photographs, and nothing like
+  // the blue every other app reaches for.
+  primary: '#D9542B',
+  primarySoft: '#FDEEE8',
+  primaryPress: '#BC4620',
 
-  // Brass, for the second voice — counts, codes, the quiet marks of quality.
-  accent: '#D6A54A',
-  accentSoft: '#2E2416',
+  // Brass, the second voice — counts, codes, the quiet marks.
+  accent: '#A8791C',
+  accentSoft: '#FBF2DF',
 
-  success: '#5FB88A',
-  successSoft: '#182A22',
-  warning: '#D6A54A',
-  warningSoft: '#2E2416',
-  danger: '#E5575B',
-  dangerSoft: '#331A1C',
+  success: '#1E8C57',
+  successSoft: '#E3F4EB',
+  warning: '#A8791C',
+  warningSoft: '#FBF2DF',
+  danger: '#C8353F',
+  dangerSoft: '#FBE8E9',
 
-  mediaPlaceholder: '#221D19',
-  scrim: 'rgba(8, 6, 5, 0.72)',
-  // Laid over the foot of a poster so text stays readable on any picture.
-  posterScrim: ['rgba(10,8,6,0)', 'rgba(10,8,6,0.55)', 'rgba(10,8,6,0.92)'],
-  // Behind a hero, warm rather than grey so a photograph does not go muddy.
-  heroScrim: ['rgba(20,17,15,0.25)', 'rgba(20,17,15,0.75)', 'rgba(20,17,15,0.97)'],
+  mediaPlaceholder: '#EDE8E1',
+  scrim: 'rgba(26, 21, 18, 0.55)',
+  // Laid over the foot of a poster so white text stays readable on any picture.
+  posterScrim: ['rgba(18,13,10,0)', 'rgba(18,13,10,0.5)', 'rgba(18,13,10,0.88)'],
+  heroScrim: ['rgba(18,13,10,0.15)', 'rgba(18,13,10,0.55)', 'rgba(18,13,10,0.85)'],
 };
 
 /**
@@ -81,21 +82,21 @@ export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48
 export const radius = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 };
 
 export const shadow = {
-  // On a dark ground a shadow does almost nothing; separation comes from the
-  // surface being lighter than the background, and from a hairline border.
+  // Warm-tinted rather than grey. A neutral shadow on a warm ground reads as
+  // dirt; one carrying the ground's own hue reads as depth.
   card: {
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
+    shadowColor: '#3B2A1E',
+    shadowOpacity: 0.09,
     shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
   },
   raised: {
-    shadowColor: '#000',
-    shadowOpacity: 0.55,
+    shadowColor: '#3B2A1E',
+    shadowOpacity: 0.16,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 12 },
-    elevation: 9,
+    elevation: 8,
   },
 };
 
@@ -103,25 +104,25 @@ export const shadow = {
 export const STYLE_META = {
   highlights: {
     label: 'Highlights',
-    tint: '#E0B341',
+    tint: '#A8791C',
     icon: 'zap',
     blurb: 'Short and quick — the best bits only',
   },
   celebration: {
     label: 'Celebration',
-    tint: '#F0713F',
+    tint: '#D9542B',
     icon: 'gift',
     blurb: 'Upbeat, for a party or a night out',
   },
   cinematic: {
     label: 'Cinematic',
-    tint: '#9B8BF4',
+    tint: '#5B4B8A',
     icon: 'film',
     blurb: 'Slow and unhurried, long holds',
   },
   family_story: {
     label: 'Family Story',
-    tint: '#63C295',
+    tint: '#1E7A5A',
     icon: 'heart',
     blurb: 'The whole day, nothing left out',
   },
