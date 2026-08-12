@@ -34,6 +34,9 @@ export function ScreenHeader({ title, subtitle, left, right, children, compact }
 /** A round control. `tone` decides whether it reads as the screen's main action. */
 export function RoundButton({ name, onPress, tone = 'plain', size = 19, label, badge }) {
   const filled = tone === 'filled';
+  // `onDark` is for controls sitting over a photograph, where the usual pale
+  // chip disappears and dark ink on it is unreadable.
+  const onDark = tone === 'onDark';
   return (
     <Pressable
       onPress={onPress}
@@ -43,10 +46,11 @@ export function RoundButton({ name, onPress, tone = 'plain', size = 19, label, b
       style={({ pressed }) => [
         styles.round,
         filled && styles.roundFilled,
+        onDark && styles.roundOnDark,
         pressed && { opacity: 0.7 },
       ]}
     >
-      <Feather name={name} size={size} color={filled ? '#fff' : colors.text} />
+      <Feather name={name} size={size} color={filled || onDark ? '#fff' : colors.text} />
       {badge ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
@@ -100,6 +104,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   roundFilled: { backgroundColor: colors.primary, ...shadow.card },
+  roundOnDark: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
   badge: {
     position: 'absolute',
     top: -1,

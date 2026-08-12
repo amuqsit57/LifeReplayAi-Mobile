@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
@@ -192,15 +193,26 @@ export default function EventScreen() {
         }
       >
         {/* ----------------------------------------------------------- header */}
+        {/* The event's own photograph carries the header, at full strength with a
+            gradient over it — the blurred white wash before this drained the one
+            image on the screen of everything that made it worth looking at. */}
         <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
           {cover ? (
-            <Image source={{ uri: cover }} style={styles.heroImage} contentFit="cover" blurRadius={28} />
-          ) : null}
-          <View style={styles.heroVeil} />
+            <>
+              <Image source={{ uri: cover }} style={styles.heroImage} contentFit="cover" />
+              <LinearGradient
+                colors={['rgba(10,7,18,0.45)', 'rgba(10,7,18,0.86)']}
+                style={styles.heroImage}
+                pointerEvents="none"
+              />
+            </>
+          ) : (
+            <View style={[styles.heroImage, { backgroundColor: colors.surfaceAlt }]} />
+          )}
 
           <View style={styles.heroBar}>
-            <RoundButton name="chevron-left" label="Back" onPress={() => router.back()} />
-            <RoundButton name="user-plus" label="Invite" onPress={() => setInviting(true)} />
+            <RoundButton name="chevron-left" tone="onDark" label="Back" onPress={() => router.back()} />
+            <RoundButton name="user-plus" tone="onDark" label="Invite" onPress={() => setInviting(true)} />
           </View>
 
           <View style={styles.heroText}>
@@ -517,17 +529,24 @@ const styles = StyleSheet.create({
 
   // The cover, blurred, behind the title — the event's own photograph carrying
   // its header rather than a flat coloured band.
-  hero: { paddingTop: 52, paddingBottom: spacing.lg, paddingHorizontal: spacing.lg, gap: spacing.lg },
+  hero: {
+    paddingTop: 52,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+    overflow: 'hidden',
+  },
   // Room under the title block for the add button that hangs over its edge, so
   // it never collides with the tabs beneath.
   heroSpacer: { height: spacing.xl },
   heroImage: { ...StyleSheet.absoluteFillObject },
-  heroVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.82)' },
   heroBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroText: { gap: spacing.sm },
-  title: { ...type.display, color: colors.text },
+  title: { ...type.display, color: '#fff' },
   heroMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  metaText: { ...type.caption, color: colors.textSoft },
+  metaText: { ...type.caption, color: 'rgba(255,255,255,0.82)' },
 
   // One gutter value, applied by wrapping sections rather than repeated on each
   // child — that repetition is how the padding drifted between them before.
