@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { api } from '../../src/lib/api';
 import { feed, myLikes, setLike } from '../../src/lib/data';
-import { STYLE_META, colors, spacing } from '../../src/theme';
+import { STYLE_META, colors, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
 import { Wordmark } from '../../src/ui/brand';
+import CreateCard from '../../src/ui/CreateCard';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
 import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
 import PostCard from '../../src/ui/PostCard';
@@ -116,6 +117,14 @@ export default function FeedScreen() {
         data={list}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        ListHeaderComponent={
+          !query ? (
+            <View style={styles.postWrap}>
+              <CreateCard onPress={() => setCreating(true)} />
+              {list.length ? <Text style={styles.section}>Recent films</Text> : null}
+            </View>
+          ) : null
+        }
         ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
         ListEmptyComponent={
           posts.isLoading ? (
@@ -155,4 +164,5 @@ const styles = StyleSheet.create({
   content: { paddingTop: spacing.md, paddingBottom: spacing.xxxl },
   headActions: { flexDirection: 'row', gap: spacing.sm },
   postWrap: { paddingHorizontal: spacing.lg },
+  section: { ...type.heading, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.xs },
 });

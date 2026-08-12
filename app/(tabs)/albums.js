@@ -9,7 +9,8 @@ import { api } from '../../src/lib/api';
 import { supabase } from '../../src/lib/supabase';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import { ScreenHeader, SearchBar } from '../../src/ui/Header';
-import { RowSkeleton } from '../../src/ui/Skeleton';
+import { Tappable } from '../../src/ui/press';
+import { GridSkeleton } from '../../src/ui/Skeleton';
 import SortSheet, { SORTS, applySort } from '../../src/ui/SortSheet';
 
 /** Every album you can reach, across every event. Row level security scopes it. */
@@ -22,44 +23,63 @@ async function allAlbums() {
   return data ?? [];
 }
 
-function AlbumCard({ album, cover, onPress }) {
+function modified(iso) {
+  if (!iso) return '';
+  const days = (Date.now() - new Date(iso).getTime()) / 86_400_000;
+  if (days < 1) return 'Last modified today';
+  if (days < 2) return 'Last modified yesterday';
+  if (days < 7) return `Last modified ${Math.floor(days)}d ago`;
+  if (days < 60) return `Last modified ${Math.floor(days / 7)}w ago`;
+  return `Last modified ${Math.floor(days / 30)}mo ago`;
+}
+
+function AlbumTile({ album, cover, onPress }) {
   const count = album.album_memories?.[0]?.count ?? 0;
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}>
+    <Tappable onPress={onPress} haptic style={styles.tile}>
       <View style={styles.coverWrap}>
         {cover ? (
           <Image
             source={{ uri: cover }}
             style={styles.cover}
             contentFit="cover"
-            transition={140}
+            transition={160}
             recyclingKey={album.id}
           />
         ) : (
           <View style={[styles.cover, styles.coverEmpty]}>
-            <Feather name="folder" size={22} color={colors.primary} />
+            <Feather name="folder" size={22} color={colors.textMuted} />
           </View>
         )}
-        {/* A stacked edge, so an album reads as a set rather than one picture. */}
-        <View style={styles.stackEdge} />
-      </View>
 
-      <View style={styles.body}>
-        <Text style={styles.title} numberOfLines={1}>
-          {album.title}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {album.events?.title ?? 'An event'}
-        </Text>
-        <View style={styles.countPill}>
-          <Feather name="image" size={11} color={colors.textSoft} />
-          <Text style={styles.countText}>{count}</Text>
+        {/* Count sits on the cover, the way a stack shows its depth. */}
+        <View style={styles.badge}>
+          <Feather name="layers" size={10} color="#fff" />
+          <Text style={styles.badgeText}>{count}</Text>
         </View>
       </View>
 
-      <Feather name="chevron-right" size={18} color={colors.textMuted} />
-    </Pressable>
+      <Text style={styles.tileTitle} numberOfLines={1}>
+        {album.title}
+      </Text>
+      <Text style={styles.tileMeta} numberOfLines={1}>
+        {modified(album.created_at)}
+      </Text>
+    </Tappable>
+  );
+}
+
+function NewAlbumTile({ onPress }) {
+  return (
+    <Tappable onPress={onPress} haptic style={styles.tile}>
+      <View style={[styles.cover, styles.newTile]}>
+        <View style={styles.newIcon}>
+          <Feather name="folder-plus" size={19} color={colors.primary} />
+        </View>
+        <Text style={styles.newLabel}>New album</Text>
+      </View>
+    </Tappable>
   );
 }
 
@@ -72,8 +92,6 @@ export default function AlbumsScreen() {
   const albums = useQuery({ queryKey: ['allAlbums'], queryFn: allAlbums });
   const all = albums.data ?? [];
 
-  // Covers come from the album's own event, batched the same way the events
-  // list does it — one call rather than one per card.
   const eventIds = useMemo(
     () => [...new Set(all.map((a) => a.event_id).filter(Boolean))],
     [all]
@@ -97,64 +115,73 @@ export default function AlbumsScreen() {
     return applySort(filtered, sort, 'albums');
   }, [all, query, sort]);
 
+  // The "new" tile rides at the end of the same grid rather than sitting apart,
+  // so the affordance is where the albums are.
+  const cells = useMemo(() => [...list, { id: '__new__', isNew: true }], [list]);
   const sortLabel = SORTS.albums.find((s) => s.value === sort)?.label ?? 'Newest first';
 
   return (
     <View style={styles.screen}>
-      <ScreenHeader title="Albums" subtitle={`${all.length} across your events`}>
+      <ScreenHeader
+        title="Albums"
+        subtitle={`${all.length} across your events`}
+        right={
+          <Pressable style={styles.sortBtn} onPress={() => setSorting(true)} hitSlop={8}>
+            <Feather name="sliders" size={13} color={colors.primary} />
+            <Text style={styles.sortText}>Sort</Text>
+          </Pressable>
+        }
+      >
         <SearchBar
           value={query}
           onChangeText={setQuery}
           onClear={() => setQuery('')}
           placeholder="Search albums or events"
         />
-        <Pressable style={styles.sortBar} onPress={() => setSorting(true)}>
-          <Feather name="sliders" size={13} color={colors.textSoft} />
-          <Text style={styles.sortText}>{sortLabel}</Text>
-          <Feather name="chevron-down" size={13} color={colors.textMuted} />
-        </Pressable>
       </ScreenHeader>
 
-      <FlatList
-        contentContainerStyle={styles.content}
-        data={list}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <AlbumCard
-            album={item}
-            cover={covers.data?.[item.event_id]}
-            onPress={() => router.push(`/album/${item.id}`)}
-          />
-        )}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
-        initialNumToRender={6}
-        maxToRenderPerBatch={6}
-        windowSize={5}
-        removeClippedSubviews
-        ListEmptyComponent={
-          albums.isLoading ? (
-            <RowSkeleton count={4} />
-          ) : (
-            <View style={styles.blank}>
-              <View style={styles.blankIcon}>
-                <Feather name="folder-plus" size={24} color={colors.primary} />
-              </View>
-              <Text style={styles.blankTitle}>No albums yet</Text>
-              <Text style={styles.blankBody}>
-                Open an event, hold a photo to start selecting, then choose Album. Each one gets its
-                own films — the ceremony cut separately from the party.
+      {albums.isLoading ? (
+        <View style={styles.loading}>
+          <GridSkeleton count={4} />
+        </View>
+      ) : (
+        <FlatList
+          contentContainerStyle={styles.content}
+          data={cells}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          renderItem={({ item }) =>
+            item.isNew ? (
+              <NewAlbumTile onPress={() => router.push('/(tabs)/events')} />
+            ) : (
+              <AlbumTile
+                album={item}
+                cover={covers.data?.[item.event_id]}
+                onPress={() => router.push(`/album/${item.id}`)}
+              />
+            )
+          }
+          ListHeaderComponent={
+            list.length === 0 && !query ? (
+              <Text style={styles.hint}>
+                Open an event, hold a photo to start selecting, then choose Album. Each one gets
+                its own films.
               </Text>
-            </View>
-          )
-        }
-        refreshControl={
-          <RefreshControl
-            refreshing={albums.isFetching}
-            onRefresh={albums.refetch}
-            tintColor={colors.primary}
-          />
-        }
-      />
+            ) : null
+          }
+          initialNumToRender={6}
+          windowSize={5}
+          removeClippedSubviews
+          refreshControl={
+            <RefreshControl
+              refreshing={albums.isFetching}
+              onRefresh={albums.refetch}
+              tintColor={colors.primary}
+            />
+          }
+        />
+      )}
 
       <SortSheet
         visible={sorting}
@@ -170,74 +197,57 @@ export default function AlbumsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  loading: { padding: spacing.lg },
+  row: { gap: spacing.md, marginBottom: spacing.lg },
 
-  sortBar: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceAlt,
-  },
-  sortText: { ...type.caption, color: colors.textSoft },
+  sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  sortText: { ...type.label, color: colors.primary },
 
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    ...shadow.card,
-  },
-  coverWrap: { width: 64, height: 64 },
+  hint: { ...type.caption, color: colors.textMuted, marginBottom: spacing.lg },
+
+  tile: { flex: 1, gap: 6 },
+  coverWrap: { borderRadius: radius.md, overflow: 'hidden' },
   cover: {
-    width: 60,
-    height: 60,
+    width: '100%',
+    aspectRatio: 1,
     borderRadius: radius.md,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.mediaPlaceholder,
   },
   coverEmpty: { alignItems: 'center', justifyContent: 'center' },
-  stackEdge: {
+  badge: {
     position: 'absolute',
-    right: 0,
-    top: 5,
-    width: 60,
-    height: 54,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSunk,
-    zIndex: -1,
-  },
-
-  body: { flex: 1, gap: 3 },
-  title: { ...type.heading, color: colors.text },
-  meta: { ...type.caption, color: colors.textMuted },
-  countPill: {
-    alignSelf: 'flex-start',
+    left: spacing.sm,
+    bottom: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: radius.sm,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: 'rgba(16,12,26,0.62)',
   },
-  countText: { ...type.tiny, color: colors.textSoft },
+  badgeText: { ...type.tiny, color: '#fff' },
 
-  blank: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xxxl },
-  blankIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primarySoft,
+  tileTitle: { ...type.bodyStrong, color: colors.text },
+  tileMeta: { ...type.caption, color: colors.textMuted },
+
+  newTile: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.primary + '55',
   },
-  blankTitle: { ...type.heading, color: colors.text },
-  blankBody: { ...type.caption, color: colors.textMuted, textAlign: 'center', maxWidth: 300 },
+  newIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadow.card,
+  },
+  newLabel: { ...type.label, color: colors.primary },
 });
