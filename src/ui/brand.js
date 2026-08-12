@@ -19,6 +19,9 @@ export function Wordmark({ size = 'lg' }) {
 
   return (
     <View style={styles.lockup}>
+      {/* Two frames offset, the way a reel of them stacks. One colour at two
+          weights rather than two colours — a mark in a single hue reads as a
+          mark, one in two reads as decoration. */}
       <View style={{ width: unit * 1.5, height: unit * 1.5 }}>
         <View
           style={[
@@ -26,8 +29,9 @@ export function Wordmark({ size = 'lg' }) {
             {
               width: unit,
               height: unit,
-              borderRadius: unit * 0.32,
+              borderRadius: unit * 0.3,
               backgroundColor: colors.primary,
+              opacity: 0.32,
               left: 0,
               top: unit * 0.5,
             },
@@ -39,19 +43,16 @@ export function Wordmark({ size = 'lg' }) {
             {
               width: unit,
               height: unit,
-              borderRadius: unit * 0.32,
-              backgroundColor: colors.accent,
+              borderRadius: unit * 0.3,
+              backgroundColor: colors.primary,
               left: unit * 0.5,
               top: 0,
-              opacity: 0.9,
             },
           ]}
         />
       </View>
 
-      <Text style={[big ? styles.nameLg : styles.nameSm]}>
-        Life<Text style={{ color: colors.primary }}>Replay</Text>
-      </Text>
+      <Text style={big ? styles.nameLg : styles.nameSm}>Life Replay</Text>
     </View>
   );
 }
@@ -91,8 +92,8 @@ export function Segmented({ options, value, onChange }) {
 const styles = StyleSheet.create({
   lockup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   frame: { position: 'absolute' },
-  nameLg: { ...type.title, color: colors.text, letterSpacing: -0.6 },
-  nameSm: { ...type.heading, color: colors.text, letterSpacing: -0.4 },
+  nameLg: { ...type.display, color: colors.text, fontSize: 22, lineHeight: 26 },
+  nameSm: { ...type.heading, color: colors.text },
 
   segmented: {
     flexDirection: 'row',

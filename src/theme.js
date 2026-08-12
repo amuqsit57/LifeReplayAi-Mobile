@@ -1,128 +1,130 @@
 /**
- * Ink and ember.
+ * A neutral, high-contrast system on white.
  *
- * The app is almost entirely other people's photographs, and photographs sit
- * better on a dark ground than a bright one — a white interface makes every
- * image look like it is being examined, a dark one makes it look like it is
- * being watched. This is the room lights going down.
- *
- * The dark is warm rather than neutral: browns and umbers rather than blue-grey,
- * because family footage is warm and a cold ground fights it. The accent is an
- * ember, picked from the same family as tungsten light and golden hour, which is
- * what most of this footage is lit by anyway.
+ * Earlier passes tinted the greys warm and set the titles in a serif, which read
+ * as characterful rather than professional. Both are gone. The greys are a true
+ * cool-neutral ramp, the ground is white without a cast, and there is exactly
+ * one accent — everything else is neutral, so when colour appears it means
+ * something. This is the discipline that makes an interface look considered:
+ * restraint, contrast, and spacing, not hue.
  */
 export const colors = {
-  // Paper rather than screen white: a hair of warmth, so photographs sit on it
-  // instead of being cut out against it.
-  background: '#FDFCFA',
+  background: '#FFFFFF',
   surface: '#FFFFFF',
-  surfaceAlt: '#F4F1EC',
-  surfaceSunk: '#EBE6DF',
-  border: '#E8E3DB',
-  borderStrong: '#D2C9BC',
+  surfaceAlt: '#F5F6F8',
+  surfaceSunk: '#ECEEF2',
+  border: '#E4E7EC',
+  borderStrong: '#C6CBD4',
 
-  text: '#1A1512',
-  textSoft: '#544B44',
-  textMuted: '#8C8079',
+  // Near-black rather than pure, so long text is not harsh, with a trace of blue
+  // to sit with the neutral ramp.
+  text: '#0C0E14',
+  textSoft: '#474D59',
+  textMuted: '#858B98',
   textOnAccent: '#FFFFFF',
 
-  // An ember. Warm enough to belong beside family photographs, and nothing like
-  // the blue every other app reaches for.
-  primary: '#D9542B',
-  primarySoft: '#FDEEE8',
-  primaryPress: '#BC4620',
+  // One accent. Indigo carries authority without being the corporate blue every
+  // utility app defaults to.
+  primary: '#4F46E5',
+  primarySoft: '#EEEDFD',
+  primaryPress: '#4038C7',
 
-  // Brass, the second voice — counts, codes, the quiet marks.
-  accent: '#A8791C',
-  accentSoft: '#FBF2DF',
+  // Reserved for emphasis inside content — counts, an active heart — never for
+  // navigation, so it keeps its weight.
+  accent: '#E0453C',
+  accentSoft: '#FDECEB',
 
-  success: '#1E8C57',
-  successSoft: '#E3F4EB',
-  warning: '#A8791C',
-  warningSoft: '#FBF2DF',
-  danger: '#C8353F',
-  dangerSoft: '#FBE8E9',
+  success: '#0F8B54',
+  successSoft: '#E4F5ED',
+  warning: '#B25E09',
+  warningSoft: '#FDF1E3',
+  danger: '#D02F3A',
+  dangerSoft: '#FDEBEC',
 
-  mediaPlaceholder: '#EDE8E1',
-  scrim: 'rgba(26, 21, 18, 0.55)',
-  // Laid over the foot of a poster so white text stays readable on any picture.
-  posterScrim: ['rgba(18,13,10,0)', 'rgba(18,13,10,0.5)', 'rgba(18,13,10,0.88)'],
-  heroScrim: ['rgba(18,13,10,0.15)', 'rgba(18,13,10,0.55)', 'rgba(18,13,10,0.85)'],
+  mediaPlaceholder: '#EDEFF3',
+  scrim: 'rgba(12, 14, 20, 0.6)',
+  // Over the foot of a poster, so white text holds on any picture.
+  posterScrim: ['rgba(8,10,14,0)', 'rgba(8,10,14,0.5)', 'rgba(8,10,14,0.9)'],
+  heroScrim: ['rgba(8,10,14,0.1)', 'rgba(8,10,14,0.55)', 'rgba(8,10,14,0.88)'],
 };
 
 /**
- * Two faces, doing different jobs.
+ * One family, many weights.
  *
- * Fraunces is a serif with real character in its curves — it carries the titles
- * and gives the app a voice that a default system stack cannot. Manrope sets
- * everything that has to be read rather than looked at.
+ * A single grotesque used across the whole scale reads as more professional than
+ * a display serif paired with a body face — the serif gave the app a voice, but
+ * the voice was wrong for something people trust with their photographs. Weight
+ * and tracking carry the hierarchy instead of a change of typeface.
  */
 export const fonts = {
-  display: 'Fraunces_700Bold',
-  displayItalic: 'Fraunces_600SemiBold_Italic',
-  body: 'Manrope_500Medium',
-  bodyBold: 'Manrope_700Bold',
-  bodyExtra: 'Manrope_800ExtraBold',
+  regular: 'Manrope_500Medium',
+  bold: 'Manrope_700Bold',
+  black: 'Manrope_800ExtraBold',
 };
 
 export const type = {
-  display: { fontFamily: fonts.display, fontSize: 30, lineHeight: 36, letterSpacing: -0.8 },
-  title: { fontFamily: fonts.display, fontSize: 21, lineHeight: 27, letterSpacing: -0.4 },
-  heading: { fontFamily: fonts.bodyExtra, fontSize: 16, lineHeight: 22, letterSpacing: -0.2 },
-  body: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },
-  bodyStrong: { fontFamily: fonts.bodyBold, fontSize: 15, lineHeight: 22 },
-  label: { fontFamily: fonts.bodyBold, fontSize: 13, lineHeight: 18 },
-  caption: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 17 },
-  tiny: { fontFamily: fonts.bodyBold, fontSize: 11, lineHeight: 14, letterSpacing: 0.3 },
-  // Set like a slate: spaced caps, for codes, counts and runtimes.
-  slate: { fontFamily: fonts.bodyExtra, fontSize: 11, lineHeight: 14, letterSpacing: 1.6 },
+  // Tight tracking at large sizes is most of what makes a heading look drawn
+  // rather than typed.
+  display: { fontFamily: fonts.black, fontSize: 28, lineHeight: 34, letterSpacing: -0.9 },
+  title: { fontFamily: fonts.black, fontSize: 20, lineHeight: 26, letterSpacing: -0.5 },
+  heading: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 22, letterSpacing: -0.2 },
+  body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22 },
+  bodyStrong: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 22 },
+  label: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 18, letterSpacing: -0.1 },
+  caption: { fontFamily: fonts.regular, fontSize: 12.5, lineHeight: 17 },
+  tiny: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 14 },
+  // Spaced caps, for codes, runtimes and section markers.
+  slate: { fontFamily: fonts.black, fontSize: 10.5, lineHeight: 14, letterSpacing: 1.4 },
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 };
-export const radius = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 };
+export const radius = { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 };
 
 export const shadow = {
-  // Warm-tinted rather than grey. A neutral shadow on a warm ground reads as
-  // dirt; one carrying the ground's own hue reads as depth.
+  // Barely there. On white, separation should come from the hairline border;
+  // the shadow only lifts the element off the page a fraction.
   card: {
-    shadowColor: '#3B2A1E',
-    shadowOpacity: 0.09,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 5 },
+    shadowColor: '#0C0E14',
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 },
     elevation: 2,
   },
   raised: {
-    shadowColor: '#3B2A1E',
-    shadowOpacity: 0.16,
-    shadowRadius: 28,
+    shadowColor: '#0C0E14',
+    shadowOpacity: 0.12,
+    shadowRadius: 26,
     shadowOffset: { width: 0, height: 12 },
     elevation: 8,
   },
 };
 
-/** Each replay style gets an identity so the picker reads at a glance. */
+/**
+ * Each film style gets a hue, drawn from one ramp so four of them on a screen
+ * look like a set rather than four unrelated brand colours.
+ */
 export const STYLE_META = {
   highlights: {
     label: 'Highlights',
-    tint: '#A8791C',
+    tint: '#B25E09',
     icon: 'zap',
     blurb: 'Short and quick — the best bits only',
   },
   celebration: {
     label: 'Celebration',
-    tint: '#D9542B',
+    tint: '#D02F3A',
     icon: 'gift',
     blurb: 'Upbeat, for a party or a night out',
   },
   cinematic: {
     label: 'Cinematic',
-    tint: '#5B4B8A',
+    tint: '#4F46E5',
     icon: 'film',
     blurb: 'Slow and unhurried, long holds',
   },
   family_story: {
     label: 'Family Story',
-    tint: '#1E7A5A',
+    tint: '#0F8B54',
     icon: 'heart',
     blurb: 'The whole day, nothing left out',
   },

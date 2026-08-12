@@ -1,12 +1,8 @@
 import {
-  Fraunces_600SemiBold_Italic,
-  Fraunces_700Bold,
-  useFonts,
-} from '@expo-google-fonts/fraunces';
-import {
   Manrope_500Medium,
   Manrope_700Bold,
   Manrope_800ExtraBold,
+  useFonts,
 } from '@expo-google-fonts/manrope';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
@@ -26,8 +22,6 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    Fraunces_700Bold,
-    Fraunces_600SemiBold_Italic,
     Manrope_500Medium,
     Manrope_700Bold,
     Manrope_800ExtraBold,
@@ -68,7 +62,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <StatusBar style="light" />
+          <StatusBar style="dark" />
           <Stack
             screenOptions={{
               headerShown: false,
