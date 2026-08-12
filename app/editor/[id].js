@@ -112,6 +112,10 @@ export default function EditorScreen() {
 
   const sourceUri = memory?.kind === 'video' ? memory.url ?? null : null;
 
+  // Cached, so a clip reached a second time — scrubbing back, playing again —
+  // does not download again.
+  const asVideo = (uri) => (uri ? { uri, useCaching: true } : null);
+
   // The source goes into the hook rather than being pushed in afterwards.
   //
   // `useVideoPlayer` keys the player on the source and rebuilds it when that
@@ -119,12 +123,32 @@ export default function EditorScreen() {
   // against the hook rather than with it — which is why a video shot sat on its
   // thumbnail and never played. This is the same shape the replay screen uses,
   // and that one has always worked.
-  const player = useVideoPlayer(sourceUri, (instance) => {
+  const player = useVideoPlayer(asVideo(sourceUri), (instance) => {
     instance.loop = false;
     // The finished film carries music and nothing else — the renderer drops clip
     // audio — so hearing it here would preview a soundtrack that does not exist.
     instance.muted = true;
     // Silent, so it has no business claiming the audio session from the music.
+    instance.audioMixingMode = 'mixWithOthers';
+  });
+
+  // The next video along, loaded now rather than when the playhead arrives.
+  //
+  // A two second shot cannot download a twenty megabyte clip inside its own two
+  // seconds, so lazily loading each one meant the run-through walked straight
+  // past every video before it had anything to show. This warms the next one
+  // while the current shot is on screen; no view is attached to it, creating the
+  // player is what starts the fetch.
+  const upcoming = useMemo(() => {
+    for (let i = selected + 1; i < clips.length; i += 1) {
+      const next = byId[clips[i].memory_id];
+      if (next?.kind === 'video' && next.url) return next.url;
+    }
+    return null;
+  }, [clips, byId, selected]);
+
+  useVideoPlayer(asVideo(upcoming), (instance) => {
+    instance.muted = true;
     instance.audioMixingMode = 'mixWithOthers';
   });
 
@@ -153,6 +177,17 @@ export default function EditorScreen() {
     }
   });
 
+  // A new source starts unknown rather than inheriting the last clip's verdict —
+  // otherwise the shot after a loaded one starts its clock immediately on a
+  // stale "ready".
+  useEffect(() => {
+    setVideoStatus(sourceUri ? 'loading' : 'idle');
+  }, [sourceUri]);
+
+  // Whether the shot on screen is a video that has not arrived yet. While that is
+  // true the film is not really running, so nothing should advance.
+  const waiting = playing && !!sourceUri && videoStatus !== 'readyToPlay';
+
   useEffect(() => {
     if (!playing) {
       try {
@@ -169,13 +204,26 @@ export default function EditorScreen() {
       return undefined;
     }
 
-    // Already loaded from a previous pass — the ready event will not fire again.
+    // Hold the clock until the picture can actually be shown. Starting it
+    // regardless is what marched the playhead past every video shot: two seconds
+    // is not long enough to fetch a clip, so it was always still loading when its
+    // turn ended.
+    if (waiting) {
+      // Unless it never arrives. A clip that will not decode should cost a
+      // moment, not the whole run-through.
+      const bail = setTimeout(() => {
+        if (selected + 1 < live.current.clips.length) setSelected(selected + 1);
+        else setPlaying(false);
+      }, 10_000);
+      return () => clearTimeout(bail);
+    }
+
     try {
       player.currentTime = Number(current.start_at) || 0;
       player.playbackRate = SPEED_RATE[current.speed] ?? 1;
       player.play();
     } catch {
-      // Not ready yet; the status listener above picks it up.
+      // Nothing loaded — a still, or a clip that failed.
     }
 
     const timer = setTimeout(() => {
@@ -184,7 +232,7 @@ export default function EditorScreen() {
     }, shotMillis(current));
 
     return () => clearTimeout(timer);
-  }, [playing, selected, player]);
+  }, [playing, selected, waiting, player]);
 
   // ---- the music, under the picture --------------------------------------
   // A cut is judged against its music or it is not really being judged. The
@@ -212,12 +260,14 @@ export default function EditorScreen() {
   useEffect(() => {
     if (!musicUri) return;
     try {
-      if (playing) score.play();
+      // Held while a clip loads, so the music does not run on over a picture
+      // that has stopped.
+      if (playing && !waiting) score.play();
       else score.pause();
     } catch {
       // Not loaded yet; the next toggle catches it.
     }
-  }, [playing, musicUri, score]);
+  }, [playing, waiting, musicUri, score]);
 
   // Back to the top of the track when the run-through restarts from the first
   // shot, so a second play does not resume halfway through the music.
@@ -386,7 +436,10 @@ export default function EditorScreen() {
         memory={memory}
         index={selected}
         total={clips.length}
-        playing={playing}
+        // The camera move and the transition run only once the shot is really
+        // on screen, so neither plays out behind a clip that is still loading.
+        playing={playing && !waiting}
+        waiting={waiting}
         player={player}
         videoStatus={videoStatus}
         entrance={entrance}
@@ -398,7 +451,9 @@ export default function EditorScreen() {
         clips={clips}
         byId={byId}
         selected={selected}
-        playing={playing}
+        // The playhead waits with everything else, rather than sliding across a
+        // shot that has not started.
+        playing={playing && !waiting}
         musicLabel={musicLabel}
         onSelect={(index) => {
           stop();

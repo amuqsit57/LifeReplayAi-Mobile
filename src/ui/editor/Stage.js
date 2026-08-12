@@ -2,7 +2,16 @@ import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { VideoView } from 'expo-video';
 import { useEffect, useRef } from 'react';
-import { Animated, Dimensions, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { GRADE_FILTER } from '../../lib/plan';
 import { colors, spacing, type } from '../../theme';
@@ -83,6 +92,7 @@ export default function Stage({
   index,
   total,
   playing,
+  waiting,
   player,
   videoStatus,
   entrance,
@@ -239,7 +249,14 @@ export default function Stage({
         />
       ) : null}
 
-      {total ? (
+      {waiting ? (
+        // Held, not stuck. The run-through has paused itself until this clip can
+        // be shown; saying so is the difference between waiting and broken.
+        <View style={styles.wait}>
+          <ActivityIndicator color="#fff" />
+          <Text style={styles.waitText}>Loading this clip</Text>
+        </View>
+      ) : total ? (
         <Pressable
           style={styles.play}
           onPress={onTogglePlay}
@@ -289,6 +306,13 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   emptyText: { ...type.caption, color: colors.textMuted },
 
+  wait: {
+    position: 'absolute',
+    alignSelf: 'center',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  waitText: { ...type.caption, color: 'rgba(255,255,255,0.8)' },
   play: {
     position: 'absolute',
     alignSelf: 'center',
