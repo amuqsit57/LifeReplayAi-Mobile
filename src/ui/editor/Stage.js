@@ -188,32 +188,40 @@ export default function Stage({
 
   return (
     <View style={[styles.stage, { height }]}>
-      {isVideo ? (
-        // Concrete width and height, no absolute positioning, no filter, no
-        // transform, no animated parent, no clipping above it.
-        //
-        // This is the shape the replay screen uses, and that one has always
-        // worked. An absolutely-filled player inside a parent that clips is what
-        // blacked the picture out here — the same combination that blacked it out
-        // once before. A video shot therefore plays clean and ungraded, and the
-        // bar below says as much: wrong colours would be a worse lie than none.
-        //
-        // nativeControls off because the stage has its own transport; leaving it
-        // on put a second play button on top of the first.
+      {/* Mounted for as long as the editor is, and never unmounted between
+          shots.
+
+          A VideoView creates its surface when it mounts, and that takes longer
+          than a two second shot allows — so the first video in a run-through was
+          still bringing its surface up when its turn ended, and only looked
+          right on a second pass with the view already warm. Keeping it mounted
+          means the surface exists before it is ever needed.
+
+          Concrete width and height, no absolute positioning, no filter, no
+          transform, no animated parent, no clipping above it: that is the shape
+          the replay screen uses, and the shape that stopped it rendering black.
+          A video shot therefore plays clean and ungraded, and the bar below says
+          as much — wrong colours would be a worse lie than none.
+
+          nativeControls off because the stage has its own transport; leaving it
+          on put a second play button on top of the first. */}
+      {player ? (
         <VideoView
           player={player}
           style={{ width: SCREEN_WIDTH, height }}
           contentFit="contain"
           nativeControls={false}
-          // Android defaults to a SurfaceView, which is punched through the view
-          // hierarchy rather than drawn in it. Next to animated siblings and an
-          // overlaid bar that shows up as a black rectangle. A TextureView is
-          // composited normally, which is what this screen needs.
+          // Android defaults to a SurfaceView, punched through the view hierarchy
+          // rather than drawn in it; next to animated siblings and an overlaid bar
+          // that reads as a black rectangle. A TextureView composites normally.
           surfaceType="textureView"
         />
-      ) : (
-        // Stills get the full treatment, and the clipping the camera move needs.
-        <Animated.View style={[styles.fill, styles.clip, entering]}>
+      ) : null}
+
+      {/* Stills sit over the player rather than instead of it, so the surface
+          underneath is never torn down. Opaque, so nothing shows through. */}
+      {!isVideo ? (
+        <Animated.View style={[styles.fill, styles.clip, styles.stills, entering]}>
           <Animated.View
             style={[
               styles.fill,
@@ -240,7 +248,7 @@ export default function Stage({
             </View>
           </Animated.View>
         </Animated.View>
-      )}
+      ) : null}
 
       {/* A transition through a colour is the colour clearing, not the shot
           arriving — so it is drawn over the top rather than applied to it. */}
@@ -309,6 +317,8 @@ const styles = StyleSheet.create({
   stage: { backgroundColor: '#0B0812', justifyContent: 'center', alignItems: 'center' },
   fill: { ...StyleSheet.absoluteFillObject },
   clip: { overflow: 'hidden' },
+  // Opaque, because it covers a live player rather than replacing it.
+  stills: { backgroundColor: '#0B0812' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   emptyText: { ...type.caption, color: colors.textMuted },
 

@@ -166,6 +166,45 @@ export default function EditorScreen() {
 
   const player = memory?.kind === 'video' ? players.pool.get(memory.id) ?? null : null;
 
+  // The player the view stays mounted on, which is not always the one the shot
+  // needs. A run of photographs would otherwise unmount the VideoView and throw
+  // its surface away, and the next video would have to build one again inside
+  // its own two seconds — which is exactly why the first pass showed a still and
+  // the second showed the picture.
+  const [held, setHeld] = useState(null);
+  useEffect(() => {
+    if (player) setHeld(player);
+  }, [player]);
+
+  // Seeded the moment the pool opens, so the view is mounted and its surface up
+  // from the first frame of the editor — not from the first video shot reached.
+  // An edit that opens on a photograph would otherwise still pay for the mount
+  // when it got to one.
+  useEffect(() => {
+    if (!players.ready || held) return;
+    const first = players.pool.values().next().value;
+    if (first) setHeld(first);
+  }, [players.ready, players.pool, held]);
+
+  // Park each clip on its own in-point once the pool is open, so the first frame
+  // of every shot is decoded and waiting rather than fetched when it is reached.
+  useEffect(() => {
+    if (!players.ready) return;
+    const firstUse = new Map();
+    for (const shot of clips) {
+      if (!firstUse.has(shot.memory_id)) firstUse.set(shot.memory_id, shot);
+    }
+    for (const [id, instance] of players.pool) {
+      try {
+        instance.currentTime = Number(firstUse.get(id)?.start_at) || 0;
+      } catch {
+        // Not open; the shot seeks again when it plays.
+      }
+    }
+    // Once, when the pool becomes ready — not on every edit to the plan.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [players.ready]);
+
   // Read inside listeners and timers without making every edit restart playback.
   const live = useRef({});
   live.current = { clips, byId, selected, playing };
@@ -495,8 +534,10 @@ export default function EditorScreen() {
         // on screen, so neither plays out behind a clip that is still loading.
         playing={playing && !waiting}
         waiting={waiting}
+        // `hasSource` is whether *this shot* is a playable video; `player` is
+        // only what the view stays mounted on.
         hasSource={!!player}
-        player={player}
+        player={player ?? held}
         entrance={entrance}
         height={Math.max(190, STAGE_HEIGHT)}
         onTogglePlay={() => setPlaying((on) => !on)}
