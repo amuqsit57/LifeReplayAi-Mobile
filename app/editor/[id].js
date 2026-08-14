@@ -139,7 +139,12 @@ export default function EditorScreen() {
     [clips, byId]
   );
 
-  const cache = useClipCache(videos, posters);
+  // `enabled` is the fix for a hole in the gate: before the edit loads there are
+  // no clips to see, the cache reported "nothing to fetch, ready", and the editor
+  // then rendered on that stale answer the instant the plan arrived — opening
+  // behind the download it was supposed to wait for. Which is exactly what "it is
+  // still loading on demand" looked like.
+  const cache = useClipCache(videos, posters, !!plan);
 
   // The file this shot plays from.
   //
@@ -179,7 +184,14 @@ export default function EditorScreen() {
     // so a download landing cannot restart a shot already on screen.
     if (pinnedTo.current !== memory.id || !playing) {
       pinnedTo.current = memory.id;
-      setSourceUri(ready ?? memory.url);
+      const picked = ready ?? memory.url;
+      // Says plainly whether this shot is coming off the disk or the network.
+      console.log(
+        `[clips] shot ${memory.id.slice(0, 8)} plays from ${
+          picked.startsWith('file://') ? 'DISK' : 'NETWORK'
+        }`
+      );
+      setSourceUri(picked);
     }
   }, [memory?.id, memory?.kind, memory?.url, cache.local, cache.failed, playing]);
 

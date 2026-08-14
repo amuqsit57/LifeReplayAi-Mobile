@@ -37,7 +37,16 @@ const pathFor = (id) => `${DIR}${id}.mp4`;
  * @param {Array<{id: string, url: string}>} videos every clip the edit uses
  * @param {Array<string>} stills thumbnails to warm at the same time
  */
-export function useClipCache(videos, stills = []) {
+/**
+ * Says what the cache is actually doing, in the Metro log.
+ *
+ * This existed as guesswork three times over — "it must be the layout", "it must
+ * be the hook", "it must be the ordering" — and each guess cost a round trip. A
+ * cache either has the file or it does not, and it can simply say which.
+ */
+const log = (...parts) => console.log('[clips]', ...parts);
+
+export function useClipCache(videos, stills = [], enabled = true) {
   const [local, setLocal] = useState({});
   const [failed, setFailed] = useState({});
   const [done, setDone] = useState(0);
@@ -63,10 +72,21 @@ export function useClipCache(videos, stills = []) {
     setReady(false);
     setSkipped(false);
 
+    // Nothing is ready before the edit itself has loaded — otherwise the first
+    // render, with no clips known yet, reports "all done" and the editor opens
+    // behind the download it was supposed to wait for.
+    if (!enabled) {
+      log('holding: the edit has not loaded yet');
+      return undefined;
+    }
+
     if (!videos.length) {
+      log('no video in this edit; nothing to fetch');
       setReady(true);
       return undefined;
     }
+
+    log(`starting: ${videos.length} clip(s), cacheDirectory=${FileSystem.cacheDirectory}`);
 
     const tick = () => {
       if (cancelled.current) return;
@@ -82,10 +102,13 @@ export function useClipCache(videos, stills = []) {
       try {
         const info = await FileSystem.getInfoAsync(target);
         if (info.exists && info.size > 0) {
+          log(`hit  ${video.id.slice(0, 8)} ${(info.size / 1e6).toFixed(1)}MB already here`);
           meter.current[video.id] = { written: info.size, total: info.size };
           setLocal((current) => ({ ...current, [video.id]: info.uri }));
           return;
         }
+
+        log(`get  ${video.id.slice(0, 8)} ${video.url.slice(0, 72)}`);
 
         const job = FileSystem.createDownloadResumable(
           video.url,
@@ -104,14 +127,17 @@ export function useClipCache(videos, stills = []) {
         if (cancelled.current) return;
 
         if (result && result.status >= 200 && result.status < 300) {
+          log(`done ${video.id.slice(0, 8)} -> ${result.uri}`);
           setLocal((current) => ({ ...current, [video.id]: result.uri }));
         } else {
+          log(`FAIL ${video.id.slice(0, 8)} http ${result && result.status}`);
           // Marked rather than hidden: a clip that cannot be cached has to fall
           // back to streaming, or it would simply never play.
           setFailed((current) => ({ ...current, [video.id]: true }));
           await FileSystem.deleteAsync(target, { idempotent: true });
         }
-      } catch {
+      } catch (problem) {
+        log(`FAIL ${video.id.slice(0, 8)} ${problem?.message ?? problem}`);
         if (!cancelled.current) setFailed((current) => ({ ...current, [video.id]: true }));
         try {
           await FileSystem.deleteAsync(target, { idempotent: true });
@@ -127,9 +153,10 @@ export function useClipCache(videos, stills = []) {
     (async () => {
       try {
         await ensureDir();
-      } catch {
+      } catch (problem) {
         // Without a cache directory everything streams. Worse, but not broken,
         // and nothing here may stop an edit from opening.
+        log('FAIL no cache directory:', problem?.message ?? problem);
         setReady(true);
         return;
       }
@@ -146,14 +173,17 @@ export function useClipCache(videos, stills = []) {
       });
 
       await Promise.all(lanes);
-      if (!cancelled.current) setReady(true);
+      if (!cancelled.current) {
+        log('ready');
+        setReady(true);
+      }
     })();
 
     return () => {
       cancelled.current = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, stillKey]);
+  }, [key, stillKey, enabled]);
 
   return {
     local,
