@@ -28,10 +28,25 @@ async function ensureDir() {
 }
 
 /**
- * The extension matters: Android picks its demuxer from the file name, and
- * without one it probes the container instead — slower, and not always right.
+ * Named by the memory *and* the object it came from.
+ *
+ * Naming by memory id alone meant a clip already cached as its 16MB original
+ * satisfied the lookup for its half-megabyte proxy — the proxies were built,
+ * stored, and then never used, because the cache said it already had that clip.
+ * A cache key has to describe what is in the file, not only what it is of.
+ *
+ * The extension is kept because Android picks its demuxer from the file name;
+ * without one it probes the container instead, which is slower and not always
+ * right.
  */
-const pathFor = (id) => `${DIR}${id}.mp4`;
+const stampFor = (url) => {
+  // The signature changes on every read, so only the object path identifies it.
+  const path = String(url).split('?')[0];
+  const name = path.slice(path.lastIndexOf('/') + 1) || 'clip.mp4';
+  return name.replace(/[^A-Za-z0-9._-]/g, '_').slice(-56);
+};
+
+const pathFor = (id, url) => `${DIR}${id}-${stampFor(url)}`;
 
 /**
  * @param {Array<{id: string, url: string}>} videos every clip the edit uses
@@ -59,7 +74,9 @@ export function useClipCache(videos, stills = [], enabled = true) {
 
   // Standing in for the list itself: comparing the array would restart the queue
   // on every render.
-  const key = videos.map((v) => v.id).join(',');
+  // Includes the object each clip resolves to, so switching a clip to its
+  // proxy re-runs the queue rather than reporting the original as a hit.
+  const key = videos.map((v) => `${v.id}|${stampFor(v.url)}`).join(',');
   const stillKey = stills.join(',');
 
   const skip = useCallback(() => setSkipped(true), []);
@@ -98,7 +115,7 @@ export function useClipCache(videos, stills = [], enabled = true) {
     };
 
     const fetchOne = async (video) => {
-      const target = pathFor(video.id);
+      const target = pathFor(video.id, video.url);
       try {
         const info = await FileSystem.getInfoAsync(target);
         if (info.exists && info.size > 0) {
@@ -159,6 +176,23 @@ export function useClipCache(videos, stills = [], enabled = true) {
         log('FAIL no cache directory:', problem?.message ?? problem);
         setReady(true);
         return;
+      }
+
+      // Drop earlier versions of these same clips — the originals left behind
+      // when an edit moves to proxies are sixteen megabytes each and will never
+      // be read again.
+      try {
+        const keep = new Set(videos.map((v) => pathFor(v.id, v.url).split('/').pop()));
+        const mine = new Set(videos.map((v) => v.id));
+        for (const name of await FileSystem.readDirectoryAsync(DIR)) {
+          const owner = name.slice(0, name.indexOf('-'));
+          if (mine.has(owner) && !keep.has(name)) {
+            await FileSystem.deleteAsync(`${DIR}${name}`, { idempotent: true });
+            log(`swept ${name}`);
+          }
+        }
+      } catch {
+        // Housekeeping only; nothing here is worth failing over.
       }
 
       // The stills are small and wanted immediately; they warm alongside rather
