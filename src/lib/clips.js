@@ -27,15 +27,23 @@ async function ensureDir() {
   }
 }
 
-/** Named by memory id — a memory's bytes never change, so a hit is always valid. */
-const pathFor = (id) => `${DIR}${id}`;
+/**
+ * Named by memory id — a memory's bytes never change, so a hit is always valid.
+ *
+ * The extension matters. Android picks its demuxer from the file name, and a
+ * path with no extension makes it probe the container instead, which is slower
+ * and not always right.
+ */
+const pathFor = (id) => `${DIR}${id}.mp4`;
 
 /**
  * @param {Array<{id: string, url: string}>} videos in the order the edit uses them
- * @returns {{ local: Record<string,string>, done: number, total: number, busy: boolean }}
+ * @returns {{ local, failed, done, total, busy }} `local` maps memory id to a
+ *   file:// URI; `failed` marks the ones that will have to be streamed.
  */
 export function useClipCache(videos) {
   const [local, setLocal] = useState({});
+  const [failed, setFailed] = useState({});
   const [done, setDone] = useState(0);
 
   // What the effect below is working through. Compared by id so re-rendering with
@@ -81,11 +89,14 @@ export function useClipCache(videos) {
           if (result.status >= 200 && result.status < 300) {
             setLocal((current) => ({ ...current, [video.id]: result.uri }));
           } else {
-            // Leave it out of the map and it streams instead.
+            // Marked failed, which is what lets the player fall back to
+            // streaming it. Without that flag a clip that cannot be cached would
+            // simply never play.
+            setFailed((current) => ({ ...current, [video.id]: true }));
             await FileSystem.deleteAsync(target, { idempotent: true });
           }
         } catch {
-          // A clip that will not download still plays from its URL.
+          if (!cancelled.current) setFailed((current) => ({ ...current, [video.id]: true }));
           try {
             await FileSystem.deleteAsync(target, { idempotent: true });
           } catch {
@@ -106,5 +117,5 @@ export function useClipCache(videos) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  return { local, done, total: videos.length, busy: done < videos.length };
+  return { local, failed, done, total: videos.length, busy: done < videos.length };
 }

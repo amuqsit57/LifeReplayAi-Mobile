@@ -151,12 +151,27 @@ export default function EditorScreen() {
       setSourceUri(null);
       return;
     }
-    // A different shot always re-picks. The same shot only re-picks when idle.
+    // Wait for the cached copy rather than racing it.
+    //
+    // Streaming the clip while the cache downloads the same clip means fetching
+    // one file twice at once over one connection, and both halves crawl. That is
+    // what the buffering was. So a clip that is still queued shows its still and
+    // holds; only one the cache has given up on is streamed.
+    const ready = cache.local[memory.id];
+    const hopeless = cache.failed[memory.id];
+    if (!ready && !hopeless) {
+      pinnedTo.current = null;
+      setSourceUri(null);
+      return;
+    }
+
+    // A different shot always re-picks. The same shot only re-picks when idle,
+    // so a download landing cannot restart a shot already on screen.
     if (pinnedTo.current !== memory.id || !playing) {
       pinnedTo.current = memory.id;
-      setSourceUri(cache.local[memory.id] ?? memory.url);
+      setSourceUri(ready ?? memory.url);
     }
-  }, [memory?.id, memory?.kind, memory?.url, cache.local, playing]);
+  }, [memory?.id, memory?.kind, memory?.url, cache.local, cache.failed, playing]);
 
   // The player's own cache is for things it has to fetch. Asking it to cache a
   // file that is already on this phone is work for nothing, and on a file:// URI
@@ -216,9 +231,11 @@ export default function EditorScreen() {
     setVideoStatus(sourceUri ? 'loading' : 'idle');
   }, [sourceUri]);
 
-  // Whether the shot on screen is a video that has not arrived yet. While that is
+  // Whether the shot on screen is a video that has not arrived yet — either its
+  // file is still downloading, or it has not finished opening. While that is
   // true the film is not really running, so nothing should advance.
-  const waiting = playing && !!sourceUri && videoStatus !== 'readyToPlay';
+  const needsVideo = memory?.kind === 'video' && !!memory?.url;
+  const waiting = playing && needsVideo && (!sourceUri || videoStatus !== 'readyToPlay');
 
   useEffect(() => {
     if (!playing) {
@@ -241,12 +258,13 @@ export default function EditorScreen() {
     // is not long enough to fetch a clip, so it was always still loading when its
     // turn ended.
     if (waiting) {
-      // Unless it never arrives. A clip that will not decode should cost a
-      // moment, not the whole run-through.
+      // Unless it never arrives. Long enough for the biggest clip in the library
+      // to come down — they run to sixty megabytes — and short enough that a
+      // broken one costs a pause rather than the whole run-through.
       const bail = setTimeout(() => {
         if (selected + 1 < live.current.clips.length) setSelected(selected + 1);
         else setPlaying(false);
-      }, 10_000);
+      }, 45_000);
       return () => clearTimeout(bail);
     }
 
@@ -472,6 +490,7 @@ export default function EditorScreen() {
         // on screen, so neither plays out behind a clip that is still loading.
         playing={playing && !waiting}
         waiting={waiting}
+        hasSource={!!sourceUri}
         player={player}
         videoStatus={videoStatus}
         entrance={entrance}

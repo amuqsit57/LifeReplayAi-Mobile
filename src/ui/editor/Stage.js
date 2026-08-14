@@ -93,13 +93,17 @@ export default function Stage({
   total,
   playing,
   waiting,
+  hasSource,
   player,
   videoStatus,
   entrance,
   height,
   onTogglePlay,
 }) {
-  const isVideo = memory?.kind === 'video' && !!memory?.url;
+  // A video shot only takes the player once it has a file to play. Until then it
+  // shows its own still — an empty player is a black rectangle, and a black
+  // rectangle is indistinguishable from a broken one.
+  const isVideo = memory?.kind === 'video' && !!memory?.url && hasSource;
   const filter = GRADE_FILTER[clip?.grade] ?? null;
 
   // The camera move, and the way the shot arrives. Both native-driver friendly.
@@ -283,7 +287,9 @@ export default function Stage({
             Shot {index + 1} of {total} · {Number(clip.seconds).toFixed(1)}s
           </Text>
           <Text style={styles.barNote} numberOfLines={1}>
-            {isVideo && videoStatus === 'error'
+            {waiting && !hasSource
+              ? 'Getting this clip onto your phone — it plays from there, not over the network'
+              : isVideo && videoStatus === 'error'
               ? 'This clip would not load — it will still be cut into the render'
               : isVideo && videoStatus === 'loading'
                 ? 'Loading this clip…'
