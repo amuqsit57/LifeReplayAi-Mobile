@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { createVideoPlayer, useVideoPlayer } from 'expo-video';
+import { useVideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../src/lib/api';
 import { useClipCache } from '../../src/lib/clips';
+import { usePlayerPool } from '../../src/lib/players';
 import {
   SPEED_RATE,
   addClips,
@@ -43,11 +44,6 @@ import Tracks from '../../src/ui/editor/Tracks';
 // A third of the screen for the picture. An even split with the panel below left
 // the effects two rows tall on a normal phone, which read as them not being there.
 const STAGE_HEIGHT = Math.round(Dimensions.get('window').height * 0.32);
-
-// One decoder per clip is what makes changing shot instant, and also what
-// would exhaust a phone if an edit had forty of them. Beyond this the extra
-// clips fall back to being opened when reached.
-const MAX_PLAYERS = 8;
 
 /**
  * The editor.
@@ -162,62 +158,13 @@ export default function EditorScreen() {
   // them already open on their file. Changing shot is then only a matter of
   // which one is on screen. This is what an editor does, and why one feels
   // instant while a video feed does not.
-  const pool = useRef(new Map());
-  const [poolSize, setPoolSize] = useState(0);
+  // Built only once the files are down, and — the part the last version missed —
+  // not counted as ready until each one has actually opened its file. Finishing
+  // the progress screen on the download alone is why the first run through an
+  // edit came up empty while the bar claimed to be done.
+  const players = usePlayerPool(videos, cache.local, cache.ready);
 
-  useEffect(() => {
-    if (!cache.ready || !videos.length) return;
-
-    let added = 0;
-    // Bounded: each player is a decoder and some buffer, and an edit with forty
-    // clips would not survive forty of them.
-    for (const video of videos.slice(0, MAX_PLAYERS)) {
-      if (pool.current.has(video.id)) continue;
-      const uri = cache.local[video.id] ?? video.url;
-      try {
-        const instance = createVideoPlayer({
-          uri,
-          // Only worth caching what has to be fetched; these are local files.
-          useCaching: !uri.startsWith('file://'),
-        });
-        instance.loop = false;
-        // The finished film carries music and nothing else — the renderer drops
-        // clip audio — so sound here would preview a soundtrack that does not
-        // exist. Silent also means no claim on the audio session, which the
-        // music needs.
-        instance.muted = true;
-        instance.audioMixingMode = 'mixWithOthers';
-        pool.current.set(video.id, instance);
-        added += 1;
-        console.log(
-          `[clips] player ready for ${video.id.slice(0, 8)} from ${
-            uri.startsWith('file://') ? 'DISK' : 'NETWORK'
-          }`
-        );
-      } catch (problem) {
-        console.log(`[clips] could not build a player for ${video.id.slice(0, 8)}`, problem?.message);
-      }
-    }
-    if (added) setPoolSize(pool.current.size);
-  }, [cache.ready, cache.local, videos]);
-
-  // Created by hand, so released by hand — these do not clean themselves up the
-  // way the hook's do.
-  useEffect(
-    () => () => {
-      for (const instance of pool.current.values()) {
-        try {
-          instance.release();
-        } catch {
-          // Already gone.
-        }
-      }
-      pool.current.clear();
-    },
-    []
-  );
-
-  const player = memory?.kind === 'video' ? pool.current.get(memory.id) ?? null : null;
+  const player = memory?.kind === 'video' ? players.pool.get(memory.id) ?? null : null;
 
   // Read inside listeners and timers without making every edit restart playback.
   const live = useRef({});
@@ -226,7 +173,7 @@ export default function EditorScreen() {
   // Only the shot on screen runs. The rest hold their position, ready to resume
   // the moment they are shown again.
   useEffect(() => {
-    for (const [id, instance] of pool.current) {
+    for (const [id, instance] of players.pool) {
       if (id === memory?.id) continue;
       try {
         instance.pause();
@@ -234,7 +181,7 @@ export default function EditorScreen() {
         // Already released.
       }
     }
-  }, [memory?.id, poolSize]);
+  }, [memory?.id, players.pool, players.ready]);
 
   // A video shot with no player of its own is the only thing left worth waiting
   // for, and after the preparing screen there should not be one. Nothing waits
@@ -428,27 +375,41 @@ export default function EditorScreen() {
     );
   }
 
-  // Nothing opens until every clip is on the phone.
+  // Nothing opens until every clip is on the phone *and* open in a player.
   //
-  // Loading them on demand cannot work — a two second shot cannot fetch a five
-  // megabyte file — so the wait happens once, here, where it is honest and
-  // measured, instead of every time the playhead reaches a video.
-  if (!cache.ready) {
-    const pct = cache.bytes.total
-      ? Math.min(100, Math.round((cache.bytes.written / cache.bytes.total) * 100))
-      : 0;
+  // Two phases, and the second is the one that was missing: a downloaded file
+  // still has to be opened, and calling the wait finished after the download is
+  // why the first run through an edit came up empty on a bar that said 100%.
+  if (!cache.ready || !players.ready) {
+    const downloading = !cache.ready;
+    const pct = downloading
+      ? cache.bytes.total
+        ? Math.min(100, Math.round((cache.bytes.written / cache.bytes.total) * 100))
+        : 0
+      : players.total
+        ? Math.round((players.opened / players.total) * 100)
+        : 100;
 
     return (
       <View style={styles.loading}>
-        <Feather name="download-cloud" size={26} color={colors.primary} />
-        <Text style={styles.prepTitle}>Getting the clips ready</Text>
+        <Feather
+          name={downloading ? 'download-cloud' : 'film'}
+          size={26}
+          color={colors.primary}
+        />
+        <Text style={styles.prepTitle}>
+          {downloading ? 'Getting the clips' : 'Opening the clips'}
+        </Text>
         <Text style={styles.loadingText}>
-          {cache.done} of {cache.total} {cache.total === 1 ? 'clip' : 'clips'}
-          {cache.bytes.total
-            ? ` · ${(cache.bytes.written / 1e6).toFixed(1)} of ${(
-                cache.bytes.total / 1e6
-              ).toFixed(1)} MB`
-            : ''}
+          {downloading
+            ? `${cache.done} of ${cache.total} ${cache.total === 1 ? 'clip' : 'clips'}${
+                cache.bytes.total
+                  ? ` · ${(cache.bytes.written / 1e6).toFixed(1)} of ${(
+                      cache.bytes.total / 1e6
+                    ).toFixed(1)} MB`
+                  : ''
+              }`
+            : `${players.opened} of ${players.total} ready to play`}
         </Text>
 
         <View style={styles.meter}>
@@ -456,11 +417,15 @@ export default function EditorScreen() {
         </View>
 
         <Text style={styles.prepNote}>
-          They play from your phone after this, so nothing stops to load while you edit.
+          Every clip is loaded before you start, so nothing stops to buffer while you edit.
         </Text>
 
-        <Pressable onPress={cache.skip} hitSlop={10} style={styles.skip}>
-          <Text style={styles.link}>Start editing now</Text>
+        <Pressable
+          onPress={downloading ? cache.skip : undefined}
+          hitSlop={10}
+          style={styles.skip}
+        >
+          {downloading ? <Text style={styles.link}>Start editing now</Text> : null}
         </Pressable>
       </View>
     );
