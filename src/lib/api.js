@@ -124,6 +124,17 @@ export const api = {
   /** The edit plus every memory it may cut from, in one call. */
   editable: (replayId) => request(`/api/replays/${replayId}/editable`),
 
+  /**
+   * Small, easily decoded copies of this edit's video, for editing against.
+   *
+   * Slow the first time an event is edited — each clip is transcoded — and
+   * instant afterwards, since they are kept. Worth the wait: a 4K clip is 16MB
+   * and beyond what most phone decoders will touch, and its proxy is 0.5MB of
+   * baseline H.264 that anything can play.
+   */
+  proxies: (replayId) =>
+    request(`/api/replays/${replayId}/proxies`, { method: 'POST', timeoutMs: 300_000 }),
+
   /** Store the edit; `render` also queues it. Everything is re-checked server side. */
   savePlan: (replayId, plan, render = false) =>
     request(`/api/replays/${replayId}/plan`, {

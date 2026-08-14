@@ -116,7 +116,7 @@ export default function EditorScreen() {
   // soon as the edit opens. A two second shot cannot download a five megabyte
   // file inside its own two seconds, so waiting until its turn was always going
   // to stall — however gracefully the waiting was handled.
-  const videos = useMemo(() => {
+  const shots = useMemo(() => {
     const seen = new Set();
     const out = [];
     for (const shot of clips) {
@@ -128,6 +128,26 @@ export default function EditorScreen() {
     }
     return out;
   }, [clips, byId]);
+
+  // Edit against proxies, render from the originals.
+  //
+  // One of these clips is 4096x2160 at 15 Mbps, and most Android decoders stop at
+  // 3840 wide — so it fell to software and took several attempts to show a frame
+  // while the 1080p one beside it was instant. That is not something waiting
+  // fixes. Its proxy is 720x380 baseline H.264, half a megabyte against sixteen,
+  // and decodes anywhere. Every offline suite has worked this way for decades.
+  const proxies = useQuery({
+    queryKey: ['proxies', id],
+    queryFn: () => api.proxies(id),
+    enabled: !!plan && shots.length > 0,
+    staleTime: Infinity,
+    retry: false,
+  });
+
+  const videos = useMemo(
+    () => shots.map((shot) => ({ id: shot.id, url: proxies.data?.[shot.id] ?? shot.url })),
+    [shots, proxies.data]
+  );
 
   // The stills too, so a photograph shot never flashes empty either.
   const posters = useMemo(
@@ -144,7 +164,10 @@ export default function EditorScreen() {
   // then rendered on that stale answer the instant the plan arrived — opening
   // behind the download it was supposed to wait for. Which is exactly what "it is
   // still loading on demand" looked like.
-  const cache = useClipCache(videos, posters, !!plan);
+  // Nothing is fetched until it is known *what* to fetch: starting on the
+  // originals and swapping to proxies afterwards would download both.
+  const proxiesSettled = !shots.length || proxies.isFetched || proxies.isError;
+  const cache = useClipCache(videos, posters, !!plan && proxiesSettled);
 
   // ---- one player per clip, built once and kept ---------------------------
   //
@@ -450,52 +473,70 @@ export default function EditorScreen() {
   // Two phases, and the second is the one that was missing: a downloaded file
   // still has to be opened, and calling the wait finished after the download is
   // why the first run through an edit came up empty on a bar that said 100%.
-  if (!cache.ready || !players.ready) {
-    const downloading = !cache.ready;
-    const pct = downloading
-      ? cache.bytes.total
-        ? Math.min(100, Math.round((cache.bytes.written / cache.bytes.total) * 100))
-        : 0
-      : players.total
-        ? Math.round((players.opened / players.total) * 100)
-        : 100;
+  if (!proxiesSettled || !cache.ready || !players.ready) {
+    // Three phases, and each one is a thing that has to be true before a shot can
+    // appear on cue: something playable to fetch, the bytes on the phone, and a
+    // decoder open on them.
+    const phase = !proxiesSettled ? 'proxy' : !cache.ready ? 'download' : 'open';
+
+    const pct =
+      phase === 'proxy'
+        ? null
+        : phase === 'download'
+          ? cache.bytes.total
+            ? Math.min(100, Math.round((cache.bytes.written / cache.bytes.total) * 100))
+            : 0
+          : players.total
+            ? Math.round((players.opened / players.total) * 100)
+            : 100;
 
     return (
       <View style={styles.loading}>
         <Feather
-          name={downloading ? 'download-cloud' : 'film'}
+          name={phase === 'proxy' ? 'scissors' : phase === 'download' ? 'download-cloud' : 'film'}
           size={26}
           color={colors.primary}
         />
         <Text style={styles.prepTitle}>
-          {downloading ? 'Getting the clips' : 'Opening the clips'}
+          {phase === 'proxy'
+            ? 'Preparing the clips'
+            : phase === 'download'
+              ? 'Getting the clips'
+              : 'Opening the clips'}
         </Text>
         <Text style={styles.loadingText}>
-          {downloading
-            ? `${cache.done} of ${cache.total} ${cache.total === 1 ? 'clip' : 'clips'}${
-                cache.bytes.total
-                  ? ` · ${(cache.bytes.written / 1e6).toFixed(1)} of ${(
-                      cache.bytes.total / 1e6
-                    ).toFixed(1)} MB`
-                  : ''
-              }`
-            : `${players.opened} of ${players.total} ready to play`}
+          {phase === 'proxy'
+            ? 'Making editing copies · this happens once per event'
+            : phase === 'download'
+              ? `${cache.done} of ${cache.total} ${cache.total === 1 ? 'clip' : 'clips'}${
+                  cache.bytes.total
+                    ? ` · ${(cache.bytes.written / 1e6).toFixed(1)} of ${(
+                        cache.bytes.total / 1e6
+                      ).toFixed(1)} MB`
+                    : ''
+                }`
+              : `${players.opened} of ${players.total} ready to play`}
         </Text>
 
-        <View style={styles.meter}>
-          <View style={[styles.meterFill, { width: `${pct}%` }]} />
-        </View>
+        {pct === null ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <View style={styles.meter}>
+            <View style={[styles.meterFill, { width: `${pct}%` }]} />
+          </View>
+        )}
 
         <Text style={styles.prepNote}>
-          Every clip is loaded before you start, so nothing stops to buffer while you edit.
+          You edit against small copies and the film is still cut from the originals — so
+          nothing stops to buffer while you work.
         </Text>
 
         <Pressable
-          onPress={downloading ? cache.skip : undefined}
+          onPress={phase === 'download' ? cache.skip : undefined}
           hitSlop={10}
           style={styles.skip}
         >
-          {downloading ? <Text style={styles.link}>Start editing now</Text> : null}
+          {phase === 'download' ? <Text style={styles.link}>Start editing now</Text> : null}
         </Pressable>
       </View>
     );
