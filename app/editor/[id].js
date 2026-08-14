@@ -1,9 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { useEventListener } from 'expo';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useVideoPlayer } from 'expo-video';
+import { createVideoPlayer, useVideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -44,6 +43,11 @@ import Tracks from '../../src/ui/editor/Tracks';
 // A third of the screen for the picture. An even split with the panel below left
 // the effects two rows tall on a normal phone, which read as them not being there.
 const STAGE_HEIGHT = Math.round(Dimensions.get('window').height * 0.32);
+
+// One decoder per clip is what makes changing shot instant, and also what
+// would exhaust a phone if an edit had forty of them. Beyond this the extra
+// clips fall back to being opened when reached.
+const MAX_PLAYERS = 8;
 
 /**
  * The editor.
@@ -146,125 +150,104 @@ export default function EditorScreen() {
   // still loading on demand" looked like.
   const cache = useClipCache(videos, posters, !!plan);
 
-  // The file this shot plays from.
+  // ---- one player per clip, built once and kept ---------------------------
   //
-  // It has to change when the shot changes — including mid-playback, which the
-  // previous version got wrong: it skipped the whole update while playing, so a
-  // run-through kept whichever source the first shot had and every video after
-  // it came up black.
+  // The files were already on disk and it still paused at every video, because
+  // the player itself was being rebuilt for each shot: `useVideoPlayer` keys on
+  // its source, so changing shot meant constructing a decoder and opening a file
+  // before anything could appear. That is the pause, and it is not something
+  // caching can fix.
   //
-  // What must *not* change is the source of a shot already on screen. A local
-  // copy landing mid-shot would rebuild the player underneath it and restart the
-  // clip, so a newly downloaded file is only adopted the next time that shot
-  // comes round.
-  const [sourceUri, setSourceUri] = useState(null);
-  const pinnedTo = useRef(null);
+  // So every clip in the edit gets its own player when the editor opens, all of
+  // them already open on their file. Changing shot is then only a matter of
+  // which one is on screen. This is what an editor does, and why one feels
+  // instant while a video feed does not.
+  const pool = useRef(new Map());
+  const [poolSize, setPoolSize] = useState(0);
 
   useEffect(() => {
-    if (memory?.kind !== 'video' || !memory.url) {
-      pinnedTo.current = null;
-      setSourceUri(null);
-      return;
+    if (!cache.ready || !videos.length) return;
+
+    let added = 0;
+    // Bounded: each player is a decoder and some buffer, and an edit with forty
+    // clips would not survive forty of them.
+    for (const video of videos.slice(0, MAX_PLAYERS)) {
+      if (pool.current.has(video.id)) continue;
+      const uri = cache.local[video.id] ?? video.url;
+      try {
+        const instance = createVideoPlayer({
+          uri,
+          // Only worth caching what has to be fetched; these are local files.
+          useCaching: !uri.startsWith('file://'),
+        });
+        instance.loop = false;
+        // The finished film carries music and nothing else — the renderer drops
+        // clip audio — so sound here would preview a soundtrack that does not
+        // exist. Silent also means no claim on the audio session, which the
+        // music needs.
+        instance.muted = true;
+        instance.audioMixingMode = 'mixWithOthers';
+        pool.current.set(video.id, instance);
+        added += 1;
+        console.log(
+          `[clips] player ready for ${video.id.slice(0, 8)} from ${
+            uri.startsWith('file://') ? 'DISK' : 'NETWORK'
+          }`
+        );
+      } catch (problem) {
+        console.log(`[clips] could not build a player for ${video.id.slice(0, 8)}`, problem?.message);
+      }
     }
-    // Wait for the cached copy rather than racing it.
-    //
-    // Streaming the clip while the cache downloads the same clip means fetching
-    // one file twice at once over one connection, and both halves crawl. That is
-    // what the buffering was. So a clip that is still queued shows its still and
-    // holds; only one the cache has given up on is streamed.
-    const ready = cache.local[memory.id];
-    const hopeless = cache.failed[memory.id];
-    if (!ready && !hopeless) {
-      pinnedTo.current = null;
-      setSourceUri(null);
-      return;
-    }
+    if (added) setPoolSize(pool.current.size);
+  }, [cache.ready, cache.local, videos]);
 
-    // A different shot always re-picks. The same shot only re-picks when idle,
-    // so a download landing cannot restart a shot already on screen.
-    if (pinnedTo.current !== memory.id || !playing) {
-      pinnedTo.current = memory.id;
-      const picked = ready ?? memory.url;
-      // Says plainly whether this shot is coming off the disk or the network.
-      console.log(
-        `[clips] shot ${memory.id.slice(0, 8)} plays from ${
-          picked.startsWith('file://') ? 'DISK' : 'NETWORK'
-        }`
-      );
-      setSourceUri(picked);
-    }
-  }, [memory?.id, memory?.kind, memory?.url, cache.local, cache.failed, playing]);
+  // Created by hand, so released by hand — these do not clean themselves up the
+  // way the hook's do.
+  useEffect(
+    () => () => {
+      for (const instance of pool.current.values()) {
+        try {
+          instance.release();
+        } catch {
+          // Already gone.
+        }
+      }
+      pool.current.clear();
+    },
+    []
+  );
 
-  // The player's own cache is for things it has to fetch. Asking it to cache a
-  // file that is already on this phone is work for nothing, and on a file:// URI
-  // it is work the player has no reason to handle well.
-  const asVideo = (uri) =>
-    uri ? { uri, useCaching: !uri.startsWith('file://') } : null;
-
-  // The source goes into the hook rather than being pushed in afterwards.
-  //
-  // `useVideoPlayer` keys the player on the source and rebuilds it when that
-  // changes, so holding it at null and calling replaceAsync by hand was working
-  // against the hook rather than with it — which is why a video shot sat on its
-  // thumbnail and never played. This is the same shape the replay screen uses,
-  // and that one has always worked.
-  const player = useVideoPlayer(asVideo(sourceUri), (instance) => {
-    instance.loop = false;
-    // The finished film carries music and nothing else — the renderer drops clip
-    // audio — so hearing it here would preview a soundtrack that does not exist.
-    instance.muted = true;
-    // Silent, so it has no business claiming the audio session from the music.
-    instance.audioMixingMode = 'mixWithOthers';
-  });
-
-  // There was a second player here warming the next clip. It is gone: the disk
-  // cache above already has the files before they are needed, and two decoders
-  // running at once is a good way to make the one being watched stutter.
+  const player = memory?.kind === 'video' ? pool.current.get(memory.id) ?? null : null;
 
   // Read inside listeners and timers without making every edit restart playback.
   const live = useRef({});
   live.current = { clips, byId, selected, playing };
 
-  // Seek and play, once it is actually ready to do either. The status is also
-  // kept so the stage can say "loading" or "would not load" — without it a clip
-  // that fails to decode looks exactly like one that is simply paused, which is
-  // how this went unexplained for as long as it did.
-  const [videoStatus, setVideoStatus] = useState('idle');
-
-  useEventListener(player, 'statusChange', ({ status }) => {
-    setVideoStatus(status);
-    if (status !== 'readyToPlay') return;
-    const { clips: reel, selected: at, playing: running } = live.current;
-    const current = reel[at];
-    if (!current) return;
-    try {
-      player.currentTime = Number(current.start_at) || 0;
-      player.playbackRate = SPEED_RATE[current.speed] ?? 1;
-      if (running) player.play();
-    } catch {
-      // Seeking a source that went away mid-change.
-    }
-  });
-
-  // A new source starts unknown rather than inheriting the last clip's verdict —
-  // otherwise the shot after a loaded one starts its clock immediately on a
-  // stale "ready".
+  // Only the shot on screen runs. The rest hold their position, ready to resume
+  // the moment they are shown again.
   useEffect(() => {
-    setVideoStatus(sourceUri ? 'loading' : 'idle');
-  }, [sourceUri]);
+    for (const [id, instance] of pool.current) {
+      if (id === memory?.id) continue;
+      try {
+        instance.pause();
+      } catch {
+        // Already released.
+      }
+    }
+  }, [memory?.id, poolSize]);
 
-  // Whether the shot on screen is a video that has not arrived yet — either its
-  // file is still downloading, or it has not finished opening. While that is
-  // true the film is not really running, so nothing should advance.
+  // A video shot with no player of its own is the only thing left worth waiting
+  // for, and after the preparing screen there should not be one. Nothing waits
+  // on loading any more: the players are already open on their files.
   const needsVideo = memory?.kind === 'video' && !!memory?.url;
-  const waiting = playing && needsVideo && (!sourceUri || videoStatus !== 'readyToPlay');
+  const waiting = playing && needsVideo && !player;
 
   useEffect(() => {
     if (!playing) {
       try {
-        player.pause();
+        player?.pause();
       } catch {
-        // Nothing loaded to stop.
+        // Already released.
       }
       return undefined;
     }
@@ -275,27 +258,24 @@ export default function EditorScreen() {
       return undefined;
     }
 
-    // Hold the clock until the picture can actually be shown. Starting it
-    // regardless is what marched the playhead past every video shot: two seconds
-    // is not long enough to fetch a clip, so it was always still loading when its
-    // turn ended.
     if (waiting) {
-      // Unless it never arrives. Long enough for the biggest clip in the library
-      // to come down — they run to sixty megabytes — and short enough that a
-      // broken one costs a pause rather than the whole run-through.
+      // A clip with no player never gets one by waiting, so this is a short skip
+      // rather than a long hold.
       const bail = setTimeout(() => {
         if (selected + 1 < live.current.clips.length) setSelected(selected + 1);
         else setPlaying(false);
-      }, 45_000);
+      }, 1_500);
       return () => clearTimeout(bail);
     }
 
     try {
-      player.currentTime = Number(current.start_at) || 0;
-      player.playbackRate = SPEED_RATE[current.speed] ?? 1;
-      player.play();
+      if (player) {
+        player.currentTime = Number(current.start_at) || 0;
+        player.playbackRate = SPEED_RATE[current.speed] ?? 1;
+        player.play();
+      }
     } catch {
-      // Nothing loaded — a still, or a clip that failed.
+      // Released underneath us; the next shot picks up.
     }
 
     const timer = setTimeout(() => {
@@ -550,9 +530,8 @@ export default function EditorScreen() {
         // on screen, so neither plays out behind a clip that is still loading.
         playing={playing && !waiting}
         waiting={waiting}
-        hasSource={!!sourceUri}
+        hasSource={!!player}
         player={player}
-        videoStatus={videoStatus}
         entrance={entrance}
         height={Math.max(190, STAGE_HEIGHT)}
         onTogglePlay={() => setPlaying((on) => !on)}

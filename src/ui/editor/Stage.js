@@ -95,7 +95,6 @@ export default function Stage({
   waiting,
   hasSource,
   player,
-  videoStatus,
   entrance,
   height,
   onTogglePlay,
@@ -263,7 +262,7 @@ export default function Stage({
         // be shown; saying so is the difference between waiting and broken.
         <View style={styles.wait}>
           <ActivityIndicator color="#fff" />
-          <Text style={styles.waitText}>Loading this clip</Text>
+          <Text style={styles.waitText}>Skipping — no player for this clip</Text>
         </View>
       ) : total ? (
         <Pressable
@@ -287,17 +286,13 @@ export default function Stage({
             Shot {index + 1} of {total} · {Number(clip.seconds).toFixed(1)}s
           </Text>
           <Text style={styles.barNote} numberOfLines={1}>
-            {waiting && !hasSource
-              ? 'Getting this clip onto your phone — it plays from there, not over the network'
-              : isVideo && videoStatus === 'error'
-              ? 'This clip would not load — it will still be cut into the render'
-              : isVideo && videoStatus === 'loading'
-                ? 'Loading this clip…'
-                : isVideo
-                  ? 'Video plays ungraded here — the grade is applied when you render'
-                  : clip.texture && clip.texture !== 'none'
-                    ? 'Grain and bloom only appear in the render'
-                    : 'Preview — the render is sharper than this'}
+            {waiting
+              ? 'This clip has no player — it is still cut into the render'
+              : isVideo
+                ? 'Video plays ungraded here — the grade is applied when you render'
+                : clip.texture && clip.texture !== 'none'
+                  ? 'Grain and bloom only appear in the render'
+                  : 'Preview — the render is sharper than this'}
           </Text>
         </View>
       ) : null}
