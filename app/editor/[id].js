@@ -131,24 +131,38 @@ export default function EditorScreen() {
 
   const cache = useClipCache(videos);
 
-  // The file this shot plays from, chosen when the shot comes up and then left
-  // alone. Swapping a remote URL for a local copy the moment the download lands
-  // would rebuild the player underneath a shot that is already on screen and
-  // restart it — so the choice only moves while nothing is playing.
+  // The file this shot plays from.
+  //
+  // It has to change when the shot changes — including mid-playback, which the
+  // previous version got wrong: it skipped the whole update while playing, so a
+  // run-through kept whichever source the first shot had and every video after
+  // it came up black.
+  //
+  // What must *not* change is the source of a shot already on screen. A local
+  // copy landing mid-shot would rebuild the player underneath it and restart the
+  // clip, so a newly downloaded file is only adopted the next time that shot
+  // comes round.
   const [sourceUri, setSourceUri] = useState(null);
+  const pinnedTo = useRef(null);
 
   useEffect(() => {
-    if (playing) return;
     if (memory?.kind !== 'video' || !memory.url) {
+      pinnedTo.current = null;
       setSourceUri(null);
       return;
     }
-    setSourceUri(cache.local[memory.id] ?? memory.url);
+    // A different shot always re-picks. The same shot only re-picks when idle.
+    if (pinnedTo.current !== memory.id || !playing) {
+      pinnedTo.current = memory.id;
+      setSourceUri(cache.local[memory.id] ?? memory.url);
+    }
   }, [memory?.id, memory?.kind, memory?.url, cache.local, playing]);
 
-  // Cached by the player too, so a clip reached a second time within a session
-  // costs nothing even before its file has landed.
-  const asVideo = (uri) => (uri ? { uri, useCaching: true } : null);
+  // The player's own cache is for things it has to fetch. Asking it to cache a
+  // file that is already on this phone is work for nothing, and on a file:// URI
+  // it is work the player has no reason to handle well.
+  const asVideo = (uri) =>
+    uri ? { uri, useCaching: !uri.startsWith('file://') } : null;
 
   // The source goes into the hook rather than being pushed in afterwards.
   //
@@ -166,25 +180,9 @@ export default function EditorScreen() {
     instance.audioMixingMode = 'mixWithOthers';
   });
 
-  // The next video along, loaded now rather than when the playhead arrives.
-  //
-  // A two second shot cannot download a twenty megabyte clip inside its own two
-  // seconds, so lazily loading each one meant the run-through walked straight
-  // past every video before it had anything to show. This warms the next one
-  // while the current shot is on screen; no view is attached to it, creating the
-  // player is what starts the fetch.
-  const upcoming = useMemo(() => {
-    for (let i = selected + 1; i < clips.length; i += 1) {
-      const next = byId[clips[i].memory_id];
-      if (next?.kind === 'video' && next.url) return cache.local[next.id] ?? next.url;
-    }
-    return null;
-  }, [clips, byId, selected, cache.local]);
-
-  useVideoPlayer(asVideo(upcoming), (instance) => {
-    instance.muted = true;
-    instance.audioMixingMode = 'mixWithOthers';
-  });
+  // There was a second player here warming the next clip. It is gone: the disk
+  // cache above already has the files before they are needed, and two decoders
+  // running at once is a good way to make the one being watched stutter.
 
   // Read inside listeners and timers without making every edit restart playback.
   const live = useRef({});

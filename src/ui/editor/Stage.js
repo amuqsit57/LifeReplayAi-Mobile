@@ -202,6 +202,11 @@ export default function Stage({
           style={{ width: SCREEN_WIDTH, height }}
           contentFit="contain"
           nativeControls={false}
+          // Android defaults to a SurfaceView, which is punched through the view
+          // hierarchy rather than drawn in it. Next to animated siblings and an
+          // overlaid bar that shows up as a black rectangle. A TextureView is
+          // composited normally, which is what this screen needs.
+          surfaceType="textureView"
         />
       ) : (
         // Stills get the full treatment, and the clipping the camera move needs.
