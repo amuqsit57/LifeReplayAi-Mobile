@@ -18,6 +18,10 @@ import { colors, spacing, type } from '../../theme';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+// The renderer draws its title band 360px tall in a 1920 frame — a little under a
+// fifth of the height. This is the same share of the preview.
+const CAPTION = 62;
+
 /**
  * How each transition reads as a movement of the incoming shot.
  *
@@ -208,20 +212,26 @@ export default function Stage({
           nativeControls off because the stage has its own transport; leaving it
           on put a second play button on top of the first. */}
       {player ? (
-        <VideoView
-          player={player}
-          style={{ width: SCREEN_WIDTH, height }}
-          contentFit="contain"
-          nativeControls={false}
-          // Android defaults to a SurfaceView, punched through the view hierarchy
-          // rather than drawn in it; next to animated siblings and an overlaid bar
-          // that reads as a black rectangle. A TextureView composites normally.
-          surfaceType="textureView"
-          // The only honest signal that this clip is actually on screen. A
-          // player can be open, seeked and playing while the view has still
-          // drawn nothing — which is what a short clip looked like.
-          onFirstFrameRender={onFirstFrame}
-        />
+        // Graded and transitioned like everything else now.
+        //
+        // Video used to be exempt from both because a SurfaceView is punched
+        // through the view hierarchy rather than drawn in it, so a filter or an
+        // animated parent turned it black. On a TextureView it composites like
+        // any other view, so the grade applies to the picture and the shot
+        // arrives the way its transition says it should.
+        <Animated.View style={[styles.videoWrap, isVideo ? entering : null]}>
+          <VideoView
+            player={player}
+            style={[{ width: SCREEN_WIDTH, height }, filter ? { filter } : null]}
+            contentFit="contain"
+            nativeControls={false}
+            surfaceType="textureView"
+            // The only honest signal that this clip is actually on screen. A
+            // player can be open, seeked and playing while the view has still
+            // drawn nothing — which is what a short clip looked like.
+            onFirstFrameRender={onFirstFrame}
+          />
+        </Animated.View>
       ) : null}
 
       {/* Stills sit over the player rather than instead of it, so the surface
@@ -269,6 +279,27 @@ export default function Stage({
             },
           ]}
         />
+      ) : null}
+
+      {/* The title, where it will actually land.
+          Mirrors what the renderer draws — a dimmed band, a short rule, and the
+          words in caps with wide tracking — so a caption can be placed by
+          looking rather than by rendering and checking. */}
+      {clip?.caption ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.caption,
+            (clip.caption_at ?? 'bottom') === 'top' && { top: 0 },
+            (clip.caption_at ?? 'bottom') === 'middle' && { top: '50%', marginTop: -CAPTION / 2 },
+            (clip.caption_at ?? 'bottom') === 'bottom' && { bottom: 0 },
+          ]}
+        >
+          <Text style={styles.captionRule}>—</Text>
+          <Text style={styles.captionText} numberOfLines={2}>
+            {clip.caption.toUpperCase()}
+          </Text>
+        </View>
       ) : null}
 
       {waiting ? (
@@ -325,6 +356,30 @@ const styles = StyleSheet.create({
   clip: { overflow: 'hidden' },
   // Opaque, because it covers a live player rather than replacing it.
   stills: { backgroundColor: '#0B0812' },
+  videoWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+
+  caption: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: CAPTION,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    backgroundColor: 'rgba(0,0,0,0.30)',
+  },
+  // On a picture, so fixed white rather than a theme token.
+  captionRule: { color: 'rgba(255,255,255,0.7)', fontSize: 15, lineHeight: 17 },
+  captionText: {
+    ...type.label,
+    color: '#fff',
+    letterSpacing: 2.4,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   emptyText: { ...type.caption, color: colors.textMuted },
 

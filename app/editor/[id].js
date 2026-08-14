@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
   KeyboardAvoidingView,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -43,7 +44,12 @@ import Tracks from '../../src/ui/editor/Tracks';
 
 // A third of the screen for the picture. An even split with the panel below left
 // the effects two rows tall on a normal phone, which read as them not being there.
-const STAGE_HEIGHT = Math.round(Dimensions.get('window').height * 0.32);
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const STAGE_HEIGHT = Math.round(SCREEN_HEIGHT * 0.32);
+// Small enough to still see the picture, large enough to leave the timeline
+// and a row of controls on screen.
+const MIN_STAGE = 150;
+const MAX_STAGE = Math.round(SCREEN_HEIGHT * 0.62);
 
 /**
  * The editor.
@@ -378,6 +384,33 @@ export default function EditorScreen() {
   // Touching anything mid-playback stops it, rather than fighting the timer.
   const stop = useCallback(() => setPlaying(false), []);
 
+  // ---- how much of the screen the picture gets ----------------------------
+  // Judging a grade wants a big picture; arranging forty shots wants the panel.
+  // Rather than pick one, it drags.
+  const [stageHeight, setStageHeight] = useState(STAGE_HEIGHT);
+  const grabbedAt = useRef(STAGE_HEIGHT);
+
+  const resizer = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 2,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        Haptics.selectionAsync().catch(() => {});
+        setStageHeight((current) => {
+          grabbedAt.current = current;
+          return current;
+        });
+      },
+      onPanResponderMove: (_event, gesture) => {
+        // Floor keeps the picture legible; ceiling keeps the timeline and at
+        // least one row of controls on screen.
+        const next = grabbedAt.current + gesture.dy;
+        setStageHeight(Math.max(MIN_STAGE, Math.min(MAX_STAGE, next)));
+      },
+    })
+  ).current;
+
   // Dragging a shot's out point is one continuous gesture, so it takes one undo
   // snapshot when it starts and none after. Without this a single stretch buries
   // the history under forty near-identical plans and undo becomes useless.
@@ -438,6 +471,27 @@ export default function EditorScreen() {
       setBusy(null);
     }
   };
+
+  // Saving happens by itself.
+  //
+  // Save and Render were two buttons doing overlapping things — one wrote the
+  // plan, the other wrote it *and* queued a film — which left it unclear whether
+  // rendering without saving first lost anything. It never did, and having to
+  // decide was the whole problem. The edit is a document: it keeps itself, and
+  // Render is the only thing left to choose.
+  useEffect(() => {
+    if (!dirty || busy) return undefined;
+    const timer = setTimeout(() => {
+      api
+        .savePlan(id, plan, false)
+        .then(() => setDirty(false))
+        .catch(() => {
+          // Left dirty on purpose, so the next change tries again and leaving
+          // still offers to save.
+        });
+    }, 1_200);
+    return () => clearTimeout(timer);
+  }, [dirty, busy, plan, id]);
 
   const leave = () => {
     if (!dirty) return router.back();
@@ -585,18 +639,23 @@ export default function EditorScreen() {
               color={history.length ? colors.textSoft : colors.borderStrong}
             />
           </Pressable>
-          <Pressable onPress={() => save()} hitSlop={8} disabled={!dirty || !!busy}>
-            {busy === 'save' ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Text style={[styles.save, (!dirty || busy) && styles.saveOff]}>Save</Text>
-            )}
-          </Pressable>
+          {/* State, not a button. The edit saves itself; this only says so. */}
+          <View style={styles.saved}>
+            <Feather
+              name={dirty ? 'upload-cloud' : 'check'}
+              size={13}
+              color={dirty ? colors.textMuted : colors.success}
+            />
+            <Text style={[styles.savedText, !dirty && { color: colors.success }]}>
+              {dirty ? 'Saving' : 'Saved'}
+            </Text>
+          </View>
         </View>
       </View>
 
-      {/* A fixed share of the screen rather than an even split with the panel —
-          an inspector squeezed to two rows is why the effects looked absent. */}
+      {/* A third of the screen to begin with, and then whatever you drag it to.
+          Judging a grade wants a big picture; arranging forty shots wants the
+          panel. Neither is the right answer all the time. */}
       <Stage
         clip={clip}
         memory={memory}
@@ -613,9 +672,14 @@ export default function EditorScreen() {
         onFirstFrame={noteFrame}
         player={player ?? held}
         entrance={entrance}
-        height={Math.max(190, STAGE_HEIGHT)}
+        height={stageHeight}
         onTogglePlay={() => setPlaying((on) => !on)}
       />
+
+      {/* Drag to give the picture more room, or the panel more room. */}
+      <View style={styles.grip} {...resizer.panHandlers}>
+        <View style={styles.gripBar} />
+      </View>
 
       <Tracks
         clips={clips}
@@ -794,8 +858,16 @@ const styles = StyleSheet.create({
   },
   sub: { ...type.caption, color: colors.textMuted },
   headActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  save: { ...type.label, color: colors.primary },
-  saveOff: { color: colors.borderStrong },
+  saved: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  savedText: { ...type.tiny, color: colors.textMuted },
+
+  grip: { alignItems: 'center', paddingVertical: 7, backgroundColor: colors.surface },
+  gripBar: {
+    width: 46,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.borderStrong,
+  },
 
   bar: {
     flexDirection: 'row',
