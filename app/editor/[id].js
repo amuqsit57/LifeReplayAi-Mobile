@@ -129,7 +129,17 @@ export default function EditorScreen() {
     return out;
   }, [clips, byId]);
 
-  const cache = useClipCache(videos);
+  // The stills too, so a photograph shot never flashes empty either.
+  const posters = useMemo(
+    () =>
+      clips
+        .map((shot) => byId[shot.memory_id]?.thumbnail_url)
+        .filter(Boolean)
+        .slice(0, 60),
+    [clips, byId]
+  );
+
+  const cache = useClipCache(videos, posters);
 
   // The file this shot plays from.
   //
@@ -426,6 +436,44 @@ export default function EditorScreen() {
     );
   }
 
+  // Nothing opens until every clip is on the phone.
+  //
+  // Loading them on demand cannot work — a two second shot cannot fetch a five
+  // megabyte file — so the wait happens once, here, where it is honest and
+  // measured, instead of every time the playhead reaches a video.
+  if (!cache.ready) {
+    const pct = cache.bytes.total
+      ? Math.min(100, Math.round((cache.bytes.written / cache.bytes.total) * 100))
+      : 0;
+
+    return (
+      <View style={styles.loading}>
+        <Feather name="download-cloud" size={26} color={colors.primary} />
+        <Text style={styles.prepTitle}>Getting the clips ready</Text>
+        <Text style={styles.loadingText}>
+          {cache.done} of {cache.total} {cache.total === 1 ? 'clip' : 'clips'}
+          {cache.bytes.total
+            ? ` · ${(cache.bytes.written / 1e6).toFixed(1)} of ${(
+                cache.bytes.total / 1e6
+              ).toFixed(1)} MB`
+            : ''}
+        </Text>
+
+        <View style={styles.meter}>
+          <View style={[styles.meterFill, { width: `${pct}%` }]} />
+        </View>
+
+        <Text style={styles.prepNote}>
+          They play from your phone after this, so nothing stops to load while you edit.
+        </Text>
+
+        <Pressable onPress={cache.skip} hitSlop={10} style={styles.skip}>
+          <Text style={styles.link}>Start editing now</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.screen}
@@ -497,18 +545,6 @@ export default function EditorScreen() {
         height={Math.max(190, STAGE_HEIGHT)}
         onTogglePlay={() => setPlaying((on) => !on)}
       />
-
-      {/* Quiet, and only while it is true. The edit is usable throughout — this
-          says why the first pass over a video may still pause. */}
-      {cache.busy && cache.total ? (
-        <View style={styles.prep}>
-          <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.prepText}>
-            Getting {cache.total === 1 ? 'the clip' : `${cache.total} clips`} ready ·{' '}
-            {cache.done}/{cache.total}
-          </Text>
-        </View>
-      ) : null}
 
       <Tracks
         clips={clips}
@@ -652,6 +688,23 @@ const styles = StyleSheet.create({
   loadingText: { ...type.caption, color: colors.textMuted },
   link: { ...type.label, color: colors.primary },
 
+  prepTitle: { ...type.heading, color: colors.text },
+  prepNote: {
+    ...type.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xxl,
+  },
+  meter: {
+    width: '62%',
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.surfaceSunk,
+    overflow: 'hidden',
+  },
+  meterFill: { height: 5, borderRadius: 3, backgroundColor: colors.primary },
+  skip: { paddingTop: spacing.sm },
+
   head: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -672,16 +725,6 @@ const styles = StyleSheet.create({
   headActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   save: { ...type.label, color: colors.primary },
   saveOff: { color: colors.borderStrong },
-
-  prep: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 6,
-    backgroundColor: colors.primarySoft,
-  },
-  prepText: { ...type.caption, color: colors.primary },
 
   bar: {
     flexDirection: 'row',
