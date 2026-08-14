@@ -222,11 +222,35 @@ export default function EditorScreen() {
     }
   }, [memory?.id, players.pool, players.ready]);
 
-  // A video shot with no player of its own is the only thing left worth waiting
-  // for, and after the preparing screen there should not be one. Nothing waits
-  // on loading any more: the players are already open on their files.
+  // ---- has this clip actually appeared? -----------------------------------
+  // A player can be open, seeked, and reporting that it is playing while the view
+  // has drawn nothing at all — which is what a short clip looked like: the shot
+  // ran its course over a thumbnail and moved on.
+  //
+  // `onFirstFrameRender` is the only signal that means the picture is really on
+  // screen. Once a clip has produced a frame it is remembered, because a view
+  // that has already drawn it does not announce it again, and waiting a second
+  // time for something that has already happened would be its own stall.
+  const [drawn, setDrawn] = useState(() => new Set());
+
+  const noteFrame = useCallback(() => {
+    const id = live.current.byId[live.current.clips[live.current.selected]?.memory_id]?.id;
+    if (!id) return;
+    setDrawn((current) => (current.has(id) ? current : new Set(current).add(id)));
+  }, []);
+
   const needsVideo = memory?.kind === 'video' && !!memory?.url;
-  const waiting = playing && needsVideo && !player;
+  const frameReady = !needsVideo || drawn.has(memory.id);
+  const waiting = playing && needsVideo && (!player || !frameReady);
+
+  // A paused player may never announce a frame — there is nothing to draw until
+  // something asks it to. Rather than leave the still sitting over a clip that is
+  // perfectly fine, give it a moment and then take the frame as read.
+  useEffect(() => {
+    if (!needsVideo || !player || frameReady) return undefined;
+    const assume = setTimeout(() => noteFrame(), 1_200);
+    return () => clearTimeout(assume);
+  }, [needsVideo, player, frameReady, noteFrame]);
 
   useEffect(() => {
     if (!playing) {
@@ -244,13 +268,20 @@ export default function EditorScreen() {
       return undefined;
     }
 
+    // Held until the picture is genuinely on screen. The player is told to run
+    // regardless, because a frame is what is being waited for and a paused
+    // player will not produce one — it is the shot's clock that holds, not the
+    // clip.
     if (waiting) {
-      // A clip with no player never gets one by waiting, so this is a short skip
-      // rather than a long hold.
+      try {
+        player?.play();
+      } catch {
+        // No player; the bail below moves on.
+      }
       const bail = setTimeout(() => {
         if (selected + 1 < live.current.clips.length) setSelected(selected + 1);
         else setPlaying(false);
-      }, 1_500);
+      }, 4_000);
       return () => clearTimeout(bail);
     }
 
@@ -537,6 +568,8 @@ export default function EditorScreen() {
         // `hasSource` is whether *this shot* is a playable video; `player` is
         // only what the view stays mounted on.
         hasSource={!!player}
+        frameReady={frameReady}
+        onFirstFrame={noteFrame}
         player={player ?? held}
         entrance={entrance}
         height={Math.max(190, STAGE_HEIGHT)}

@@ -94,6 +94,8 @@ export default function Stage({
   playing,
   waiting,
   hasSource,
+  frameReady,
+  onFirstFrame,
   player,
   entrance,
   height,
@@ -215,12 +217,16 @@ export default function Stage({
           // rather than drawn in it; next to animated siblings and an overlaid bar
           // that reads as a black rectangle. A TextureView composites normally.
           surfaceType="textureView"
+          // The only honest signal that this clip is actually on screen. A
+          // player can be open, seeked and playing while the view has still
+          // drawn nothing — which is what a short clip looked like.
+          onFirstFrameRender={onFirstFrame}
         />
       ) : null}
 
       {/* Stills sit over the player rather than instead of it, so the surface
           underneath is never torn down. Opaque, so nothing shows through. */}
-      {!isVideo ? (
+      {!isVideo || !frameReady ? (
         <Animated.View style={[styles.fill, styles.clip, styles.stills, entering]}>
           <Animated.View
             style={[
