@@ -901,7 +901,7 @@ const styles = StyleSheet.create({
   heroImage: { ...StyleSheet.absoluteFillObject },
   heroBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroText: { gap: spacing.sm },
-  title: { ...type.display, color: '#fff' },
+  title: { ...type.title, color: '#fff' },
   heroMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   metaText: { ...type.caption, color: 'rgba(255,255,255,0.82)' },
 
@@ -1012,7 +1012,7 @@ const styles = StyleSheet.create({
   },
 
   editsHead: { gap: 4, paddingTop: spacing.lg },
-  editsTitle: { ...type.heading, color: colors.text },
+  editsTitle: { ...type.heading, fontSize: 15, lineHeight: 21, color: colors.text },
   editRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1031,7 +1031,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editTitle: { ...type.bodyStrong, color: colors.text },
+  editTitle: { ...type.label, color: colors.text },
   editAgain: { padding: 6 },
   startEdit: {
     flexDirection: 'row',
@@ -1054,7 +1054,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  albumTitle: { ...type.bodyStrong, color: colors.text },
+  albumTitle: { ...type.label, color: colors.text },
 
   selectBar: {
     position: 'absolute',
@@ -1072,7 +1072,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     ...shadow.raised,
   },
-  selectCount: { ...type.bodyStrong, color: colors.text },
+  selectCount: { ...type.label, color: colors.text },
   selectAll: { ...type.label, color: colors.primary },
   selectAction: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   selectActionText: { ...type.label, color: colors.primary },
@@ -1085,12 +1085,12 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.md,
   },
-  sheetTitle: { ...type.title, color: colors.text },
+  sheetTitle: { ...type.heading, color: colors.text },
   // The gallery hint is inset to the screen gutter; inside a sheet that padding
   // would double up on the sheet's own.
   sheetHint: { ...type.caption, color: colors.textMuted },
   person: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
-  personName: { ...type.bodyStrong, color: colors.text },
+  personName: { ...type.label, color: colors.text },
   ownerChip: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -1115,5 +1115,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   ctaOff: { backgroundColor: colors.borderStrong },
-  ctaText: { ...type.bodyStrong, color: '#fff' },
+  ctaText: { ...type.label, color: '#fff' },
 });

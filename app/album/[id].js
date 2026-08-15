@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
   heroText: { gap: spacing.xs },
   crumb: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   crumbText: { ...type.tiny, color: colors.primary },
-  title: { ...type.display, color: colors.text },
+  title: { ...type.title, color: colors.text },
   meta: { ...type.caption, color: colors.textMuted },
 
   addRow: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs },
@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addTitle: { ...type.bodyStrong, color: colors.text },
+  addTitle: { ...type.label, color: colors.text },
 
   hint: { ...type.caption, color: colors.textMuted, paddingHorizontal: spacing.lg },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.lg },
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
   chipTextOn: { color: '#fff' },
 
   films: { gap: spacing.sm, paddingHorizontal: spacing.lg },
-  sectionTitle: { ...type.heading, color: colors.text, paddingTop: spacing.md },
+  sectionTitle: { ...type.heading, fontSize: 15, lineHeight: 21, color: colors.text, paddingTop: spacing.md },
   editRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -636,7 +636,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editTitle: { ...type.bodyStrong, color: colors.text },
+  editTitle: { ...type.label, color: colors.text },
   startEdit: {
     flexDirection: 'row',
     alignItems: 'center',
