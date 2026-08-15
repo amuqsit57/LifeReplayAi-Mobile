@@ -145,9 +145,14 @@ export function MediaTile({
       ) : null}
 
       {/* Whose photo this is. Hidden while selecting, where the tick owns the corner. */}
+      {/* Who added it, by name as well as face. An avatar alone asks you to know
+          everyone's photograph; a first name answers the question directly. */}
       {uploader && !selected ? (
         <View style={styles.uploader}>
-          <Avatar url={uploader.avatar_url} name={uploader.full_name} size="sm" />
+          <Avatar url={uploader.avatar_url} name={uploader.full_name} size="xs" />
+          <Text style={styles.uploaderName} numberOfLines={1}>
+            {uploader.full_name?.split(' ')[0] ?? 'Someone'}
+          </Text>
         </View>
       ) : null}
 
@@ -220,12 +225,20 @@ const styles = StyleSheet.create({
 
   uploader: {
     position: 'absolute',
+    left: 4,
     right: 4,
-    top: 4,
+    bottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingRight: 6,
+    paddingVertical: 2,
+    paddingLeft: 2,
+    backgroundColor: 'rgba(12,9,20,0.62)',
     borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: '#fff',
   },
+  // On a photograph, so fixed white rather than a theme token.
+  uploaderName: { ...type.tiny, fontSize: 9.5, color: '#fff', flexShrink: 1 },
   tick: {
     position: 'absolute',
     right: 5,

@@ -94,6 +94,8 @@ export default function EventScreen() {
   const [albumTitle, setAlbumTitle] = useState('');
   const [query, setQuery] = useState('');
   const [by, setBy] = useState(null);
+  const [filmQuery, setFilmQuery] = useState('');
+  const [filmSort, setFilmSort] = useState('recent');
 
   const event = useQuery({ queryKey: ['event', id], queryFn: () => getEvent(id) });
   const people = useQuery({ queryKey: ['people', id], queryFn: () => eventPeople(id) });
@@ -158,7 +160,24 @@ export default function EventScreen() {
   // two are listed separately because they behave differently — asking for the
   // cinematic cut again replaces it, and an edit never replaces anything.
   const eventFilms = (replays.data ?? []).filter((r) => !r.album_id && !r.is_edit);
-  const edits = (replays.data ?? []).filter((r) => r.is_edit);
+
+  // The hand-cut ones are a real list, so they get a real list's controls.
+  const edits = useMemo(() => {
+    const needle = filmQuery.trim().toLowerCase();
+    const rows = (replays.data ?? []).filter((r) => {
+      if (!r.is_edit) return false;
+      if (!needle) return true;
+      return (r.title ?? '').toLowerCase().includes(needle);
+    });
+
+    const made = (r) => new Date(r.edited_at ?? r.created_at ?? 0).getTime();
+    return [...rows].sort((a, b) => {
+      if (filmSort === 'oldest') return made(a) - made(b);
+      if (filmSort === 'longest') return (b.duration_seconds ?? 0) - (a.duration_seconds ?? 0);
+      if (filmSort === 'name') return (a.title ?? '').localeCompare(b.title ?? '');
+      return made(b) - made(a);
+    });
+  }, [replays.data, filmQuery, filmSort]);
   const selecting = selected.length > 0;
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
@@ -502,6 +521,42 @@ export default function EventScreen() {
                 Cut them yourself. Open a film above to start from its cut.
               </Text>
             </View>
+
+            {(replays.data ?? []).filter((r) => r.is_edit).length > 2 ? (
+              <>
+                <SearchBar
+                  value={filmQuery}
+                  onChangeText={setFilmQuery}
+                  onClear={() => setFilmQuery('')}
+                  placeholder="Search your edits"
+                />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
+                >
+                  {[
+                    { value: 'recent', label: 'Newest' },
+                    { value: 'oldest', label: 'Oldest' },
+                    { value: 'longest', label: 'Longest' },
+                    { value: 'name', label: 'A–Z' },
+                  ].map((option) => {
+                    const on = filmSort === option.value;
+                    return (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => setFilmSort(option.value)}
+                        style={[styles.filterChip, on && styles.filterChipOn]}
+                      >
+                        <Text style={[styles.filterText, on && styles.filterTextOn]}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            ) : null}
 
             {edits.map((edit) => (
               <Pressable
