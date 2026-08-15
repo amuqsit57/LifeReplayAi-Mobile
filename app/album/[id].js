@@ -301,12 +301,14 @@ export default function AlbumScreen() {
             <>
               {inside.length > 8 ? (
                 <>
-                  <SearchBar
-                    value={query}
-                    onChangeText={setQuery}
-                    onClear={() => setQuery('')}
-                    placeholder="Search what is in them"
-                  />
+                  <View style={styles.gutter}>
+                    <SearchBar
+                      value={query}
+                      onChangeText={setQuery}
+                      onClear={() => setQuery('')}
+                      placeholder="Search what is in them"
+                    />
+                  </View>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -591,9 +593,14 @@ const styles = StyleSheet.create({
     ...type.caption,
     color: colors.textMuted,
     textAlign: 'center',
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xl,
   },
-  chips: { gap: spacing.sm, paddingVertical: spacing.xs },
+  chips: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+  },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

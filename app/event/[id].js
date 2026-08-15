@@ -596,7 +596,7 @@ export default function EventScreen() {
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
+                  contentContainerStyle={styles.sortRow}
                 >
                   {[
                     { value: 'recent', label: 'Newest' },
@@ -956,6 +956,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xs,
   },
+  // Already inside a padded parent, so this only needs the rhythm.
+  sortRow: { gap: spacing.sm, paddingVertical: spacing.xs },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
