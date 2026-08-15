@@ -367,6 +367,7 @@ function Shot({
   // made trimming feel like wading.
   const [live, setLive] = useState(null);
   const seconds = live?.seconds ?? Number(clip.seconds);
+  const startAt = live?.start_at ?? Number(clip.start_at) ?? 0;
   const width = widthFor(seconds, zoom);
 
   const ceiling =
@@ -543,6 +544,16 @@ function Shot({
             The left one moves the in-point and holds the out-point still, which
             is what trimming the head of a shot means and the only workable way
             to trim a six minute clip. The right one changes the length. */}
+        {live ? (
+          <View style={styles.readout} pointerEvents="none">
+            <Text style={styles.readoutText}>
+              {canTrimHead
+                ? `${stamp(startAt)} → ${stamp(startAt + seconds)}`
+                : `${seconds.toFixed(1)}s`}
+            </Text>
+          </View>
+        ) : null}
+
         {selected ? (
           <>
             {canTrimHead ? (
@@ -608,7 +619,7 @@ const styles = StyleSheet.create({
   },
   zoomText: { ...type.tiny, fontSize: 10, color: colors.textMuted, width: 34, textAlign: 'center' },
   canvas: { paddingHorizontal: GUTTER, paddingRight: 80 },
-  lane: { flexDirection: 'row', alignItems: 'center' },
+  lane: { flexDirection: 'row', alignItems: 'center', paddingTop: 20 },
   unit: { flexDirection: 'row', alignItems: 'center' },
 
   shot: {
@@ -642,23 +653,44 @@ const styles = StyleSheet.create({
     padding: 3,
   },
 
+  // Wide enough to hit without magnifying the shot, and unmistakably a grip
+  // rather than an edge that happens to be draggable.
   handle: {
     position: 'absolute',
     right: 0,
     top: 0,
     bottom: 0,
-    width: 22,
+    width: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(107,78,230,0.85)',
+    backgroundColor: colors.primary,
+    borderTopRightRadius: radius.sm - 2,
+    borderBottomRightRadius: radius.sm - 2,
   },
-  handleLeft: { left: 0, right: undefined },
+  handleLeft: {
+    left: 0,
+    right: undefined,
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
+    borderTopLeftRadius: radius.sm - 2,
+    borderBottomLeftRadius: radius.sm - 2,
+  },
   handleGrip: {
     width: 3,
-    height: 20,
+    height: 22,
     borderRadius: 2,
     backgroundColor: '#fff',
   },
+  readout: {
+    position: 'absolute',
+    top: -22,
+    alignSelf: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.text,
+  },
+  readoutText: { ...type.tiny, fontSize: 10, color: '#fff', fontVariant: ['tabular-nums'] },
 
   join: { width: JOIN, alignItems: 'center', justifyContent: 'center' },
   joinPip: {

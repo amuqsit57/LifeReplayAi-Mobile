@@ -41,7 +41,6 @@ import AddShots from '../../src/ui/editor/AddShots';
 import AudioPanel from '../../src/ui/editor/AudioPanel';
 import Inspector from '../../src/ui/editor/Inspector';
 import Stage from '../../src/ui/editor/Stage';
-import TrimSheet from '../../src/ui/editor/TrimSheet';
 import Tracks from '../../src/ui/editor/Tracks';
 
 // A third of the screen for the picture. An even split with the panel below left
@@ -79,7 +78,6 @@ export default function EditorScreen() {
   const [scoring, setScoring] = useState(false);
   const [naming, setNaming] = useState(false);
   const [tab, setTab] = useState('shot');
-  const [trimming, setTrimming] = useState(false);
 
   // Undo is a stack of whole plans. They are small — a hundred shots of nine
   // short fields — and keeping snapshots means every operation is undoable
@@ -787,41 +785,6 @@ export default function EditorScreen() {
           style={styles.barItem}
           onPress={() => {
             stop();
-            setTrimming(true);
-          }}
-          disabled={!clip}
-        >
-          <Feather name="crop" size={16} color={clip ? colors.textSoft : colors.borderStrong} />
-          <Text style={[styles.barText, !clip && { color: colors.borderStrong }]}>Trim</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.barItem}
-          onPress={() => {
-            stop();
-            edit((current) => splitClip(current, selected));
-          }}
-          disabled={!clip || Number(clip?.seconds) < 0.8}
-        >
-          <Feather
-            name="scissors"
-            size={16}
-            color={clip && Number(clip.seconds) >= 0.8 ? colors.textSoft : colors.borderStrong}
-          />
-          <Text
-            style={[
-              styles.barText,
-              (!clip || Number(clip?.seconds) < 0.8) && { color: colors.borderStrong },
-            ]}
-          >
-            Split
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.barItem}
-          onPress={() => {
-            stop();
             setScoring(true);
           }}
         >
@@ -849,10 +812,6 @@ export default function EditorScreen() {
             setSelected(Math.max(0, Math.min(clips.length - 1, to)));
           }}
           onDuplicate={() => edit((p) => duplicateClip(p, selected))}
-          onSplit={() => {
-            stop();
-            edit((p) => splitClip(p, selected));
-          }}
           onDelete={() => {
             edit((p) => removeClip(p, selected));
             setSelected((index) => Math.max(0, Math.min(index, clips.length - 2)));
@@ -921,14 +880,6 @@ export default function EditorScreen() {
           edit((p) => addClips(p, memories, at));
           setSelected(at);
         }}
-      />
-
-      <TrimSheet
-        visible={trimming && !!clip}
-        onClose={() => setTrimming(false)}
-        clip={clip}
-        memory={memory}
-        onChange={(patch) => edit((current) => updateClip(current, selected, patch))}
       />
 
       <AudioPanel
