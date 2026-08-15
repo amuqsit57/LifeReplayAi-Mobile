@@ -299,7 +299,7 @@ export default function AlbumScreen() {
             </View>
           ) : (
             <>
-              {inside.length > 8 ? (
+              {inside.length > 2 ? (
                 <>
                   <View style={styles.gutter}>
                     <SearchBar

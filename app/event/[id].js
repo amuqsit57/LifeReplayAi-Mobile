@@ -403,7 +403,7 @@ export default function EventScreen() {
             <>
               {/* Filters appear only once there is enough to warrant sorting
                   through. Below that they are three controls over nine photos. */}
-              {list.length > 8 ? (
+              {list.length > 2 ? (
                 <View style={styles.gutter}>
                   <SearchBar
                     value={query}
@@ -414,7 +414,7 @@ export default function EventScreen() {
                 </View>
               ) : null}
 
-              {list.length > 8 ? (
+              {list.length > 2 ? (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -448,7 +448,7 @@ export default function EventScreen() {
 
               {/* Who added what. One chip per person who actually contributed,
                   which is the question people ask of a shared event. */}
-              {list.length > 8 && (people.data ?? []).length > 1 ? (
+              {(people.data ?? []).length > 1 ? (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -485,7 +485,7 @@ export default function EventScreen() {
                 </ScrollView>
               ) : null}
 
-              {list.length > 8 ? (
+              {list.length > 2 ? (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
