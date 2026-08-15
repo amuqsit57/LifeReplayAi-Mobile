@@ -8,6 +8,7 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 
 import { api } from '../../src/lib/api';
 import { listEvents } from '../../src/lib/data';
+import { useWarmImages } from '../../src/lib/warm';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import CreateCard from '../../src/ui/CreateCard';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
@@ -36,6 +37,8 @@ function ago(iso) {
  */
 function EventCard({ event, cover, onPress }) {
   const count = event.memories?.[0]?.count ?? 0;
+  // How many people are contributing is what makes a shared event read as shared.
+  const members = event.event_members?.[0]?.count ?? 0;
 
   return (
     <Tappable onPress={onPress} haptic scaleTo={0.985} style={styles.card}>
@@ -72,6 +75,13 @@ function EventCard({ event, cover, onPress }) {
             <Text style={styles.meta}>
               {count} {count === 1 ? 'item' : 'items'}
             </Text>
+            {members > 1 ? (
+              <>
+                <Text style={styles.sep}>·</Text>
+                <Feather name="users" size={11} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.meta}>{members}</Text>
+              </>
+            ) : null}
             <Text style={styles.sep}>·</Text>
             <Text style={styles.meta}>{ago(event.created_at)}</Text>
             {event.location ? (
@@ -93,6 +103,7 @@ function EventCard({ event, cover, onPress }) {
 /** The same event at half the width, for everything below the first. */
 function EventTile({ event, cover, onPress }) {
   const count = event.memories?.[0]?.count ?? 0;
+  const members = event.event_members?.[0]?.count ?? 0;
 
   return (
     <Tappable onPress={onPress} haptic scaleTo={0.97} fill style={styles.tile}>
@@ -120,6 +131,7 @@ function EventTile({ event, cover, onPress }) {
         {event.title}
       </Text>
       <Text style={styles.tileMeta} numberOfLines={1}>
+        {members > 1 ? `${members} people · ` : ''}
         {ago(event.created_at)}
         {event.location ? ` · ${event.location}` : ''}
       </Text>
@@ -144,6 +156,12 @@ export default function EventsScreen() {
     enabled: ids.length > 0,
     staleTime: 30 * 60 * 1000,
   });
+
+  // The covers you can see, fetched before the grid appears.
+  const warm = useWarmImages(
+    (events.data ?? []).slice(0, 5).map((e) => covers.data?.[e.id]).filter(Boolean),
+    5
+  );
 
   const list = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -244,7 +262,7 @@ export default function EventsScreen() {
           </View>
         }
         ListEmptyComponent={
-          events.isLoading ? (
+          events.isLoading || !warm ? (
             <RowSkeleton count={3} />
           ) : query ? (
             <Text style={styles.none}>No events match “{query}”.</Text>

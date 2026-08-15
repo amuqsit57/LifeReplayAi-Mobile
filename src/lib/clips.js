@@ -81,7 +81,10 @@ export function useClipCache(videos, stills = [], enabled = true) {
     .map((v) => `${v.id}|${stampFor(v.url)}`)
     .sort()
     .join(',');
-  const stillKey = [...stills].sort().join(',');
+  // Deduped as well as sorted. Splitting a shot adds a second reference to the
+  // same thumbnail, which lengthened the list, changed the key, and threw the
+  // preparing screen back up over an editor that needed nothing new.
+  const stillKey = [...new Set(stills)].sort().join(',');
 
   const skip = useCallback(() => setSkipped(true), []);
 

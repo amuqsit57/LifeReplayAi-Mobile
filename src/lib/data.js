@@ -84,7 +84,10 @@ export async function listEvents() {
       // whole request rather than guessing. That failed the query outright, which
       // is why the home screen showed no events at all while every one of them sat
       // in the database.
-      .select('*, memories!memories_event_id_fkey(count)')
+      // The member count comes along too: how many people are contributing is
+      // the thing that makes a shared event feel shared, and asking per card
+      // would be one round trip each.
+      .select('*, memories!memories_event_id_fkey(count), event_members(count)')
       .order('event_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
   );

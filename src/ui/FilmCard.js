@@ -156,7 +156,7 @@ export default function FilmCard({ style, replay, onGenerate, onOpen }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.label} numberOfLines={1}>{name}</Text>
           <Text style={styles.sub} numberOfLines={1}>
-            {failed ? 'Failed — tap to try again' : meta.blurb ?? 'Tap to make this film'}
+            {failed ? 'Failed — tap to try again' : meta.blurb ?? 'Tap to generate'}
           </Text>
         </View>
         <View style={[styles.makeChip, { backgroundColor: meta.tint ?? colors.primary }]}>

@@ -6,6 +6,7 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 
 import { api } from '../../src/lib/api';
 import { feed, myLikes, setLike } from '../../src/lib/data';
+import { useWarmImages } from '../../src/lib/warm';
 import { STYLE_META, colors, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
 import { Wordmark } from '../../src/ui/brand';
@@ -62,6 +63,12 @@ export default function FeedScreen() {
     queryFn: () => myLikes(ids),
     enabled: ids.length > 0,
   });
+
+  // The posters for the first couple of posts, before anything is drawn.
+  const warm = useWarmImages(
+    all.slice(0, 2).map((post) => media.data?.[post.id]?.thumbnail_url).filter(Boolean),
+    2
+  );
 
   const likedSet = useMemo(() => new Set(liked.data ?? []), [liked.data]);
   const sortLabel = SORTS.films.find((option) => option.value === sort)?.label ?? 'Newest first';
@@ -158,7 +165,7 @@ export default function FeedScreen() {
         }
         ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
         ListEmptyComponent={
-          posts.isLoading ? (
+          posts.isLoading || !warm ? (
             <FeedSkeleton count={2} />
           ) : query ? (
             <Empty icon="🔍" title="Nothing matches" body={`No films for “${query}”.`} />

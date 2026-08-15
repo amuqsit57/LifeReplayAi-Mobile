@@ -27,7 +27,7 @@ import { Segmented, Tappable } from '../../src/ui/press';
 import FilmCard from '../../src/ui/FilmCard';
 import { GridSkeleton } from '../../src/ui/Skeleton';
 import UploadSheet from '../../src/ui/UploadSheet';
-import { RoundButton } from '../../src/ui/Header';
+import { RoundButton, SearchBar } from '../../src/ui/Header';
 import InviteSheet from '../../src/ui/InviteSheet';
 import { Avatar, AvatarRow, MediaTile } from '../../src/ui/social';
 import Viewer from '../../src/ui/Viewer';
@@ -51,6 +51,17 @@ const FILTERS = [
   { value: 'video', label: 'Videos', icon: 'video', match: (m) => m.kind === 'video' },
   { value: 'mine', label: 'Mine', icon: 'user', match: (m, meId) => m.uploaded_by === meId },
 ];
+
+/** How long ago, in the shortest form that still says it. */
+function ago(iso) {
+  if (!iso) return '';
+  const seconds = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604_800) return `${Math.floor(seconds / 86_400)}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
 
 // Only shown while something is still happening, or has gone wrong. A photo that
 // is simply fine says nothing — "ready" under every tile was noise on a grid
@@ -79,6 +90,8 @@ export default function EventScreen() {
   const [uploaded, setUploaded] = useState(null);
   const [albumSheet, setAlbumSheet] = useState(false);
   const [albumTitle, setAlbumTitle] = useState('');
+  const [query, setQuery] = useState('');
+  const [by, setBy] = useState(null);
 
   const event = useQuery({ queryKey: ['event', id], queryFn: () => getEvent(id) });
   const people = useQuery({ queryKey: ['people', id], queryFn: () => eventPeople(id) });
@@ -107,10 +120,25 @@ export default function EventScreen() {
   const list = memories.data ?? [];
   const me = useQuery({ queryKey: ['myProfile'], queryFn: myProfile });
 
+  const peopleById = useMemo(
+    () => new Map((people.data ?? []).map((person) => [person.user_id, person])),
+    [people.data]
+  );
+
   const shown = useMemo(() => {
     const option = FILTERS.find((f) => f.value === filter) ?? FILTERS[0];
-    return list.filter((memory) => option.match(memory, me.data?.id));
-  }, [list, filter, me.data?.id]);
+    const needle = query.trim().toLowerCase();
+    return list.filter((memory) => {
+      if (!option.match(memory, me.data?.id)) return false;
+      if (by && memory.uploaded_by !== by) return false;
+      if (!needle) return true;
+      // What is in it, what it was tagged, and who added it.
+      const who = peopleById.get(memory.uploaded_by)?.full_name ?? '';
+      return [memory.description, who, ...(memory.tags ?? [])]
+        .filter(Boolean)
+        .some((field) => field.toLowerCase().includes(needle));
+    });
+  }, [list, filter, me.data?.id, query, by, peopleById]);
 
   const albumList = albums.data ?? [];
   // One generated film per style; as many hand-cut edits as anybody makes. The
@@ -120,10 +148,6 @@ export default function EventScreen() {
   const edits = (replays.data ?? []).filter((r) => r.is_edit);
   const selecting = selected.length > 0;
   const selectedSet = useMemo(() => new Set(selected), [selected]);
-  const peopleById = useMemo(
-    () => new Map((people.data ?? []).map((person) => [person.user_id, person])),
-    [people.data]
-  );
 
   const remove = useMutation({
     mutationFn: (ids) => api.deleteMemories(ids),
@@ -228,7 +252,20 @@ export default function EventScreen() {
 
           <View style={styles.heroBar}>
             <RoundButton name="chevron-left" tone="onDark" label="Back" onPress={() => router.back()} />
-            <RoundButton name="user-plus" tone="onDark" label="Invite" onPress={() => setInviting(true)} />
+            <View style={styles.heroActions}>
+              <RoundButton
+                name="users"
+                tone="onDark"
+                label="Members"
+                onPress={() => setShowingPeople(true)}
+              />
+              <RoundButton
+                name="user-plus"
+                tone="onDark"
+                label="Invite"
+                onPress={() => setInviting(true)}
+              />
+            </View>
           </View>
 
           <View style={styles.heroText}>
@@ -245,18 +282,28 @@ export default function EventScreen() {
             </Pressable>
           </View>
 
-          {/* Anchored to the bottom corner of the title block and hanging over
-              its edge, so adding reads as belonging to this event rather than to
-              whichever tab happens to be open. */}
-          <Tappable
-            onPress={addMemories}
-            disabled={Boolean(progress)}
-            haptic
-            scaleTo={0.9}
-            style={styles.addRound}
-          >
-            <Feather name={progress ? 'upload-cloud' : 'plus'} size={22} color="#fff" />
-          </Tappable>
+          {/* Straddling the bottom edge of the picture, so both read as belonging
+              to this event rather than to whichever tab happens to be open. */}
+          <View style={styles.heroRound}>
+            <Tappable
+              onPress={() => setTab('films')}
+              haptic
+              scaleTo={0.9}
+              style={[styles.round, styles.roundAlt]}
+            >
+              <Feather name="zap" size={20} color={colors.primary} />
+            </Tappable>
+
+            <Tappable
+              onPress={addMemories}
+              disabled={Boolean(progress)}
+              haptic
+              scaleTo={0.9}
+              style={styles.round}
+            >
+              <Feather name={progress ? 'upload-cloud' : 'plus'} size={22} color="#fff" />
+            </Tappable>
+          </View>
         </View>
 
         <View style={styles.heroSpacer} />
@@ -285,6 +332,56 @@ export default function EventScreen() {
             <>
               {/* Filters appear only once there is enough to warrant sorting
                   through. Below that they are three controls over nine photos. */}
+              {list.length > 8 ? (
+                <View style={styles.gutter}>
+                  <SearchBar
+                    value={query}
+                    onChangeText={setQuery}
+                    onClear={() => setQuery('')}
+                    placeholder="Search what is in them, or who added them"
+                  />
+                </View>
+              ) : null}
+
+              {/* Who added what. One chip per person who actually contributed,
+                  which is the question people ask of a shared event. */}
+              {list.length > 8 && (people.data ?? []).length > 1 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.filterRow}
+                >
+                  <Pressable
+                    onPress={() => setBy(null)}
+                    style={[styles.filterChip, !by && styles.filterChipOn]}
+                  >
+                    <Feather name="users" size={12} color={!by ? '#fff' : colors.textSoft} />
+                    <Text style={[styles.filterText, !by && styles.filterTextOn]}>Everyone</Text>
+                  </Pressable>
+
+                  {(people.data ?? []).map((person) => {
+                    const mine = list.filter((m) => m.uploaded_by === person.user_id).length;
+                    if (!mine) return null;
+                    const active = by === person.user_id;
+                    return (
+                      <Pressable
+                        key={person.user_id}
+                        onPress={() => setBy(active ? null : person.user_id)}
+                        style={[styles.filterChip, active && styles.filterChipOn]}
+                      >
+                        <Avatar url={person.avatar_url} name={person.full_name} size="xs" />
+                        <Text style={[styles.filterText, active && styles.filterTextOn]}>
+                          {person.full_name?.split(' ')[0] ?? 'Someone'}
+                        </Text>
+                        <Text style={[styles.filterCount, active && styles.filterTextOn]}>
+                          {mine}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              ) : null}
+
               {list.length > 8 ? (
                 <ScrollView
                   horizontal
@@ -396,15 +493,24 @@ export default function EventScreen() {
                   <Text style={styles.editTitle} numberOfLines={1}>
                     {edit.title || 'Untitled edit'}
                   </Text>
-                  <Text style={styles.hint}>
+                  <Text style={styles.hint} numberOfLines={1}>
                     {edit.shot_count} {edit.shot_count === 1 ? 'shot' : 'shots'}
+                    {edit.duration_seconds
+                      ? ` · ${Math.floor(edit.duration_seconds / 60)}:${String(
+                          Math.round(edit.duration_seconds % 60)
+                        ).padStart(2, '0')}`
+                      : ''}
+                    {' · '}
                     {edit.status === 'draft'
-                      ? ' · not rendered yet'
+                      ? 'not rendered'
                       : edit.status === 'succeeded'
-                        ? ' · ready'
+                        ? 'ready'
                         : edit.status === 'failed'
-                          ? ' · failed'
-                          : ' · rendering'}
+                          ? 'failed'
+                          : 'rendering'}
+                    {edit.edited_at || edit.created_at
+                      ? ` · edited ${ago(edit.edited_at ?? edit.created_at)}`
+                      : ''}
                   </Text>
                 </View>
                 {edit.status === 'succeeded' ? (
@@ -636,12 +742,17 @@ const styles = StyleSheet.create({
   // child — that repetition is how the padding drifted between them before.
   gutter: { paddingHorizontal: spacing.lg },
 
-  addRound: {
+  heroActions: { flexDirection: 'row', gap: spacing.sm },
+  heroRound: {
     position: 'absolute',
     right: spacing.lg,
-    // Half outside the title block, which is what ties the two together rather
-    // than leaving it floating in the space below.
-    bottom: -24,
+    // Exactly half the button's height, so both sit centred on the picture's
+    // bottom edge rather than nearly on it.
+    bottom: -26,
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  round: {
     width: 52,
     height: 52,
     borderRadius: 26,

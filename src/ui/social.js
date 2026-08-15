@@ -6,7 +6,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, type } from '../theme';
 
-const SIZES = { sm: 28, md: 38, lg: 56 };
+// `xs` is for chips and inline labels, where 28 is already too loud.
+const SIZES = { xs: 18, sm: 28, md: 38, lg: 56 };
 
 /** Someone's face, or their initials when they have not set one. */
 export function Avatar({ url, name, size = 'md' }) {

@@ -8,6 +8,7 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 
 import { api } from '../../src/lib/api';
 import { supabase } from '../../src/lib/supabase';
+import { useWarmImages } from '../../src/lib/warm';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import { ScreenHeader, SearchBar } from '../../src/ui/Header';
 import { Tappable } from '../../src/ui/press';
@@ -132,6 +133,12 @@ export default function AlbumsScreen() {
     staleTime: 30 * 60 * 1000,
   });
 
+  // The covers you can see, fetched before the grid appears.
+  const warm = useWarmImages(
+    all.slice(0, 5).map((album) => covers.data?.[album.event_id]).filter(Boolean),
+    5
+  );
+
   const list = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const filtered = needle
@@ -175,7 +182,7 @@ export default function AlbumsScreen() {
         />
       </ScreenHeader>
 
-      {albums.isLoading ? (
+      {albums.isLoading || !warm ? (
         <View style={styles.loading}>
           <GridSkeleton count={4} />
         </View>
