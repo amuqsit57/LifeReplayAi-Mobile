@@ -12,7 +12,7 @@ import { useWarmImages } from '../../src/lib/warm';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import { ScreenHeader, SearchBar } from '../../src/ui/Header';
 import { Tappable } from '../../src/ui/press';
-import { GridSkeleton } from '../../src/ui/Skeleton';
+import { CardsSkeleton } from '../../src/ui/Skeleton';
 import SortSheet, { SORTS, applySort } from '../../src/ui/SortSheet';
 
 /** Every album you can reach, across every event. Row level security scopes it. */
@@ -186,9 +186,7 @@ export default function AlbumsScreen() {
       </ScreenHeader>
 
       {albums.isLoading || !warm ? (
-        <View style={styles.loading}>
-          <GridSkeleton count={4} />
-        </View>
+        <CardsSkeleton pairs={3} />
       ) : (
         <FlatList
           contentContainerStyle={styles.content}

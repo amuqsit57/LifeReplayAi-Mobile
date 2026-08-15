@@ -14,7 +14,7 @@ import CreateCard from '../../src/ui/CreateCard';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
 import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
 import { Tappable } from '../../src/ui/press';
-import { RowSkeleton } from '../../src/ui/Skeleton';
+import { CardsSkeleton } from '../../src/ui/Skeleton';
 import SortSheet, { SORTS, applySort } from '../../src/ui/SortSheet';
 
 function ago(iso) {
@@ -266,7 +266,7 @@ export default function EventsScreen() {
         }
         ListEmptyComponent={
           events.isLoading || !warm ? (
-            <RowSkeleton count={3} />
+            <CardsSkeleton pairs={3} />
           ) : query ? (
             <Text style={styles.none}>No events match “{query}”.</Text>
           ) : null

@@ -80,6 +80,27 @@ export function GridSkeleton({ count = 9 }) {
   );
 }
 
+/**
+ * The shape of a grid of cards: one full-width, then pairs.
+ *
+ * Matching the real layout is the whole point. A handful of small squares on a
+ * tall screen is mostly white space, which reads as a page that failed to load
+ * rather than one still loading.
+ */
+export function CardsSkeleton({ pairs = 3 }) {
+  return (
+    <View style={styles.cards}>
+      <Shimmer style={styles.lead} />
+      {Array.from({ length: pairs }).map((_, row) => (
+        <View key={row} style={styles.pair}>
+          <Shimmer style={styles.half} />
+          <Shimmer style={styles.half} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   block: { backgroundColor: colors.surfaceSunk, borderRadius: radius.sm },
 
@@ -107,6 +128,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   rowCover: { width: 60, height: 60, borderRadius: radius.md },
+
+  cards: { padding: spacing.lg, gap: spacing.md },
+  lead: { width: '100%', aspectRatio: 16 / 10, borderRadius: radius.lg },
+  pair: { flexDirection: 'row', gap: spacing.md },
+  half: { flex: 1, aspectRatio: 1, borderRadius: radius.lg },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   tile: { width: '31.5%', aspectRatio: 1 },
