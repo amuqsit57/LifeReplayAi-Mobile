@@ -153,7 +153,7 @@ export default function AudioPanel({
     } catch (problem) {
       setError(
         /timed out/i.test(problem.message)
-          ? 'It is taking a while. The track is still being made — it will appear under Custom or from library.'
+          ? 'Still being made. It will appear in your library.'
           : problem.message
       );
       queryClient.invalidateQueries({ queryKey: ['musicLibrary'] });
@@ -299,10 +299,7 @@ export default function AudioPanel({
                           onPlay={() => audition('score', score.url)}
                         />
                       ) : (
-                        <Text style={styles.note}>
-                          Nothing composed for this event yet — it is written from the occasion
-                          and made while your film renders.
-                        </Text>
+                        <Text style={styles.note}>Composed while your film renders.</Text>
                       )}
                     </View>
                   ) : null}
@@ -314,7 +311,7 @@ export default function AudioPanel({
                         style={styles.input}
                         value={prompt}
                         onChangeText={setPrompt}
-                        placeholder="Describe the music: instruments, tempo, mood."
+                        placeholder="Instruments, tempo, mood"
                         placeholderTextColor={colors.textMuted}
                         multiline
                         maxLength={400}
@@ -342,7 +339,7 @@ export default function AudioPanel({
                         {working === 'compose' ? (
                           <>
                             <ActivityIndicator size="small" color="#fff" />
-                            <Text style={styles.generateText}>Composing — a minute or two</Text>
+                            <Text style={styles.generateText}>Composing…</Text>
                           </>
                         ) : (
                           <>
@@ -393,10 +390,7 @@ export default function AudioPanel({
                           />
                         ))
                       ) : (
-                        <Text style={styles.note}>
-                          Nothing in your library yet. Anything you generate above is kept here
-                          and can be used on any film.
-                        </Text>
+                        <Text style={styles.note}>Nothing here yet. Anything you generate is kept.</Text>
                       )}
                     </View>
                   ) : null}

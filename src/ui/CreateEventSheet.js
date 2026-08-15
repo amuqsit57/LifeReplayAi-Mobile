@@ -130,8 +130,7 @@ export default function CreateEventSheet({ visible, onClose }) {
                   </Row>
 
                   <Text style={styles.note}>
-                    You will get a code to share. Anyone with it can add their photos and make
-                    films — no setup on their side.
+                    You get a code to share. Anyone with it can add photos and make films.
                   </Text>
                 </View>
               ) : (

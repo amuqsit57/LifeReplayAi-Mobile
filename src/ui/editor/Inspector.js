@@ -84,7 +84,7 @@ export default function Inspector({
       >
         {tab === 'shot' ? (
           <>
-            <Section title="Timing" icon="clock" hint="How much screen time this shot gets." />
+            <Section title="Timing" icon="clock" />
             <Group
               title="How long it holds"
               action={<Text style={styles.readout}>{Number(clip.seconds).toFixed(1)}s</Text>}
@@ -101,7 +101,7 @@ export default function Inspector({
             {isVideo && available > MIN_SECONDS ? (
               <Group
                 title="Where it starts"
-                hint="Which part of the clip this shot is cut from."
+                hint="Where in the clip"
                 action={<Text style={styles.readout}>{Number(clip.start_at).toFixed(1)}s</Text>}
               >
                 <Slider
@@ -136,7 +136,7 @@ export default function Inspector({
             <Section
               title="Transition"
               icon="git-commit"
-              hint="How this shot joins the next one. A straight cut is right more often than not."
+              hint="How it joins the next shot"
             />
             <Group title="Transition">
               <Pressable style={styles.select} onPress={() => setPicking(true)}>
@@ -145,7 +145,7 @@ export default function Inspector({
               </Pressable>
             </Group>
 
-            <Section title="Order" icon="move" hint="Where this shot sits in the film." />
+            <Section title="Order" icon="move" />
             <Group title="Move it">
               <View style={styles.actions}>
                 <Tool
@@ -172,7 +172,7 @@ export default function Inspector({
             <Section
               title="Effects"
               icon="droplet"
-              hint="Colour, film texture and camera move — applied to this shot when it renders."
+              hint="Applied when you render"
             />
             <Group
               title="Grade"
@@ -191,7 +191,7 @@ export default function Inspector({
 
             <Group
               title="Texture"
-              hint="On every shot it stops reading as film and starts reading as a filter."
+              hint="Use sparingly"
               action={
                 <Pressable onPress={() => onApplyAll({ texture: clip.texture })}>
                   <Text style={styles.applyAll}>Apply to all</Text>
@@ -206,7 +206,7 @@ export default function Inspector({
             </Group>
 
             {!isVideo ? (
-              <Group title="Movement" hint="A still that never moves reads as a slideshow.">
+              <Group title="Movement">
                 <ChipRow
                   icons
                   options={MOTIONS}
@@ -216,9 +216,7 @@ export default function Inspector({
               </Group>
             ) : (
               <Group title="Movement">
-                <Text style={styles.note}>
-                  This shot is video — it already moves on its own.
-                </Text>
+                <Text style={styles.note}>Video already moves.</Text>
               </Group>
             )}
           </>
@@ -229,11 +227,11 @@ export default function Inspector({
             <Section
               title="Titles"
               icon="type"
-              hint="Words drawn over this shot — set in caps with a rule above them, not as a subtitle."
+              hint="Drawn over this shot"
             />
             <Group
               title="Label"
-              hint="A few words. A place, a name, a year."
+              hint="A place, a name, a year"
             >
               <TextInput
                 style={styles.input}
@@ -249,7 +247,7 @@ export default function Inspector({
             {clip.caption ? (
               <Group
                 title="Where it sits"
-                hint="Move it off the bottom when that is where the subject is."
+                
               >
                 <View style={styles.places}>
                   {CAPTION_PLACES.map((place) => {
@@ -289,7 +287,7 @@ export default function Inspector({
       <GroupedSheet
         visible={picking}
         onClose={() => setPicking(false)}
-        title="Join into the next shot"
+        title="Transition"
         groups={TRANSITION_GROUPS}
         value={clip.transition}
         onChange={(transition) => onChange({ transition })}

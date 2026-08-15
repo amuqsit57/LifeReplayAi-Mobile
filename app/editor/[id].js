@@ -560,7 +560,7 @@ export default function EditorScreen() {
         </Text>
         <Text style={styles.loadingText}>
           {phase === 'proxy'
-            ? 'Making editing copies · this happens once per event'
+            ? 'Once per event'
             : phase === 'download'
               ? `${cache.done} of ${cache.total} ${cache.total === 1 ? 'clip' : 'clips'}${
                   cache.bytes.total
@@ -580,10 +580,7 @@ export default function EditorScreen() {
           </View>
         )}
 
-        <Text style={styles.prepNote}>
-          You edit against small copies and the film is still cut from the originals — so
-          nothing stops to buffer while you work.
-        </Text>
+        <Text style={styles.prepNote}>Loaded up front so nothing buffers while you edit.</Text>
 
         <Pressable
           onPress={phase === 'download' ? cache.skip : undefined}
@@ -770,8 +767,7 @@ export default function EditorScreen() {
         <View style={styles.blank}>
           <Text style={styles.blankTitle}>Nothing in this edit yet</Text>
           <Text style={styles.blankBody}>
-            Add photos and video from the event, then set how long each one holds and how it
-            joins the next.
+            Add photos and video from the event.
           </Text>
           <Pressable style={styles.blankAction} onPress={() => setAdding(true)}>
             <Feather name="plus" size={16} color="#fff" />

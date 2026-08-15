@@ -34,8 +34,7 @@ export default function CreateCard({ onPress, hint }) {
         </View>
 
         <Text style={styles.blurb}>
-          Add the photos and videos everyone took. It finds the moments worth keeping and cuts
-          them together.
+          Add everyone’s photos and videos. It cuts them into a film.
         </Text>
 
         <View style={styles.sample}>

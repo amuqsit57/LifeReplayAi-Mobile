@@ -161,7 +161,7 @@ export default function ProfileScreen() {
               onPress={() =>
                 Alert.alert(
                   'Who can see my films',
-                  'Only people you invited to an event can see the films made from it. This is enforced in the database, not just in the app.'
+                  'Only people you invited to an event can see its films.'
                 )
               }
             />

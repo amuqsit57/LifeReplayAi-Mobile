@@ -32,8 +32,7 @@ export default function InviteSheet({ visible, onClose, event }) {
           <View style={styles.head}>
             <Text style={styles.title}>Invite to {event?.title ?? 'this event'}</Text>
             <Text style={styles.blurb}>
-              Anyone with this code can add their photos and videos, and watch every film made from
-              them.
+              Anyone with this code can add photos and watch every film.
             </Text>
           </View>
 

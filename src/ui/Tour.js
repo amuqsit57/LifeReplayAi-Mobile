@@ -23,21 +23,21 @@ const STEPS = [
     icon: 'users',
     title: 'One event, everyone’s camera',
     body:
-      'Make an event and share the code. Everyone who was there adds the photos and videos they took — nobody has to collect them.',
+      'Share the code. Everyone adds what they took.',
     tint: colors.primary,
   },
   {
     icon: 'eye',
     title: 'It watches everything',
     body:
-      'Each photo and clip is read for what is happening in it, how good it is, and where the moments are inside a long video. Duplicates are dropped.',
+      'Every photo and clip is read for what happens in it. Duplicates are dropped.',
     tint: colors.accent,
   },
   {
     icon: 'film',
     title: 'Then it cuts a film',
     body:
-      'Pick a style and it chooses the shots, paces them, grades them and scores them. Four different films from the same day, and everyone in the event can watch them.',
+      'Pick a style. It chooses the shots, paces, grades and scores them.',
     tint: colors.success,
   },
 ];

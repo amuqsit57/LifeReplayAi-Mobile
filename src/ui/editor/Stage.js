@@ -194,23 +194,11 @@ export default function Stage({
 
   return (
     <View style={[styles.stage, { height }]}>
-      {/* Mounted for as long as the editor is, and never unmounted between
-          shots.
+      {/* Never unmounted between shots. A VideoView builds its surface on
+          mount, which takes longer than a two second shot allows — so the first
+          video always missed its turn and only looked right on a second pass.
 
-          A VideoView creates its surface when it mounts, and that takes longer
-          than a two second shot allows — so the first video in a run-through was
-          still bringing its surface up when its turn ended, and only looked
-          right on a second pass with the view already warm. Keeping it mounted
-          means the surface exists before it is ever needed.
-
-          Concrete width and height, no absolute positioning, no filter, no
-          transform, no animated parent, no clipping above it: that is the shape
-          the replay screen uses, and the shape that stopped it rendering black.
-          A video shot therefore plays clean and ungraded, and the bar below says
-          as much — wrong colours would be a worse lie than none.
-
-          nativeControls off because the stage has its own transport; leaving it
-          on put a second play button on top of the first. */}
+          nativeControls off because the stage has its own transport. */}
       {player ? (
         // Graded and transitioned like everything else now.
         //
@@ -307,7 +295,7 @@ export default function Stage({
         // be shown; saying so is the difference between waiting and broken.
         <View style={styles.wait}>
           <ActivityIndicator color="#fff" />
-          <Text style={styles.waitText}>Skipping — no player for this clip</Text>
+          <Text style={styles.waitText}>Skipping</Text>
         </View>
       ) : total ? (
         <Pressable
@@ -332,12 +320,12 @@ export default function Stage({
           </Text>
           <Text style={styles.barNote} numberOfLines={1}>
             {waiting
-              ? 'This clip has no player — it is still cut into the render'
+              ? 'No preview — still in the render'
               : isVideo
-                ? 'Video plays ungraded here — the grade is applied when you render'
+                ? 'Preview'
                 : clip.texture && clip.texture !== 'none'
-                  ? 'Grain and bloom only appear in the render'
-                  : 'Preview — the render is sharper than this'}
+                  ? 'Grain shows in the render'
+                  : 'Preview'}
           </Text>
         </View>
       ) : null}

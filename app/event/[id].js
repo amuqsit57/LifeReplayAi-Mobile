@@ -356,7 +356,7 @@ export default function EventScreen() {
             <View style={styles.editsHead}>
               <Text style={styles.editsTitle}>AI generated films</Text>
               <Text style={styles.hint}>
-                One cut per style, chosen and assembled for you. Asking again replaces it.
+                One per style. Asking again replaces it.
               </Text>
             </View>
 
@@ -377,9 +377,7 @@ export default function EventScreen() {
             <View style={styles.editsHead}>
               <Text style={styles.editsTitle}>Custom films</Text>
               <Text style={styles.hint}>
-                Cut them yourself: the shots, how long each holds, how it is graded and what it
-                is scored with. Open a film above to start from its cut rather than a blank
-                timeline. You can keep as many of these as you like.
+                Cut them yourself. Open a film above to start from its cut.
               </Text>
             </View>
 
@@ -443,7 +441,7 @@ export default function EventScreen() {
             <Empty
               icon="❏"
               title="No albums yet"
-              body="Select photos in the gallery and choose Make album. Each album gets its own films."
+              body="Select photos in the gallery and choose Make album."
             />
           ) : (
             <View style={{ gap: spacing.sm }}>

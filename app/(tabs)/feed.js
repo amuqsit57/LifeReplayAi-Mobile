@@ -166,7 +166,7 @@ export default function FeedScreen() {
             <Empty
               icon="🎬"
               title="No films yet"
-              body="Make an event, add photos and videos, then generate a film. It shows up here for everyone you invited."
+              body="Make an event, add photos, generate a film."
             />
           )
         }
