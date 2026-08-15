@@ -138,7 +138,7 @@ export default function Viewer({ memories = [], startId, visible, onClose, onDel
               ])
             }
           >
-            <Feather name="x-circle" size={18} color="#fff" />
+            <Feather name="trash-2" size={18} color="#fff" />
           </Pressable>
         </View>
 

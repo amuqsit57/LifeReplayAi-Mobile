@@ -96,6 +96,7 @@ export default function EventScreen() {
   const [by, setBy] = useState(null);
   const [filmQuery, setFilmQuery] = useState('');
   const [filmSort, setFilmSort] = useState('recent');
+  const [gallerySort, setGallerySort] = useState('newest');
 
   const event = useQuery({ queryKey: ['event', id], queryFn: () => getEvent(id) });
   const people = useQuery({ queryKey: ['people', id], queryFn: () => eventPeople(id) });
@@ -143,7 +144,7 @@ export default function EventScreen() {
   const shown = useMemo(() => {
     const option = FILTERS.find((f) => f.value === filter) ?? FILTERS[0];
     const needle = query.trim().toLowerCase();
-    return list.filter((memory) => {
+    const rows = list.filter((memory) => {
       if (!option.match(memory, me.data?.id)) return false;
       if (by && memory.uploaded_by !== by) return false;
       if (!needle) return true;
@@ -153,7 +154,20 @@ export default function EventScreen() {
         .filter(Boolean)
         .some((field) => field.toLowerCase().includes(needle));
     });
-  }, [list, filter, me.data?.id, query, by, peopleById]);
+
+    // When it was taken, not when it reached us — a wedding shot by four guests
+    // belongs in the order the day happened.
+    const when = (m) => new Date(m.captured_at ?? m.created_at ?? 0).getTime();
+    const RANK = { essential: 3, strong: 2, ordinary: 1, weak: 0 };
+
+    return [...rows].sort((a, b) => {
+      if (gallerySort === 'oldest') return when(a) - when(b);
+      if (gallerySort === 'best') {
+        return (RANK[b.significance] ?? 0) - (RANK[a.significance] ?? 0) || when(b) - when(a);
+      }
+      return when(b) - when(a);
+    });
+  }, [list, filter, me.data?.id, query, by, peopleById, gallerySort]);
 
   const albumList = albums.data ?? [];
   // One generated film per style; as many hand-cut edits as anybody makes. The
@@ -346,7 +360,7 @@ export default function EventScreen() {
             <Feather
               name={progress ? 'upload-cloud' : 'plus'}
               size={15}
-              color={colors.accent}
+              color={colors.primary}
             />
             <Text style={styles.actionAltText}>{progress ? 'Adding' : 'Add media'}</Text>
           </Pressable>
@@ -385,6 +399,38 @@ export default function EventScreen() {
                     placeholder="Search what is in them, or who added them"
                   />
                 </View>
+              ) : null}
+
+              {list.length > 8 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.filterRow}
+                >
+                  {[
+                    { value: 'newest', label: 'Newest', icon: 'arrow-down' },
+                    { value: 'oldest', label: 'Oldest', icon: 'arrow-up' },
+                    { value: 'best', label: 'Best first', icon: 'star' },
+                  ].map((option) => {
+                    const on = gallerySort === option.value;
+                    return (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => setGallerySort(option.value)}
+                        style={[styles.filterChip, on && styles.filterChipOn]}
+                      >
+                        <Feather
+                          name={option.icon}
+                          size={12}
+                          color={on ? '#fff' : colors.textSoft}
+                        />
+                        <Text style={[styles.filterText, on && styles.filterTextOn]}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               ) : null}
 
               {/* Who added what. One chip per person who actually contributed,
@@ -867,11 +913,11 @@ const styles = StyleSheet.create({
   actionMainText: { ...type.label, color: '#fff' },
   actionAlt: {
     paddingHorizontal: spacing.lg,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.primarySoft,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.accent + '33',
+    borderColor: colors.primary + '2E',
   },
-  actionAltText: { ...type.label, color: colors.accent },
+  actionAltText: { ...type.label, color: colors.primary },
   pressed: { opacity: 0.85 },
   round: {
     width: 52,
