@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../src/lib/api';
+import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { useWarmImages } from '../../src/lib/warm';
 import {
   addToAlbum,
@@ -28,7 +29,7 @@ import {
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Segmented } from '../../src/ui/press';
 import FilmCard from '../../src/ui/FilmCard';
-import { RoundButton } from '../../src/ui/Header';
+import { RoundButton, SearchBar } from '../../src/ui/Header';
 import { GridSkeleton } from '../../src/ui/Skeleton';
 import { MediaTile } from '../../src/ui/social';
 import Viewer from '../../src/ui/Viewer';
@@ -66,7 +67,34 @@ export default function AlbumScreen() {
 
   const inAlbum = useMemo(() => new Set(memberIds.data ?? []), [memberIds.data]);
   const all = everything.data ?? [];
-  const contents = all.filter((m) => inAlbum.has(m.id));
+  const [query, setQuery] = useState('');
+  const [kind, setKind] = useState('all');
+  const [sort, setSort] = useState('newest');
+
+  const inside = all.filter((m) => inAlbum.has(m.id));
+
+  const contents = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const rows = inside.filter((m) => {
+      if (kind !== 'all' && m.kind !== kind) return false;
+      if (!needle) return true;
+      return [m.description, ...(m.tags ?? [])]
+        .filter(Boolean)
+        .some((field) => field.toLowerCase().includes(needle));
+    });
+
+    // When it was taken, not when it arrived.
+    const when = (m) => new Date(m.captured_at ?? m.created_at ?? 0).getTime();
+    const RANK = { essential: 3, strong: 2, ordinary: 1, weak: 0 };
+    return [...rows].sort((a, b) => {
+      if (sort === 'oldest') return when(a) - when(b);
+      if (sort === 'best') {
+        return (RANK[b.significance] ?? 0) - (RANK[a.significance] ?? 0) || when(b) - when(a);
+      }
+      return when(b) - when(a);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [all, inAlbum, query, kind, sort]);
   const available = all.filter((m) => !inAlbum.has(m.id));
   const generated = (replays.data ?? []).filter((r) => r.album_id === id && !r.is_edit);
   const albumEdits = (replays.data ?? []).filter((r) => r.album_id === id && r.is_edit);
@@ -77,7 +105,7 @@ export default function AlbumScreen() {
   // them. Not settled until the memories have actually arrived — an empty list
   // before then means "not yet", not "nothing to load".
   const warm = useWarmImages(
-    contents.map((m) => m.thumbnail_url ?? m.url),
+    inside.map((m) => m.thumbnail_url ?? m.url),
     12,
     everything.isFetched && memberIds.isFetched
   );
@@ -96,6 +124,31 @@ export default function AlbumScreen() {
     },
     onError: (error) => Alert.alert('Could not open the editor', error.message),
   });
+
+  // Upload into the event, then put what landed straight into this album.
+  const [progress, setProgress] = useState(null);
+
+  async function addOwnMedia() {
+    const assets = await pickMemories();
+    if (!assets.length || !album.data?.event_id) return;
+
+    setProgress({ index: 0, total: assets.length, phase: 'preparing' });
+    const results = await uploadAll(album.data.event_id, assets, setProgress);
+    setProgress(null);
+
+    const ids = results.filter((r) => r.ok).map((r) => r.memory?.id).filter(Boolean);
+    if (ids.length) {
+      try {
+        await addToAlbum(id, ids);
+      } catch (error) {
+        Alert.alert('Added to the event, but not the album', error.message);
+      }
+    }
+
+    api.analyseBatch(album.data.event_id).catch(() => {});
+    queryClient.invalidateQueries({ queryKey: ['albumIds', id] });
+    queryClient.invalidateQueries({ queryKey: ['memories', album.data.event_id] });
+  }
 
   const add = useMutation({
     mutationFn: () => addToAlbum(id, staged),
@@ -184,18 +237,34 @@ export default function AlbumScreen() {
           </View>
         </View>
 
-        <View style={styles.gutter}>
-          <Pressable style={styles.addBar} onPress={() => setAdding(true)}>
+        <View style={[styles.gutter, styles.addRow]}>
+          <Pressable style={[styles.addBar, { flex: 1 }]} onPress={() => setAdding(true)}>
             <View style={styles.addIcon}>
-              <Feather name="plus" size={17} color={colors.primary} />
+              <Feather name="grid" size={17} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.addTitle}>Add from the event</Text>
-              <Text style={styles.meta}>
-                {available.length} {available.length === 1 ? 'item' : 'items'} not in this album yet
+              <Text style={styles.addTitle}>From the event</Text>
+              <Text style={styles.meta} numberOfLines={1}>
+                {available.length} not in here yet
               </Text>
             </View>
-            <Feather name="chevron-right" size={18} color={colors.textMuted} />
+          </Pressable>
+
+          {/* Straight from the phone into this album — it went to the event and
+              then had to be found again in the picker. */}
+          <Pressable
+            style={styles.addBar}
+            onPress={addOwnMedia}
+            disabled={Boolean(progress)}
+          >
+            <View style={styles.addIcon}>
+              <Feather
+                name={progress ? 'upload-cloud' : 'plus'}
+                size={17}
+                color={colors.primary}
+              />
+            </View>
+            <Text style={styles.addTitle}>{progress ? 'Adding' : 'Add media'}</Text>
           </Pressable>
         </View>
 
@@ -227,6 +296,70 @@ export default function AlbumScreen() {
             </View>
           ) : (
             <>
+              {inside.length > 8 ? (
+                <>
+                  <SearchBar
+                    value={query}
+                    onChangeText={setQuery}
+                    onClear={() => setQuery('')}
+                    placeholder="Search what is in them"
+                  />
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chips}
+                  >
+                    {[
+                      { value: 'all', label: 'All', icon: 'grid', group: 'kind' },
+                      { value: 'photo', label: 'Photos', icon: 'image', group: 'kind' },
+                      { value: 'video', label: 'Video', icon: 'video', group: 'kind' },
+                    ].map((option) => {
+                      const on = kind === option.value;
+                      return (
+                        <Pressable
+                          key={option.value}
+                          onPress={() => setKind(option.value)}
+                          style={[styles.chip, on && styles.chipOn]}
+                        >
+                          <Feather
+                            name={option.icon}
+                            size={12}
+                            color={on ? '#fff' : colors.textSoft}
+                          />
+                          <Text style={[styles.chipText, on && styles.chipTextOn]}>
+                            {option.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+
+                    {[
+                      { value: 'newest', label: 'Newest', icon: 'arrow-down' },
+                      { value: 'oldest', label: 'Oldest', icon: 'arrow-up' },
+                      { value: 'best', label: 'Best', icon: 'star' },
+                    ].map((option) => {
+                      const on = sort === option.value;
+                      return (
+                        <Pressable
+                          key={option.value}
+                          onPress={() => setSort(option.value)}
+                          style={[styles.chip, on && styles.chipOn]}
+                        >
+                          <Feather
+                            name={option.icon}
+                            size={12}
+                            color={on ? '#fff' : colors.textSoft}
+                          />
+                          <Text style={[styles.chipText, on && styles.chipTextOn]}>
+                            {option.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              ) : null}
+
               <Text style={styles.hint}>Tap to open · hold to take out</Text>
               <View style={styles.grid}>
                 {contents.map((memory) => (
@@ -399,6 +532,7 @@ const styles = StyleSheet.create({
   title: { ...type.display, color: colors.text },
   meta: { ...type.caption, color: colors.textMuted },
 
+  addRow: { flexDirection: 'row', gap: spacing.sm },
   addBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -422,6 +556,22 @@ const styles = StyleSheet.create({
 
   hint: { ...type.caption, color: colors.textMuted, paddingHorizontal: spacing.lg },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.lg },
+
+  chips: { gap: spacing.sm, paddingVertical: 2 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { ...type.label, color: colors.textSoft },
+  chipTextOn: { color: '#fff' },
 
   films: { gap: spacing.sm, paddingHorizontal: spacing.lg },
   sectionTitle: { ...type.heading, color: colors.text, paddingTop: spacing.md },
