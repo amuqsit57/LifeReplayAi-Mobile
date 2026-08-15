@@ -97,6 +97,9 @@ export default function EventScreen() {
   const [filmQuery, setFilmQuery] = useState('');
   const [filmSort, setFilmSort] = useState('recent');
   const [gallerySort, setGallerySort] = useState('newest');
+  // On by default: a shared event is several people's photographs, and saying
+  // whose is the first thing the page should answer.
+  const [byPerson, setByPerson] = useState(true);
 
   const event = useQuery({ queryKey: ['event', id], queryFn: () => getEvent(id) });
   const people = useQuery({ queryKey: ['people', id], queryFn: () => eventPeople(id) });
@@ -168,6 +171,25 @@ export default function EventScreen() {
       return when(b) - when(a);
     });
   }, [list, filter, me.data?.id, query, by, peopleById, gallerySort]);
+
+  // Grouping only means anything with more than one contributor, and only when
+  // nobody has been singled out already.
+  const grouped = byPerson && !by && (people.data ?? []).length > 1;
+
+  const groups = useMemo(() => {
+    if (!grouped) return [];
+    const bucket = new Map();
+    for (const memory of shown) {
+      const who = memory.uploaded_by ?? 'unknown';
+      if (!bucket.has(who)) bucket.set(who, []);
+      bucket.get(who).push(memory);
+    }
+    // Whoever brought the most goes first; it is the closest thing to an order
+    // that means something.
+    return [...bucket.entries()]
+      .map(([id, items]) => ({ id, items, person: peopleById.get(id) }))
+      .sort((a, b) => b.items.length - a.items.length);
+  }, [grouped, shown, peopleById]);
 
   const albumList = albums.data ?? [];
   // One generated film per style; as many hand-cut edits as anybody makes. The
@@ -455,11 +477,33 @@ export default function EventScreen() {
                   contentContainerStyle={styles.filterRow}
                 >
                   <Pressable
-                    onPress={() => setBy(null)}
-                    style={[styles.filterChip, !by && styles.filterChipOn]}
+                    onPress={() => {
+                      setBy(null);
+                      setByPerson(true);
+                    }}
+                    style={[styles.filterChip, grouped && styles.filterChipOn]}
                   >
-                    <Feather name="users" size={12} color={!by ? '#fff' : colors.textSoft} />
-                    <Text style={[styles.filterText, !by && styles.filterTextOn]}>Everyone</Text>
+                    <Feather name="users" size={11} color={grouped ? '#fff' : colors.textSoft} />
+                    <Text style={[styles.filterText, grouped && styles.filterTextOn]}>
+                      By person
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      setBy(null);
+                      setByPerson(false);
+                    }}
+                    style={[styles.filterChip, !grouped && !by && styles.filterChipOn]}
+                  >
+                    <Feather
+                      name="grid"
+                      size={11}
+                      color={!grouped && !by ? '#fff' : colors.textSoft}
+                    />
+                    <Text style={[styles.filterText, !grouped && !by && styles.filterTextOn]}>
+                      All together
+                    </Text>
                   </Pressable>
 
                   {(people.data ?? []).map((person) => {
@@ -469,7 +513,10 @@ export default function EventScreen() {
                     return (
                       <Pressable
                         key={person.user_id}
-                        onPress={() => setBy(active ? null : person.user_id)}
+                        onPress={() => {
+                          setBy(active ? null : person.user_id);
+                          if (!active) setByPerson(false);
+                        }}
                         style={[styles.filterChip, active && styles.filterChipOn]}
                       >
                         <Avatar url={person.avatar_url} name={person.full_name} size="xs" />
@@ -528,21 +575,58 @@ export default function EventScreen() {
                     ? `${selected.length} selected`
                     : 'Tap to open · hold to select'}
               </Text>
-              <View style={styles.grid}>
-                {shown.map((memory) => (
-                  <MediaTile
-                    key={memory.id}
-                    uri={memory.thumbnail_url ?? memory.url}
-                    kind={memory.kind}
-                    selected={selectedSet.has(memory.id)}
-                    badge={memory.status === 'ready' ? null : STATUS_LABEL[memory.status]}
-                    uploader={people.data?.length > 1 ? peopleById.get(memory.uploaded_by) : null}
-                    style={{ width: '31.5%' }}
-                    onPress={() => (selecting ? toggle(memory.id) : setViewing(memory.id))}
-                    onLongPress={() => toggle(memory.id)}
-                  />
-                ))}
-              </View>
+              {/* Grouped by whoever added it, which is the shape of a shared
+                  event: not one pile of photographs but several people's, side
+                  by side. Flattens when a single person is chosen, or when only
+                  one of them has contributed anything. */}
+              {grouped ? (
+                groups.map((group) => (
+                  <View key={group.id} style={styles.group}>
+                    <Pressable
+                      style={styles.groupHead}
+                      onPress={() => setBy(group.id)}
+                    >
+                      <Avatar url={group.person?.avatar_url} name={group.person?.full_name} size="sm" />
+                      <Text style={styles.groupName} numberOfLines={1}>
+                        {group.person?.full_name ?? 'Someone'}
+                      </Text>
+                      <Text style={styles.groupCount}>{group.items.length}</Text>
+                      <Feather name="chevron-right" size={15} color={colors.textMuted} />
+                    </Pressable>
+
+                    <View style={styles.grid}>
+                      {group.items.map((memory) => (
+                        <MediaTile
+                          key={memory.id}
+                          uri={memory.thumbnail_url ?? memory.url}
+                          kind={memory.kind}
+                          selected={selectedSet.has(memory.id)}
+                          badge={memory.status === 'ready' ? null : STATUS_LABEL[memory.status]}
+                          style={{ width: '31.5%' }}
+                          onPress={() => (selecting ? toggle(memory.id) : setViewing(memory.id))}
+                          onLongPress={() => toggle(memory.id)}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.grid}>
+                  {shown.map((memory) => (
+                    <MediaTile
+                      key={memory.id}
+                      uri={memory.thumbnail_url ?? memory.url}
+                      kind={memory.kind}
+                      selected={selectedSet.has(memory.id)}
+                      badge={memory.status === 'ready' ? null : STATUS_LABEL[memory.status]}
+                      uploader={people.data?.length > 1 ? peopleById.get(memory.uploaded_by) : null}
+                      style={{ width: '31.5%' }}
+                      onPress={() => (selecting ? toggle(memory.id) : setViewing(memory.id))}
+                      onLongPress={() => toggle(memory.id)}
+                    />
+                  ))}
+                </View>
+              )}
             </>
           )
         ) : null}
@@ -973,6 +1057,16 @@ const styles = StyleSheet.create({
   filterCount: { ...type.tiny, fontSize: 9.5, color: colors.textMuted },
 
   hint: { ...type.caption, color: colors.textMuted, paddingHorizontal: spacing.lg },
+  group: { paddingTop: spacing.md },
+  groupHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  groupName: { ...type.label, color: colors.text, flex: 1 },
+  groupCount: { ...type.tiny, color: colors.textMuted },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
