@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Keyboard, StyleSheet, Text, View } from 'react-native';
 
 import { updatePassword } from '../../src/lib/data';
 import { useAuth } from '../../src/store';
@@ -57,10 +57,17 @@ export default function Reset() {
     password: passwordProblem(password, { forSignUp: true }),
     again: !again ? 'Type it a second time' : again !== password ? 'Those two do not match' : null,
   };
+  // Only a field with something in it may complain on the way out; an empty one
+  // you merely passed through is the button's business.
+  const leave = (field, value) => () => {
+    if (value.trim()) setTouched((t) => ({ ...t, [field]: true }));
+  };
+
   const shown = {
     password: touched.password ? problems.password : null,
     again: touched.again ? problems.again : null,
   };
+  const complete = !problems.password && !problems.again;
 
   const passwordRef = useRef(null);
 
@@ -141,7 +148,7 @@ export default function Reset() {
             setPassword(value);
             setFailure(null);
           }}
-          onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+          onBlur={leave('password', password)}
           error={shown.password}
           hint={password ? undefined : `At least ${MIN_PASSWORD} characters.`}
           placeholder="Something only you would pick"
@@ -166,15 +173,16 @@ export default function Reset() {
           setAgain(value);
           setFailure(null);
         }}
-        onBlur={() => setTouched((t) => ({ ...t, again: true }))}
+        onBlur={leave('again', again)}
         error={shown.again}
         placeholder="The same one"
         autoCapitalize="none"
         autoComplete="new-password"
         textContentType="newPassword"
         returnKeyType="go"
-        blurOnSubmit={false}
-        onSubmitEditing={submit}
+        // Saves when both halves are usable, and otherwise just closes the
+        // keyboard rather than reddening a form still being filled in.
+        onSubmitEditing={() => (complete ? submit() : Keyboard.dismiss())}
       />
 
       <AuthButton label="Save password" loading={busy} onPress={submit} />

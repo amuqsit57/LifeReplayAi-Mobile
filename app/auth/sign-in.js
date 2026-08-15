@@ -15,35 +15,41 @@ export default function SignIn() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [touched, setTouched] = useState({});
+  const [checked, setChecked] = useState({});
   const [failure, setFailure] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  // Checked always, shown only once you have left the field. Marking a box red
-  // while somebody is still halfway through typing into it is the form telling
-  // you that you are wrong before you have finished being right.
   const problems = {
     email: emailProblem(email),
     password: passwordProblem(password),
   };
+
+  /**
+   * When a field is allowed to complain.
+   *
+   * Leaving a field you never typed in is not a mistake — you were on your way
+   * to the next one. Marking it red for that is the form telling you off for
+   * looking at it, which is what made tapping between the two boxes light the
+   * whole screen up. So blurring only reports a field that has something in it
+   * to be wrong about; empty ones are the button's business, on submit.
+   */
+  const leave = (field, value) => () => {
+    if (value.trim()) setChecked((c) => ({ ...c, [field]: true }));
+  };
+
   const shown = {
-    email: touched.email ? problems.email : null,
-    password: touched.password ? problems.password : null,
+    email: checked.email ? problems.email : null,
+    password: checked.password ? problems.password : null,
   };
 
   async function submit() {
-    // Everything is touched on submit, so pressing the button on an empty form
-    // marks what is missing rather than doing nothing.
-    setTouched({ email: true, password: true });
+    setChecked({ email: true, password: true });
 
-    // Straight to the first thing that is wrong, with the keyboard still up.
-    // Returning here used to leave the form red and the keyboard gone, which
-    // read as the app rejecting you rather than as one field wanting filling —
-    // and the return key reaches this before you have finished the form far more
-    // often than the button does.
-    const firstBad = problems.email ? emailRef : problems.password ? passwordRef : null;
-    if (firstBad) {
-      firstBad.current?.focus();
+    if (problems.email || problems.password) {
+      // Put the cursor where the work is. Reached from the button only — the
+      // return key never lands here, so this cannot fire while somebody is still
+      // filling the form in.
+      (problems.email ? emailRef : passwordRef).current?.focus();
       return;
     }
 
@@ -83,7 +89,7 @@ export default function SignIn() {
           setEmail(value);
           setFailure(null);
         }}
-        onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+        onBlur={leave('email', email)}
         error={shown.email}
         placeholder="you@example.com"
         keyboardType="email-address"
@@ -91,13 +97,12 @@ export default function SignIn() {
         autoCorrect={false}
         autoComplete="email"
         textContentType="emailAddress"
-        returnKeyType="next"
-        // Straight on to the password rather than dismissing the keyboard and
-        // making them reach back up the screen. `blurOnSubmit` rather than
-        // `submitBehavior`: the newer prop was being ignored here, so the
-        // keyboard shut on every return press.
-        blurOnSubmit={false}
-        onSubmitEditing={() => passwordRef.current?.focus()}
+        // No auto-advance and no submit from the keyboard, anywhere on this
+        // screen. Moving focus for somebody is a courtesy; it is not worth one
+        // chance in a hundred of the courtesy firing unprompted and marching the
+        // cursor through the form while they are trying to type in it. The
+        // button is six millimetres away and never surprises anyone.
+        returnKeyType="done"
       />
 
       <View style={styles.passwordBlock}>
@@ -111,17 +116,13 @@ export default function SignIn() {
             setPassword(value);
             setFailure(null);
           }}
-          onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+          onBlur={leave('password', password)}
           error={shown.password}
           placeholder="Your password"
           autoCapitalize="none"
           autoComplete="current-password"
           textContentType="password"
-          returnKeyType="go"
-          // Held open on a failed attempt; `submit` puts the cursor in whichever
-          // field is at fault, and a keyboard that vanished would undo that.
-          blurOnSubmit={false}
-          onSubmitEditing={submit}
+          returnKeyType="done"
         />
 
         {/* Under the field it is about, ranged right — where a thumb reaching

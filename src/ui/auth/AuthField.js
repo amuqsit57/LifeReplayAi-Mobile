@@ -24,8 +24,20 @@ import { colors, radius, spacing, type } from '../../theme';
  * Forwards its ref so a form can send the return key from one field to the next
  * rather than making people reach back up to the screen between them.
  */
+// The keyboard was opening and shutting on its own and focus was walking
+// between fields untouched. Announcing every focus event is what told the two
+// apart: focus being *lost* means the native view was rebuilt underneath the
+// input, focus being *taken* means something called `.focus()`. They need
+// opposite fixes, and the symptom looks identical from the outside.
+//
+// Kept, because this class of bug recurs whenever a field gains a style that
+// depends on focus — but only in development, so a release build is silent.
+const trace = (label, event) => {
+  if (__DEV__) console.log(`[field] ${label}: ${event}`);
+};
+
 const AuthField = forwardRef(function AuthField(
-  { icon, label, error, hint, secure, style, onBlur, onFocus, ...rest },
+  { icon, label, error, hint, secure, style, onBlur, onFocus, onSubmitEditing, ...rest },
   ref
 ) {
   const [focused, setFocused] = useState(false);
@@ -61,12 +73,18 @@ const AuthField = forwardRef(function AuthField(
           placeholderTextColor={colors.textMuted}
           secureTextEntry={secure && !revealed}
           onFocus={(event) => {
+            trace(label, 'focus');
             setFocused(true);
             onFocus?.(event);
           }}
           onBlur={(event) => {
+            trace(label, 'blur');
             setFocused(false);
             onBlur?.(event);
+          }}
+          onSubmitEditing={(event) => {
+            trace(label, 'submitEditing');
+            onSubmitEditing?.(event);
           }}
           {...rest}
         />
@@ -111,14 +129,13 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     backgroundColor: colors.surfaceAlt,
   },
-  focusRing: {
-    backgroundColor: colors.surface,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 2,
-  },
+  // Colour only. This used to raise a shadow and set `elevation` while focused,
+  // and changing elevation on Android rebuilds the native view — which throws
+  // away the focus of the TextInput inside it. The keyboard opened, the view was
+  // recreated, focus was lost, the next field took it, and the whole thing
+  // happened again: fields switching by themselves and the keyboard flickering
+  // shut. Nothing that alters elevation may depend on focus.
+  focusRing: { backgroundColor: colors.surface },
   errorFill: { backgroundColor: colors.dangerSoft },
 
   // 16px minimum, or iOS zooms the whole page on focus.

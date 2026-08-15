@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { requestPasswordReset, verifyRecoveryCode } from '../../src/lib/data';
 import { colors, radius, spacing, type } from '../../src/theme';
@@ -174,7 +174,9 @@ export default function Forgot() {
           setEmail(value);
           setFailure(null);
         }}
-        onBlur={() => setTouched(true)}
+        // Only once there is something in it to be wrong about; leaving an empty
+        // field you never typed in is not a mistake worth reddening.
+        onBlur={() => email.trim() && setTouched(true)}
         error={touched ? problem : null}
         placeholder="you@example.com"
         keyboardType="email-address"
@@ -184,10 +186,9 @@ export default function Forgot() {
         textContentType="emailAddress"
         autoFocus
         returnKeyType="go"
-        // A rejected address should leave you in the field, not staring at a red
-        // line with the keyboard gone.
-        blurOnSubmit={false}
-        onSubmitEditing={send}
+        // Sends when there is a usable address, and otherwise just closes the
+        // keyboard rather than reddening a half-typed field.
+        onSubmitEditing={() => (problem ? Keyboard.dismiss() : send())}
       />
 
       <AuthButton label="Email me a code" loading={busy} onPress={send} />

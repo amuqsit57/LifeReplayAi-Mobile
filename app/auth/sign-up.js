@@ -47,7 +47,7 @@ export default function SignUp() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [touched, setTouched] = useState({});
+  const [checked, setChecked] = useState({});
   const [failure, setFailure] = useState(null);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState(false);
@@ -57,19 +57,29 @@ export default function SignUp() {
     email: emailProblem(email),
     password: passwordProblem(password, { forSignUp: true }),
   };
+  /**
+   * When a field is allowed to complain.
+   *
+   * Leaving a field you never typed in is not a mistake — you were on your way
+   * to the next one. So blurring only reports a field with something in it to be
+   * wrong about; empty ones are the button's business, on submit.
+   */
+  const leave = (field, value) => () => {
+    if (value.trim()) setChecked((c) => ({ ...c, [field]: true }));
+  };
+
   const shown = {
-    fullName: touched.fullName ? problems.fullName : null,
-    email: touched.email ? problems.email : null,
-    password: touched.password ? problems.password : null,
+    fullName: checked.fullName ? problems.fullName : null,
+    email: checked.email ? problems.email : null,
+    password: checked.password ? problems.password : null,
   };
 
   async function submit() {
-    setTouched({ fullName: true, email: true, password: true });
+    setChecked({ fullName: true, email: true, password: true });
 
-    // Straight to the first thing that is wrong, keyboard still up. Reaching
-    // this from the return key while halfway down the form used to turn every
-    // field red at once — including the name you had not got to yet — and take
-    // the keyboard away with it.
+    // Straight to the first thing that is wrong. Reached from the button only —
+    // the return key never lands here, so this cannot fire while somebody is
+    // still working down the form.
     const firstBad = problems.fullName
       ? nameRef
       : problems.email
@@ -157,16 +167,18 @@ export default function SignUp() {
           setFullName(value);
           setFailure(null);
         }}
-        onBlur={() => setTouched((t) => ({ ...t, fullName: true }))}
+        onBlur={leave('fullName', fullName)}
         error={shown.fullName}
         hint="What everyone in your events will see."
         placeholder="Sara Khan"
         autoCapitalize="words"
         autoComplete="name"
         textContentType="name"
-        returnKeyType="next"
-        onSubmitEditing={() => emailRef.current?.focus()}
-        blurOnSubmit={false}
+        returnKeyType="done"
+        // No auto-advance and no submit from the keyboard, anywhere on this
+        // screen. Moving focus for somebody is a courtesy; it is not worth one
+        // chance in a hundred of the courtesy firing unprompted and marching the
+        // cursor through the form while they are trying to type in it.
       />
 
       <AuthField
@@ -178,7 +190,7 @@ export default function SignUp() {
           setEmail(value);
           setFailure(null);
         }}
-        onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+        onBlur={leave('email', email)}
         error={shown.email}
         placeholder="you@example.com"
         keyboardType="email-address"
@@ -186,9 +198,7 @@ export default function SignUp() {
         autoCorrect={false}
         autoComplete="email"
         textContentType="emailAddress"
-        returnKeyType="next"
-        onSubmitEditing={() => passwordRef.current?.focus()}
-        blurOnSubmit={false}
+        returnKeyType="done"
       />
 
       <View>
@@ -202,16 +212,14 @@ export default function SignUp() {
             setPassword(value);
             setFailure(null);
           }}
-          onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+          onBlur={leave('password', password)}
           error={shown.password}
           hint={password ? undefined : `At least ${MIN_PASSWORD} characters.`}
           placeholder="Something only you would pick"
           autoCapitalize="none"
           autoComplete="new-password"
           textContentType="newPassword"
-          returnKeyType="go"
-          blurOnSubmit={false}
-          onSubmitEditing={submit}
+          returnKeyType="done"
         />
         <Strength password={password} />
       </View>
