@@ -1,8 +1,17 @@
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
+import { useWarmImages } from '../../lib/warm';
 import { colors, radius, shadow, spacing, type } from '../../theme';
 import { SearchBar } from '../Header';
 
@@ -31,6 +40,10 @@ export default function AddShots({ visible, onClose, library, onInsert }) {
         .some((field) => field.toLowerCase().includes(needle));
     });
   }, [library, query, kind]);
+
+  // The tiles you can see, decoded before the grid appears. The library is
+  // already in hand here, so this only ever waits on the images themselves.
+  const warm = useWarmImages(list.map((m) => m.thumbnail_url), 12, visible);
 
   const toggle = (id) =>
     setChosen((current) =>
@@ -88,7 +101,7 @@ export default function AddShots({ visible, onClose, library, onInsert }) {
         </View>
 
         <FlatList
-          data={list}
+          data={warm ? list : []}
           keyExtractor={(item) => item.id}
           numColumns={COLUMNS}
           columnWrapperStyle={styles.column}
@@ -123,9 +136,13 @@ export default function AddShots({ visible, onClose, library, onInsert }) {
             );
           }}
           ListEmptyComponent={
-            <Text style={styles.empty}>
-              {query ? 'Nothing here matches that.' : 'Nothing has been uploaded to this event yet.'}
-            </Text>
+            !warm ? (
+              <ActivityIndicator style={{ marginTop: spacing.xxl }} color={colors.primary} />
+            ) : (
+              <Text style={styles.empty}>
+                {query ? 'Nothing here matches that.' : 'Nothing has been uploaded to this event yet.'}
+              </Text>
+            )
           }
         />
       </View>
