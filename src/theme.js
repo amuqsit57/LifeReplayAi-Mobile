@@ -78,6 +78,11 @@ export const type = {
  * the logo already has.
  */
 export const markType = {
+  // `xl` is the lockup standing on its own as the subject of a screen — the way
+  // it does above a sign-in form — rather than sitting in a header beside other
+  // controls. Tracking tightens as it grows, which is what keeps a heavy weight
+  // at this size reading as a logo instead of as a headline.
+  xl: { fontSize: 30, lineHeight: 38, fontWeight: '800', letterSpacing: -0.9 },
   lg: { fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.6 },
   sm: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.4 },
 };

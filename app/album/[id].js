@@ -27,6 +27,7 @@ import {
 } from '../../src/lib/data';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Segmented } from '../../src/ui/press';
+import ErrorState from '../../src/ui/ErrorState';
 import FilmCard from '../../src/ui/FilmCard';
 import { RoundButton, SearchBar } from '../../src/ui/Header';
 import Photo from '../../src/ui/Photo';
@@ -189,6 +190,31 @@ export default function AlbumScreen() {
   // First visit only — `warm` never returns to false once it has shown, so
   // pulling to refresh does not blank an album you are already looking at.
   const ready = album.isFetched && everything.isFetched && memberIds.isFetched && warm;
+
+  // Before the ready gate: `isFetched` is true after a failure too, so without
+  // this the page would draw itself empty and claim the album has nothing in it.
+  const failed = album.error ?? memberIds.error ?? everything.error ?? null;
+  if (failed) {
+    return (
+      <View style={styles.screen}>
+        <View style={[styles.loadingBar, { top: insets.top + spacing.md }]}>
+          <RoundButton name="chevron-left" label="Back" onPress={() => router.back()} />
+        </View>
+        <View style={styles.centre}>
+          <ErrorState
+            title="Could not open this album"
+            error={failed}
+            onRetry={() => {
+              album.refetch();
+              memberIds.refetch();
+              everything.refetch();
+            }}
+            retrying={album.isFetching || memberIds.isFetching}
+          />
+        </View>
+      </View>
+    );
+  }
 
   if (!ready) {
     return (
@@ -556,7 +582,8 @@ const styles = StyleSheet.create({
   hero: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.lg },
   veil: { backgroundColor: 'rgba(255,255,255,0.85)' },
   // Over the skeleton's hero, on the same gutter as the real one.
-  loadingBar: { position: 'absolute', left: spacing.lg },
+  loadingBar: { position: 'absolute', left: spacing.lg, zIndex: 1 },
+  centre: { flex: 1, justifyContent: 'center' },
   heroBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroText: { gap: spacing.xs },
   crumb: { flexDirection: 'row', alignItems: 'center', gap: 5 },

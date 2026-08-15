@@ -13,12 +13,15 @@ import { colors, markType, radius, shadow, spacing, type } from '../theme';
  * owns. Drawn in views instead of an image so it stays crisp at any size and
  * carries the accent colour with it.
  */
+// The mark's side length per size. The name's own metrics live in `markType`,
+// so the two scale together rather than one being nudged to match the other.
+const UNIT = { sm: 12, lg: 15, xl: 21 };
+
 export function Wordmark({ size = 'lg' }) {
-  const big = size === 'lg';
-  const unit = big ? 15 : 12;
+  const unit = UNIT[size] ?? UNIT.lg;
 
   return (
-    <View style={styles.lockup}>
+    <View style={[styles.lockup, size === 'xl' && { gap: spacing.md }]}>
       <View style={{ width: unit * 1.5, height: unit * 1.5 }}>
         <View
           style={[
@@ -49,7 +52,7 @@ export function Wordmark({ size = 'lg' }) {
         />
       </View>
 
-      <Text style={[big ? styles.nameLg : styles.nameSm]}>
+      <Text style={[styles.name, markType[size] ?? markType.lg]}>
         Life<Text style={{ color: colors.primary }}>Replay</Text>
       </Text>
     </View>
@@ -92,9 +95,9 @@ const styles = StyleSheet.create({
   lockup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   frame: { position: 'absolute' },
   // markType, not type: the logo keeps the system face it was drawn in while the
-  // rest of the app moves to Fraunces and Manrope.
-  nameLg: { ...markType.lg, color: colors.text },
-  nameSm: { ...markType.sm, color: colors.text },
+  // rest of the app moves to Fraunces and Manrope. The size comes from the
+  // caller, so one style carries the colour and nothing else.
+  name: { color: colors.text },
 
   segmented: {
     flexDirection: 'row',

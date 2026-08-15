@@ -7,7 +7,9 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } 
 import { api } from '../../src/lib/api';
 import { feed, listEvents, myProfile, signOut } from '../../src/lib/data';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
+import ErrorState from '../../src/ui/ErrorState';
 import { RoundButton, ScreenHeader } from '../../src/ui/Header';
+import { GridSkeleton } from '../../src/ui/Skeleton';
 import { Avatar, MediaTile } from '../../src/ui/social';
 
 function Row({ icon, label, value, onPress, danger, last }) {
@@ -114,7 +116,19 @@ export default function ProfileScreen() {
         </View>
 
         {tab === 'films' ? (
-          mine.length === 0 ? (
+          // An empty list and a list that has not arrived are not the same thing.
+          // Without this the tab opened on "No films yet" and then filled in,
+          // telling everyone with films that they had none.
+          posts.isError ? (
+            <ErrorState
+              title="Could not load your films"
+              error={posts.error}
+              onRetry={posts.refetch}
+              retrying={posts.isFetching}
+            />
+          ) : posts.isLoading || (ids.length > 0 && !media.isFetched) ? (
+            <GridSkeleton count={6} />
+          ) : mine.length === 0 ? (
             <View style={styles.blank}>
               <Feather name="film" size={26} color={colors.textMuted} />
               <Text style={styles.blankTitle}>No films yet</Text>
@@ -145,6 +159,13 @@ export default function ProfileScreen() {
               icon="hash"
               label="Join an event"
               onPress={() => router.push('/join')}
+            />
+            {/* The same screen the emailed link opens. Signed in, it skips
+                straight to the form. */}
+            <Row
+              icon="lock"
+              label="Change password"
+              onPress={() => router.push('/auth/reset')}
             />
             <Row
               icon="bell"

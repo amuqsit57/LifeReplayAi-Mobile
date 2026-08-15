@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { createEvent } from '../../src/lib/data';
 import { colors, radius, spacing, type } from '../../src/theme';
@@ -10,6 +11,9 @@ import { Button, Field } from '../../src/ui';
 export default function CreateScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  // This screen has no header of its own, so without the inset its title starts
+  // at y=0 and runs under the clock.
+  const insets = useSafeAreaInsets();
 
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
@@ -28,7 +32,15 @@ export default function CreateScreen() {
   });
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={styles.title}>New event</Text>
       <Text style={styles.blurb}>
         Everyone you invite can add their photos and videos, and anyone can turn them into a film.
@@ -70,6 +82,7 @@ export default function CreateScreen() {
         </View>
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

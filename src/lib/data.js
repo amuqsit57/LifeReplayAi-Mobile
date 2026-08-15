@@ -43,6 +43,60 @@ export async function signOut() {
   await supabase.auth.signOut();
 }
 
+/**
+ * Send the recovery email, which carries a six digit code.
+ *
+ * No `redirectTo`. A link would have to come back into the app through the
+ * scheme, which means a deep link to parse, a redirect allow list to keep in
+ * step with it, and a class of failure — the link opening a browser, or the
+ * wrong build, or nothing at all — that is invisible from in here. A code is
+ * read off the screen and typed, so the app never leaves the foreground and
+ * there is one less thing to configure per environment.
+ *
+ * This does need the Recovery template in the Supabase dashboard to contain
+ * `{{ .Token }}`; the stock one only has the link.
+ */
+export async function requestPasswordReset(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+  if (error) {
+    // The status is carried through rather than flattened into a message. A 504
+    // here does not mean the mail failed — it means the auth server ran out of
+    // patience waiting for SMTP, which on a free mail tier happens while the
+    // message is going out anyway. The screen needs to be able to tell that
+    // apart from a real refusal, and it cannot do that from prose.
+    const problem = new Error(error.message);
+    problem.status = error.status;
+    throw problem;
+  }
+}
+
+/**
+ * Trade the code for a session.
+ *
+ * Supabase signs you in on the strength of the code — that is what recovery is —
+ * so once this returns, `updatePassword` has an account to act on.
+ */
+export async function verifyRecoveryCode(email, token) {
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: email.trim(),
+    token: token.trim(),
+    type: 'recovery',
+  });
+  if (error) throw new Error(error.message);
+  return data.session;
+}
+
+/**
+ * Set the password of whoever the current session belongs to.
+ *
+ * The same call whether it is reached from a verified code or from a signed-in
+ * account changing its own password in settings.
+ */
+export async function updatePassword(password) {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw new Error(error.message);
+}
+
 // ---------------------------------------------------------------- family
 
 export async function myFamily() {

@@ -90,7 +90,17 @@ export default function Comments({ replayId, myId }) {
         </Pressable>
       ))}
 
-      {list.length === 0 && !comments.isLoading ? (
+      {/* A thread that could not be fetched is not an empty thread. Saying "be
+          the first" over other people's comments that simply did not arrive is
+          the worst version of this mistake. */}
+      {comments.isError ? (
+        <Pressable style={styles.failed} onPress={() => comments.refetch()}>
+          <Feather name="rotate-cw" size={13} color={colors.danger} />
+          <Text style={styles.failedText}>
+            {comments.isFetching ? 'Trying again…' : 'Could not load comments — tap to retry'}
+          </Text>
+        </Pressable>
+      ) : list.length === 0 && !comments.isLoading ? (
         <Text style={styles.none}>Be the first to say something.</Text>
       ) : null}
 
@@ -137,6 +147,15 @@ const styles = StyleSheet.create({
   ago: { ...type.tiny, color: colors.textMuted },
   body: { ...type.body, color: colors.textSoft },
   none: { ...type.caption, color: colors.textMuted },
+  failed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.dangerSoft,
+  },
+  failedText: { ...type.caption, color: colors.danger, flex: 1 },
 
   composer: {
     flexDirection: 'row',

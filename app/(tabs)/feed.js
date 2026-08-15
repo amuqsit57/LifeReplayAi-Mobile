@@ -11,6 +11,7 @@ import { STYLE_META, colors, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
 import { Wordmark } from '../../src/ui/brand';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
+import ErrorState from '../../src/ui/ErrorState';
 import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
 import PostCard from '../../src/ui/PostCard';
 import Rise from '../../src/ui/Rise';
@@ -173,7 +174,17 @@ export default function FeedScreen() {
         }
         ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
         ListEmptyComponent={
-          posts.isLoading || !warm ? (
+          // Failure first. `isLoading` is false once a query has failed and the
+          // list is empty either way, so without this branch a dead connection
+          // fell through to "No films yet".
+          posts.isError ? (
+            <ErrorState
+              title="Could not load the feed"
+              error={posts.error}
+              onRetry={posts.refetch}
+              retrying={posts.isFetching}
+            />
+          ) : posts.isLoading || !warm ? (
             <FeedSkeleton count={2} />
           ) : query ? (
             <Empty icon="🔍" title="Nothing matches" body={`No films for “${query}”.`} />
