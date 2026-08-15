@@ -23,6 +23,7 @@ import { api } from '../../src/lib/api';
 import { useClipCache } from '../../src/lib/clips';
 import { usePlayerPool } from '../../src/lib/players';
 import {
+  MIN_SECONDS,
   SPEED_RATE,
   addClips,
   applyToAll,
@@ -403,6 +404,9 @@ export default function EditorScreen() {
   // Touching anything mid-playback stops it, rather than fighting the timer.
   const stop = useCallback(() => setPlaying(false), []);
 
+  // A shot needs room for two halves that are each still a shot.
+  const canSplit = !!clip && Number(clip.seconds) >= MIN_SECONDS * 2;
+
   // Whether there is a film yet, and whether it still matches the edit.
   //
   // Saving keeps the document; only rendering makes the film. Without saying so,
@@ -758,10 +762,6 @@ export default function EditorScreen() {
         onResizeEnd={() => {
           resizing.current = false;
         }}
-        onSplit={() => {
-          stop();
-          edit((current) => splitClip(current, selected));
-        }}
         onReorder={(from, to) => {
           const at = Math.max(0, Math.min(clips.length - 1, to));
           if (at === from) return;
@@ -781,6 +781,33 @@ export default function EditorScreen() {
           <Feather name="plus-square" size={16} color={colors.textSoft} />
           <Text style={styles.barText}>Add</Text>
         </Pressable>
+        <Pressable
+          style={styles.barItem}
+          onPress={() => {
+            stop();
+            edit((current) => splitClip(current, selected));
+          }}
+          disabled={!canSplit}
+        >
+          <Feather name="scissors" size={16} color={canSplit ? colors.textSoft : colors.borderStrong} />
+          <Text style={[styles.barText, !canSplit && styles.barOff]}>Split</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.barItem}
+          onPress={() => {
+            stop();
+            edit((current) => removeClip(current, selected));
+            setSelected((index) => Math.max(0, Math.min(index, clips.length - 2)));
+          }}
+          disabled={!clip}
+        >
+          <Feather name="trash-2" size={16} color={clip ? colors.danger : colors.borderStrong} />
+          <Text style={[styles.barText, clip ? { color: colors.danger } : styles.barOff]}>
+            Remove
+          </Text>
+        </Pressable>
+
         <Pressable
           style={styles.barItem}
           onPress={() => {
@@ -978,6 +1005,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   barText: { ...type.label, color: colors.textSoft },
+  barOff: { color: colors.borderStrong },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',

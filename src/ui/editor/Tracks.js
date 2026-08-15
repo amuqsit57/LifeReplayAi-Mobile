@@ -60,7 +60,6 @@ export default function Tracks({
   onTrimHead,
   onResizeEnd,
   onReorder,
-  onSplit,
   onAdd,
   onOpenMusic,
 }) {
@@ -226,10 +225,6 @@ export default function Tracks({
           {clips.length} {clips.length === 1 ? 'shot' : 'shots'} · {stamp(runtime)}
         </Text>
         <View style={styles.tools}>
-          <Pressable onPress={onSplit} hitSlop={8} style={styles.tool}>
-            <Feather name="scissors" size={13} color={colors.textSoft} />
-            <Text style={styles.toolText}>Split</Text>
-          </Pressable>
           <Pressable onPress={onFit} hitSlop={8} style={styles.tool}>
             <Feather name="minimize-2" size={13} color={colors.textSoft} />
             <Text style={styles.toolText}>Fit</Text>
