@@ -288,28 +288,30 @@ export default function EventScreen() {
             </Pressable>
           </View>
 
-          {/* Straddling the bottom edge of the picture, so both read as belonging
-              to this event rather than to whichever tab happens to be open. */}
-          <View style={styles.heroRound}>
-            <Tappable
-              onPress={() => setTab('films')}
-              haptic
-              scaleTo={0.9}
-              style={[styles.round, styles.roundAlt]}
-            >
-              <Feather name="zap" size={20} color={colors.primary} />
-            </Tappable>
+        </View>
 
-            <Tappable
-              onPress={addMemories}
-              disabled={Boolean(progress)}
-              haptic
-              scaleTo={0.9}
-              style={styles.round}
-            >
-              <Feather name={progress ? 'upload-cloud' : 'plus'} size={22} color="#fff" />
-            </Tappable>
-          </View>
+        {/* Outside the hero on purpose. The hero clips, because its corners are
+            rounded, and anything straddling its bottom edge was being cut in
+            half by that same clip. */}
+        <View style={styles.heroRound} pointerEvents="box-none">
+          <Tappable
+            onPress={() => setTab('films')}
+            haptic
+            scaleTo={0.9}
+            style={[styles.round, styles.roundAlt]}
+          >
+            <Feather name="zap" size={20} color={colors.primary} />
+          </Tappable>
+
+          <Tappable
+            onPress={addMemories}
+            disabled={Boolean(progress)}
+            haptic
+            scaleTo={0.9}
+            style={styles.round}
+          >
+            <Feather name={progress ? 'upload-cloud' : 'plus'} size={22} color="#fff" />
+          </Tappable>
         </View>
 
         <View style={styles.heroSpacer} />
@@ -492,8 +494,32 @@ export default function EventScreen() {
                   router.push(edit.status === 'succeeded' ? `/replay/${edit.id}` : `/editor/${edit.id}`)
                 }
               >
-                <View style={styles.editIcon}>
-                  <Feather name="scissors" size={16} color={colors.primary} />
+                <View
+                  style={[
+                    styles.editIcon,
+                    edit.status === 'succeeded' && { backgroundColor: colors.successSoft },
+                    edit.status === 'failed' && { backgroundColor: colors.dangerSoft },
+                  ]}
+                >
+                  <Feather
+                    name={
+                      edit.status === 'succeeded'
+                        ? 'play'
+                        : edit.status === 'failed'
+                          ? 'alert-circle'
+                          : edit.status === 'draft'
+                            ? 'edit-3'
+                            : 'loader'
+                    }
+                    size={16}
+                    color={
+                      edit.status === 'succeeded'
+                        ? colors.success
+                        : edit.status === 'failed'
+                          ? colors.danger
+                          : colors.primary
+                    }
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.editTitle} numberOfLines={1}>
@@ -750,13 +776,15 @@ const styles = StyleSheet.create({
 
   heroActions: { flexDirection: 'row', gap: spacing.sm },
   heroRound: {
-    position: 'absolute',
-    right: spacing.lg,
-    // Exactly half the button's height, so both sit centred on the picture's
-    // bottom edge rather than nearly on it.
-    bottom: -26,
     flexDirection: 'row',
+    justifyContent: 'flex-end',
     gap: spacing.sm,
+    paddingRight: spacing.lg,
+    // Half the button's height, pulled up so both sit centred on the picture's
+    // bottom edge. Negative margin rather than absolute, so nothing clips them.
+    marginTop: -26,
+    marginBottom: -26,
+    zIndex: 2,
   },
   round: {
     width: 52,

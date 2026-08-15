@@ -79,6 +79,7 @@ export default function EditorScreen() {
   const [scoring, setScoring] = useState(false);
   const [naming, setNaming] = useState(false);
   const [tab, setTab] = useState('shot');
+  const [full, setFull] = useState(false);
 
   // Undo is a stack of whole plans. They are small — a hundred shots of nine
   // short fields — and keeping snapshots means every operation is undoable
@@ -721,181 +722,191 @@ export default function EditorScreen() {
         onFirstFrame={noteFrame}
         player={mounted}
         entrance={entrance}
-        height={stageHeight}
+        height={full ? SCREEN_HEIGHT - insets.top - insets.bottom : stageHeight}
         onTogglePlay={() => setPlaying((on) => !on)}
+        full={full}
+        onToggleFull={() => setFull((on) => !on)}
       />
 
-      {/* Drag to give the picture more room, or the panel more room. */}
-      <View style={styles.grip} {...resizer.panHandlers}>
-        <View style={styles.gripBar} />
-      </View>
+      {full ? null : (
+        <>
+          {/* Drag to give the picture more room, or the panel more room. */}
+          <View style={styles.grip} {...resizer.panHandlers}>
+            <View style={styles.gripBar} />
+          </View>
+        </>
+      )}
 
-      <Tracks
-        clips={clips}
-        byId={byId}
-        selected={selected}
-        // The playhead waits with everything else, rather than sliding across a
-        // shot that has not started.
-        playing={playing && !waiting}
-        musicLabel={musicLabel}
-        onSelect={(index) => {
-          stop();
-          setSelected(index);
-        }}
-        // Tapping a join selects the shot it belongs to — the transition lives on
-        // the shot it leaves, which is what tapping a join is asking for.
-        onSelectJoin={(index) => {
-          stop();
-          setSelected(index);
-        }}
-        onResize={resize}
-        onTrimHead={(index, startAt, secs) => {
-          const source = byId[clips[index]?.memory_id];
-          const room = Number(source?.duration_seconds) || Infinity;
-          // Never past the end of the file it was cut from.
-          if (startAt + secs > room) return;
-          edit((current) => updateClip(current, index, { start_at: startAt, seconds: secs }), {
-            snapshot: !resizing.current,
-          });
-          resizing.current = true;
-        }}
-        onResizeEnd={() => {
-          resizing.current = false;
-        }}
-        onReorder={(from, to) => {
-          const at = Math.max(0, Math.min(clips.length - 1, to));
-          if (at === from) return;
-          stop();
-          edit((current) => moveClip(current, from, at));
-          setSelected(at);
-        }}
-        onAdd={() => setAdding(true)}
-        onOpenMusic={() => {
-          stop();
-          setScoring(true);
-        }}
-      />
-
-      <View style={styles.bar}>
-        <Pressable style={styles.barItem} onPress={() => setAdding(true)}>
-          <Feather name="plus-square" size={16} color={colors.textSoft} />
-          <Text style={styles.barText}>Add</Text>
-        </Pressable>
-        <Pressable
-          style={styles.barItem}
-          onPress={() => {
+      {full ? null : (
+        <>
+        <Tracks
+          clips={clips}
+          byId={byId}
+          selected={selected}
+          // The playhead waits with everything else, rather than sliding across a
+          // shot that has not started.
+          playing={playing && !waiting}
+          musicLabel={musicLabel}
+          onSelect={(index) => {
             stop();
-            edit((current) => splitClip(current, selected));
+            setSelected(index);
           }}
-          disabled={!canSplit}
-        >
-          <Feather name="scissors" size={16} color={canSplit ? colors.textSoft : colors.borderStrong} />
-          <Text style={[styles.barText, !canSplit && styles.barOff]}>Split</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.barItem}
-          onPress={() => {
+          // Tapping a join selects the shot it belongs to — the transition lives on
+          // the shot it leaves, which is what tapping a join is asking for.
+          onSelectJoin={(index) => {
             stop();
-            edit((current) => removeClip(current, selected));
-            setSelected((index) => Math.max(0, Math.min(index, clips.length - 2)));
+            setSelected(index);
           }}
-          disabled={!clip}
-        >
-          <Feather name="trash-2" size={16} color={clip ? colors.danger : colors.borderStrong} />
-          <Text style={[styles.barText, clip ? { color: colors.danger } : styles.barOff]}>
-            Remove
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.barItem}
-          onPress={() => {
+          onResize={resize}
+          onTrimHead={(index, startAt, secs) => {
+            const source = byId[clips[index]?.memory_id];
+            const room = Number(source?.duration_seconds) || Infinity;
+            // Never past the end of the file it was cut from.
+            if (startAt + secs > room) return;
+            edit((current) => updateClip(current, index, { start_at: startAt, seconds: secs }), {
+              snapshot: !resizing.current,
+            });
+            resizing.current = true;
+          }}
+          onResizeEnd={() => {
+            resizing.current = false;
+          }}
+          onReorder={(from, to) => {
+            const at = Math.max(0, Math.min(clips.length - 1, to));
+            if (at === from) return;
+            stop();
+            edit((current) => moveClip(current, from, at));
+            setSelected(at);
+          }}
+          onAdd={() => setAdding(true)}
+          onOpenMusic={() => {
             stop();
             setScoring(true);
           }}
-        >
-          <Feather name="music" size={16} color={colors.textSoft} />
-          <Text style={styles.barText}>
-            {plan.music?.mode === 'none'
-              ? 'Silent'
-              : plan.music?.mode === 'track'
-                ? 'My track'
-                : 'Music'}
-          </Text>
-        </Pressable>
-      </View>
-
-      {clip ? (
-        <Inspector
-          clip={clip}
-          memory={memory}
-          index={selected}
-          total={clips.length}
-          onChange={(patch) => edit((p) => updateClip(p, selected, patch))}
-          onMove={(direction) => {
-            const to = selected + direction;
-            edit((p) => moveClip(p, selected, to));
-            setSelected(Math.max(0, Math.min(clips.length - 1, to)));
-          }}
-          onDuplicate={() => edit((p) => duplicateClip(p, selected))}
-          onDelete={() => {
-            edit((p) => removeClip(p, selected));
-            setSelected((index) => Math.max(0, Math.min(index, clips.length - 2)));
-          }}
-          onApplyAll={(patch) => edit((p) => applyToAll(p, patch))}
-          tab={tab}
-          onTab={setTab}
         />
-      ) : (
-        <View style={styles.blank}>
-          <Text style={styles.blankTitle}>Nothing in this edit yet</Text>
-          <Text style={styles.blankBody}>
-            Add photos and video from the event.
-          </Text>
-          <Pressable style={styles.blankAction} onPress={() => setAdding(true)}>
-            <Feather name="plus" size={16} color="#fff" />
-            <Text style={styles.blankActionText}>Add shots</Text>
+
+        <View style={styles.bar}>
+          <Pressable style={styles.barItem} onPress={() => setAdding(true)}>
+            <Feather name="plus-square" size={16} color={colors.textSoft} />
+            <Text style={styles.barText}>Add</Text>
+          </Pressable>
+          <Pressable
+            style={styles.barItem}
+            onPress={() => {
+              stop();
+              edit((current) => splitClip(current, selected));
+            }}
+            disabled={!canSplit}
+          >
+            <Feather name="scissors" size={16} color={canSplit ? colors.textSoft : colors.borderStrong} />
+            <Text style={[styles.barText, !canSplit && styles.barOff]}>Split</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.barItem}
+            onPress={() => {
+              stop();
+              setScoring(true);
+            }}
+          >
+            <Feather name="music" size={16} color={colors.textSoft} />
+            <Text style={styles.barText}>
+              {plan.music?.mode === 'none'
+                ? 'Silent'
+                : plan.music?.mode === 'track'
+                  ? 'My track'
+                  : 'Music'}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.barItem}
+            onPress={() => {
+              stop();
+              edit((current) => removeClip(current, selected));
+              setSelected((index) => Math.max(0, Math.min(index, clips.length - 2)));
+            }}
+            disabled={!clip}
+          >
+            <Feather name="trash-2" size={16} color={clip ? colors.danger : colors.borderStrong} />
+            <Text style={[styles.barText, clip ? { color: colors.danger } : styles.barOff]}>
+              Remove
+            </Text>
           </Pressable>
         </View>
-      )}
 
-      {/* The last thing on the screen, and the only thing that makes a film.
-          As one of three equal pills it read as a peer of Add and Music, and
-          nothing said the edit stays a document until this is pressed. So it
-          gets the width, the bottom edge, and a line saying where the film
-          currently stands. */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
-        <View style={styles.state}>
-          <View style={[styles.dot, { backgroundColor: filmState.tint }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.stateText, { color: filmState.tint }]} numberOfLines={1}>
-              {filmState.label}
+        {clip ? (
+          <Inspector
+            clip={clip}
+            memory={memory}
+            index={selected}
+            total={clips.length}
+            onChange={(patch) => edit((p) => updateClip(p, selected, patch))}
+            onMove={(direction) => {
+              const to = selected + direction;
+              edit((p) => moveClip(p, selected, to));
+              setSelected(Math.max(0, Math.min(clips.length - 1, to)));
+            }}
+            onDuplicate={() => edit((p) => duplicateClip(p, selected))}
+            onDelete={() => {
+              edit((p) => removeClip(p, selected));
+              setSelected((index) => Math.max(0, Math.min(index, clips.length - 2)));
+            }}
+            onApplyAll={(patch) => edit((p) => applyToAll(p, patch))}
+            tab={tab}
+            onTab={setTab}
+          />
+        ) : (
+          <View style={styles.blank}>
+            <Text style={styles.blankTitle}>Nothing in this edit yet</Text>
+            <Text style={styles.blankBody}>
+              Add photos and video from the event.
             </Text>
-            <Text style={styles.stateSub} numberOfLines={1}>
-              {clips.length} {clips.length === 1 ? 'shot' : 'shots'} · {formatSeconds(seconds)}
-            </Text>
+            <Pressable style={styles.blankAction} onPress={() => setAdding(true)}>
+              <Feather name="plus" size={16} color="#fff" />
+              <Text style={styles.blankActionText}>Add shots</Text>
+            </Pressable>
           </View>
-        </View>
+        )}
 
-        <Pressable
-          style={[
-            styles.render,
-            (!clips.length || !!busy || filmState.busy) && styles.renderOff,
-          ]}
-          onPress={() => save({ render: true })}
-          disabled={!clips.length || !!busy || filmState.busy}
-        >
-          {busy === 'render' || filmState.busy ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Feather name="film" size={16} color="#fff" />
-              <Text style={styles.renderText}>{filmState.action}</Text>
-            </>
-          )}
-        </Pressable>
-      </View>
+        {/* The last thing on the screen, and the only thing that makes a film.
+            As one of three equal pills it read as a peer of Add and Music, and
+            nothing said the edit stays a document until this is pressed. So it
+            gets the width, the bottom edge, and a line saying where the film
+            currently stands. */}
+        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
+          <View style={styles.state}>
+            <View style={[styles.dot, { backgroundColor: filmState.tint }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.stateText, { color: filmState.tint }]} numberOfLines={1}>
+                {filmState.label}
+              </Text>
+              <Text style={styles.stateSub} numberOfLines={1}>
+                {clips.length} {clips.length === 1 ? 'shot' : 'shots'} · {formatSeconds(seconds)}
+              </Text>
+            </View>
+          </View>
+
+          <Pressable
+            style={[
+              styles.render,
+              (!clips.length || !!busy || filmState.busy) && styles.renderOff,
+            ]}
+            onPress={() => save({ render: true })}
+            disabled={!clips.length || !!busy || filmState.busy}
+          >
+            {busy === 'render' || filmState.busy ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Feather name="film" size={16} color="#fff" />
+                <Text style={styles.renderText}>{filmState.action}</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+        </>
+      )}
 
       <AddShots
         visible={adding}

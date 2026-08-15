@@ -104,6 +104,8 @@ export default function Stage({
   entrance,
   height,
   onTogglePlay,
+  full,
+  onToggleFull,
 }) {
   // A video shot only takes the player once it has a file to play. Until then it
   // shows its own still — an empty player is a black rectangle, and a black
@@ -295,22 +297,46 @@ export default function Stage({
           Mirrors what the renderer draws — a dimmed band, a short rule, and the
           words in caps with wide tracking — so a caption can be placed by
           looking rather than by rendering and checking. */}
-      {clip?.caption ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.caption,
-            (clip.caption_at ?? 'bottom') === 'top' && { top: 0 },
-            (clip.caption_at ?? 'bottom') === 'middle' && { top: '50%', marginTop: -CAPTION / 2 },
-            (clip.caption_at ?? 'bottom') === 'bottom' && { bottom: 0 },
-          ]}
-        >
-          <Text style={styles.captionRule}>—</Text>
-          <Text style={styles.captionText} numberOfLines={2}>
-            {clip.caption.toUpperCase()}
-          </Text>
-        </View>
-      ) : null}
+      {clip?.caption ? (() => {
+        const set = clip.caption_style ?? 'title';
+        const at = clip.caption_at ?? 'bottom';
+        const anchor =
+          set === 'subtitle' || set === 'card'
+            ? null
+            : at === 'top'
+              ? { top: 0 }
+              : at === 'middle'
+                ? { top: '50%', marginTop: -CAPTION / 2 }
+                : { bottom: 0 };
+
+        return (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.caption,
+              anchor,
+              set === 'plain' && styles.capPlain,
+              set === 'bold' && styles.capBold,
+              set === 'subtitle' && styles.capSubtitle,
+              set === 'card' && styles.capCard,
+            ]}
+          >
+            {set === 'title' ? <Text style={styles.captionRule}>—</Text> : null}
+            <Text
+              style={[
+                styles.captionText,
+                set === 'title' && { letterSpacing: 2.4 },
+                set === 'bold' && styles.capBoldText,
+                set === 'subtitle' && styles.capSubtitleText,
+                set === 'card' && styles.capCardText,
+              ]}
+              numberOfLines={2}
+            >
+              {set === 'title' || set === 'bold' ? clip.caption.toUpperCase() : clip.caption}
+            </Text>
+          </View>
+        );
+      })() : null}
 
       {waiting ? (
         // Held, not stuck. The run-through has paused itself until this clip can
@@ -323,14 +349,14 @@ export default function Stage({
         <>
           {/* Only while paused: it is a way to look closer at a shot, not
               something to reach past a playing picture. */}
-          {isVideo && !playing ? (
+          {!playing ? (
             <Pressable
               style={styles.expand}
               hitSlop={8}
-              onPress={() => view.current?.enterFullscreen?.()}
-              accessibilityLabel="Full screen"
+              onPress={onToggleFull}
+              accessibilityLabel={full ? 'Back to the editor' : 'Full screen'}
             >
-              <Feather name="maximize" size={15} color="#fff" />
+              <Feather name={full ? 'minimize' : 'maximize'} size={15} color="#fff" />
             </Pressable>
           ) : null}
         <Pressable
@@ -394,10 +420,25 @@ const styles = StyleSheet.create({
   },
   // On a picture, so fixed white rather than a theme token.
   captionRule: { color: 'rgba(255,255,255,0.7)', fontSize: 15, lineHeight: 17 },
+  capPlain: { height: 40, backgroundColor: 'rgba(0,0,0,0.28)' },
+  capBold: { backgroundColor: 'transparent' },
+  capBoldText: { ...type.title, fontSize: 26, color: '#fff', letterSpacing: 0 },
+  capSubtitle: { bottom: 8, backgroundColor: 'transparent', height: 'auto' },
+  capSubtitleText: {
+    ...type.caption,
+    color: '#fff',
+    letterSpacing: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  capCard: { ...StyleSheet.absoluteFillObject, height: undefined, backgroundColor: 'rgba(0,0,0,0.55)' },
+  capCardText: { ...type.title, fontSize: 20, color: '#fff', letterSpacing: 0 },
   captionText: {
     ...type.label,
     color: '#fff',
-    letterSpacing: 2.4,
     textAlign: 'center',
     paddingHorizontal: spacing.lg,
     textShadowColor: 'rgba(0,0,0,0.45)',

@@ -8,6 +8,7 @@ import {
   MAX_VIDEO_SECONDS,
   MIN_SECONDS,
   CAPTION_PLACES,
+  CAPTION_STYLES,
   MOTIONS,
   SPEEDS,
   TEXTURES,
@@ -253,6 +254,16 @@ export default function Inspector({
                 returnKeyType="done"
               />
             </Group>
+
+            {clip.caption ? (
+              <Group title="Style">
+                <ChipRow
+                  options={CAPTION_STYLES}
+                  value={clip.caption_style ?? 'title'}
+                  onChange={(caption_style) => onChange({ caption_style })}
+                />
+              </Group>
+            ) : null}
 
             {clip.caption ? (
               <Group

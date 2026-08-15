@@ -121,15 +121,24 @@ export function SwatchRow({ options, value, onChange }) {
  * pushing forty entries onto the undo stack for one gesture.
  */
 export function Slider({ value, min, max, step = 0.1, onChange, onCommit }) {
+  // The handle moves from local state while a finger is down, and the value is
+  // reported once on release. Calling up on every frame re-rendered the stage,
+  // the timeline and every other control for each pixel of a drag, which is what
+  // made this crawl.
+  const [dragging, setDragging] = useState(null);
   const [width, setWidth] = useState(0);
   const box = useRef(0);
   const track = useRef(null);
   // Where the track sits on screen, measured on layout — see the move handler.
   const offset = useRef(0);
   const latest = useRef(value);
-  latest.current = value;
+  // Only while nothing is being dragged. Syncing unconditionally meant each
+  // re-render during a gesture overwrote the value the finger had reached, and
+  // release then committed whatever the prop still said.
+  if (dragging == null) latest.current = value;
 
-  const fraction = max > min ? (value - min) / (max - min) : 0;
+  const shown = dragging ?? value;
+  const fraction = max > min ? (shown - min) / (max - min) : 0;
 
   const positionToValue = (x) => {
     const w = box.current || 1;
@@ -147,15 +156,29 @@ export function Slider({ value, min, max, step = 0.1, onChange, onCommit }) {
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (event) => {
         Haptics.selectionAsync().catch(() => {});
-        onChange(positionToValue(event.nativeEvent.locationX));
+        const at = positionToValue(event.nativeEvent.locationX);
+        latest.current = at;
+        setDragging(at);
       },
       onPanResponderMove: (event, gesture) => {
         // locationX is relative to whichever view the touch is over, which stops
         // being the track as soon as the finger passes the handle. moveX is
         // screen space, so the offset measured on layout is what makes it usable.
-        onChange(positionToValue(gesture.moveX - offset.current));
+        const at = positionToValue(gesture.moveX - offset.current);
+        latest.current = at;
+        setDragging(at);
       },
-      onPanResponderRelease: () => onCommit?.(latest.current),
+      onPanResponderRelease: () => {
+        const at = latest.current;
+        setDragging(null);
+        onChange(at);
+        onCommit?.(at);
+      },
+      onPanResponderTerminate: () => {
+        const at = latest.current;
+        setDragging(null);
+        onChange(at);
+      },
     })
   ).current;
 

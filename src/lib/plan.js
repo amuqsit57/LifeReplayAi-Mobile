@@ -201,6 +201,15 @@ export const TRANSITIONS = TRANSITION_GROUPS.flatMap((group) => group.items);
  * Bottom on almost every shot; the others exist for the ones where the bottom of
  * the frame is the subject.
  */
+/** How the words are set. Five treatments a short film actually uses. */
+export const CAPTION_STYLES = [
+  { value: 'title', label: 'Title', hint: 'Caps, tracked, on a band' },
+  { value: 'plain', label: 'Lower third', hint: 'Small scrim, as written' },
+  { value: 'bold', label: 'Bold', hint: 'Large, straight on the picture' },
+  { value: 'subtitle', label: 'Subtitle', hint: 'Boxed and low' },
+  { value: 'card', label: 'Card', hint: 'Dimmed frame, centred' },
+];
+
 export const CAPTION_PLACES = [
   { value: 'top', label: 'Top' },
   { value: 'middle', label: 'Middle' },
