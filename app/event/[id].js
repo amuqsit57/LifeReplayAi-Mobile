@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -24,7 +25,7 @@ import { createAlbum, eventPeople, getEvent, listAlbums, myProfile } from '../..
 import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
-import { Segmented, Tappable } from '../../src/ui/press';
+import { Segmented } from '../../src/ui/press';
 import FilmCard from '../../src/ui/FilmCard';
 import { GridSkeleton } from '../../src/ui/Skeleton';
 import UploadSheet from '../../src/ui/UploadSheet';
@@ -293,24 +294,37 @@ export default function EventScreen() {
         {/* Outside the hero on purpose. The hero clips, because its corners are
             rounded, and anything straddling its bottom edge was being cut in
             half by that same clip. */}
-        <View style={styles.heroRound}>
-          <Tappable onPress={() => setTab('films')} haptic scaleTo={0.94} style={styles.generate}>
-            <Feather name="zap" size={15} color="#fff" />
-            <Text style={styles.generateText}>Generate</Text>
-          </Tappable>
+        {/* A row, on the same gutter as everything below it.
 
-          <Tappable
+            These were two circles half-overlapping the picture's bottom edge,
+            which looked like an afterthought and — because the rows underneath
+            covered their lower halves — swallowed roughly half the taps aimed at
+            them. Laid out normally, they are aligned and every pixel is live. */}
+        <View style={styles.actions}>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              setTab('films');
+            }}
+            style={({ pressed }) => [styles.action, styles.actionMain, pressed && styles.pressed]}
+          >
+            <Feather name="zap" size={16} color="#fff" />
+            <Text style={styles.actionMainText}>Generate a film</Text>
+          </Pressable>
+
+          <Pressable
             onPress={addMemories}
             disabled={Boolean(progress)}
-            haptic
-            scaleTo={0.9}
-            style={styles.round}
+            style={({ pressed }) => [styles.action, styles.actionAlt, pressed && styles.pressed]}
           >
-            <Feather name={progress ? 'upload-cloud' : 'plus'} size={22} color="#fff" />
-          </Tappable>
+            <Feather
+              name={progress ? 'upload-cloud' : 'plus'}
+              size={16}
+              color={colors.primary}
+            />
+            <Text style={styles.actionAltText}>{progress ? 'Adding' : 'Add'}</Text>
+          </Pressable>
         </View>
-
-        <View style={styles.heroSpacer} />
 
         <View style={styles.gutter}>
           <Segmented
@@ -771,34 +785,33 @@ const styles = StyleSheet.create({
   gutter: { paddingHorizontal: spacing.lg },
 
   heroActions: { flexDirection: 'row', gap: spacing.sm },
-  heroRound: {
+  actions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
     gap: spacing.sm,
-    paddingRight: spacing.lg,
-    // Pulled up so they straddle the picture's bottom edge. Only the top is
-    // negative: a negative bottom margin let the rows below sit *over* the lower
-    // half, and a tap there went to whatever was on top rather than the button —
-    // which is why pressing it appeared to do nothing.
-    marginTop: -26,
-    marginBottom: spacing.sm,
-    zIndex: 5,
-    elevation: 5,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
-  generate: {
+  action: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 7,
     height: 46,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 23,
-    backgroundColor: colors.accent,
-    borderWidth: 3,
-    borderColor: colors.background,
-    ...shadow.raised,
+    borderRadius: radius.md,
   },
-  generateText: { ...type.label, color: '#fff' },
+  // The one that makes something takes the room; the one that adds to it sits
+  // beside, quieter, and only as wide as its own words.
+  actionMain: { flex: 1, backgroundColor: colors.primary, ...shadow.card },
+  actionMainText: { ...type.bodyStrong, color: '#fff' },
+  actionAlt: {
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.primarySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  actionAltText: { ...type.label, color: colors.primary },
+  pressed: { opacity: 0.85 },
   round: {
     width: 52,
     height: 52,
