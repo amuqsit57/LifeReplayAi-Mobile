@@ -240,6 +240,7 @@ export default function Stage({
             <View style={[styles.fill, filter ? { filter } : null]}>
               {memory?.thumbnail_url ? (
                 <Image
+          cachePolicy="memory-disk"
                   source={{ uri: memory.thumbnail_url }}
                   style={styles.fill}
                   contentFit="contain"
@@ -276,6 +277,7 @@ export default function Stage({
 
       {texture?.grain ? (
         <Image
+          cachePolicy="memory-disk"
           source={require('../../../assets/grain.png')}
           style={[styles.fill, { opacity: texture.grain }]}
           contentFit="cover"

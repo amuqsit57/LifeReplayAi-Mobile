@@ -66,6 +66,7 @@ export default function PostCard({ post, media, liked, onToggleLike, onOpen, onO
         <View style={styles.stage}>
           {media?.thumbnail_url ? (
             <Image
+          cachePolicy="memory-disk"
               source={{ uri: media.thumbnail_url }}
               style={styles.poster}
               contentFit="cover"

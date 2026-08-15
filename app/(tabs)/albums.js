@@ -43,6 +43,7 @@ function AlbumTile({ album, cover, onPress }) {
       <View style={styles.coverWrap}>
         {cover ? (
           <Image
+          cachePolicy="memory-disk"
             source={{ uri: cover }}
             style={styles.cover}
             contentFit="cover"
@@ -79,7 +80,8 @@ function FeaturedAlbum({ album, cover, onPress }) {
   return (
     <Tappable onPress={onPress} haptic scaleTo={0.985} style={styles.feature}>
       {cover ? (
-        <Image source={{ uri: cover }} style={styles.featureCover} contentFit="cover" transition={160} />
+        <Image
+          cachePolicy="memory-disk" source={{ uri: cover }} style={styles.featureCover} contentFit="cover" transition={160} />
       ) : (
         <View style={[styles.featureCover, styles.coverEmpty]}>
           <Feather name="folder" size={26} color={colors.textMuted} />
@@ -135,7 +137,7 @@ export default function AlbumsScreen() {
 
   // The covers you can see, fetched before the grid appears.
   const warm = useWarmImages(
-    all.slice(0, 5).map((album) => covers.data?.[album.event_id]).filter(Boolean),
+    all.map((album) => covers.data?.[album.event_id]),
     5
   );
 
@@ -225,9 +227,8 @@ export default function AlbumsScreen() {
               ) : null}
             </View>
           }
-          initialNumToRender={6}
-          windowSize={5}
-          removeClippedSubviews
+          initialNumToRender={8}
+          windowSize={11}
           refreshControl={
             <RefreshControl
               refreshing={albums.isFetching}

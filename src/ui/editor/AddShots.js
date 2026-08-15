@@ -93,14 +93,14 @@ export default function AddShots({ visible, onClose, library, onInsert }) {
           numColumns={COLUMNS}
           columnWrapperStyle={styles.column}
           contentContainerStyle={styles.grid}
-          initialNumToRender={18}
-          windowSize={7}
-          removeClippedSubviews
+          initialNumToRender={24}
+          windowSize={11}
           renderItem={({ item }) => {
             const position = chosen.indexOf(item.id);
             return (
               <Pressable style={styles.tile} onPress={() => toggle(item.id)}>
                 <Image
+          cachePolicy="memory-disk"
                   source={{ uri: item.thumbnail_url }}
                   style={styles.tileImage}
                   contentFit="cover"

@@ -22,6 +22,7 @@ export function Avatar({ url, name, size = 'md' }) {
   if (url) {
     return (
       <Image
+          cachePolicy="memory-disk"
         source={{ uri: url }}
         style={{ width: px, height: px, borderRadius: px / 2, backgroundColor: colors.surfaceAlt }}
         contentFit="cover"
@@ -115,6 +116,7 @@ export function MediaTile({
     >
       {uri ? (
         <Image
+          cachePolicy="memory-disk"
           source={{ uri }}
           style={[styles.tileImage, selected && styles.tileSelected, dimmed && { opacity: 0.4 }]}
           contentFit="cover"

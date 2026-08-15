@@ -511,6 +511,7 @@ function Shot({
       >
         {memory?.thumbnail_url ? (
           <Image
+          cachePolicy="memory-disk"
             source={{ uri: memory.thumbnail_url }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"

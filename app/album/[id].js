@@ -119,7 +119,8 @@ export default function AlbumScreen() {
       >
         <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
           {cover ? (
-            <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={30} />
+            <Image
+          cachePolicy="memory-disk" source={{ uri: cover }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={30} />
           ) : null}
           <View style={[StyleSheet.absoluteFill, styles.veil]} />
 

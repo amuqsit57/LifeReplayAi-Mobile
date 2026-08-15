@@ -45,6 +45,7 @@ function EventCard({ event, cover, onPress }) {
       <View style={styles.coverWrap}>
         {cover ? (
           <Image
+          cachePolicy="memory-disk"
             source={{ uri: cover }}
             style={styles.cover}
             contentFit="cover"
@@ -110,6 +111,7 @@ function EventTile({ event, cover, onPress }) {
       <View style={styles.tileCoverWrap}>
         {cover ? (
           <Image
+          cachePolicy="memory-disk"
             source={{ uri: cover }}
             style={styles.tileCover}
             contentFit="cover"
@@ -159,7 +161,7 @@ export default function EventsScreen() {
 
   // The covers you can see, fetched before the grid appears.
   const warm = useWarmImages(
-    (events.data ?? []).slice(0, 5).map((e) => covers.data?.[e.id]).filter(Boolean),
+    (events.data ?? []).map((e) => covers.data?.[e.id]),
     5
   );
 
@@ -268,10 +270,9 @@ export default function EventsScreen() {
             <Text style={styles.none}>No events match “{query}”.</Text>
           ) : null
         }
-        initialNumToRender={5}
-        maxToRenderPerBatch={5}
-        windowSize={5}
-        removeClippedSubviews
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={11}
         refreshControl={
           <RefreshControl
             refreshing={events.isFetching}

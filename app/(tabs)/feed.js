@@ -66,7 +66,7 @@ export default function FeedScreen() {
 
   // The posters for the first couple of posts, before anything is drawn.
   const warm = useWarmImages(
-    all.slice(0, 2).map((post) => media.data?.[post.id]?.thumbnail_url).filter(Boolean),
+    all.map((post) => media.data?.[post.id]?.thumbnail_url),
     2
   );
 
@@ -177,10 +177,9 @@ export default function FeedScreen() {
             />
           )
         }
-        initialNumToRender={3}
+        initialNumToRender={4}
         maxToRenderPerBatch={4}
-        windowSize={5}
-        removeClippedSubviews
+        windowSize={9}
         refreshControl={
           <RefreshControl
             refreshing={posts.isFetching}

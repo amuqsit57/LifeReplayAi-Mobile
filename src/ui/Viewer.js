@@ -34,6 +34,7 @@ function Page({ memory, active, near }) {
         // The poster carries the page; the player is mounted over it only when
         // this is the page being looked at.
         <Image
+          cachePolicy="memory-disk"
           source={{ uri: memory.thumbnail_url }}
           style={styles.media}
           contentFit="contain"
@@ -41,6 +42,7 @@ function Page({ memory, active, near }) {
         />
       ) : (
         <Image
+          cachePolicy="memory-disk"
           // Full screen is the one place worth paying for the original, but the
           // thumbnail is already cached from the grid — showing it first means
           // something appears instantly and sharpens a moment later.

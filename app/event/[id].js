@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../src/lib/api';
+import { useWarmImages } from '../../src/lib/warm';
 import { createAlbum, eventPeople, getEvent, listAlbums, myProfile } from '../../src/lib/data';
 import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
@@ -124,6 +125,10 @@ export default function EventScreen() {
     () => new Map((people.data ?? []).map((person) => [person.user_id, person])),
     [people.data]
   );
+
+  // The gallery's own thumbnails: wait on the first rows, warm the rest behind
+  // them, so scrolling never starts a download.
+  const warm = useWarmImages(list.map((memory) => memory.thumbnail_url), 12);
 
   const shown = useMemo(() => {
     const option = FILTERS.find((f) => f.value === filter) ?? FILTERS[0];
@@ -239,7 +244,8 @@ export default function EventScreen() {
         <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
           {cover ? (
             <>
-              <Image source={{ uri: cover }} style={styles.heroImage} contentFit="cover" />
+              <Image
+          cachePolicy="memory-disk" source={{ uri: cover }} style={styles.heroImage} contentFit="cover" />
               <LinearGradient
                 colors={colors.heroScrim}
                 style={styles.heroImage}
@@ -322,7 +328,7 @@ export default function EventScreen() {
 
         {/* ---------------------------------------------------------- gallery */}
         {tab === 'gallery' ? (
-          memories.isLoading ? (
+          memories.isLoading || !warm ? (
             <View style={styles.gutter}>
               <GridSkeleton count={9} />
             </View>
