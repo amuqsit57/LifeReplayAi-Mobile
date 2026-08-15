@@ -238,7 +238,7 @@ export default function EventsScreen() {
 
       <FlatList
         contentContainerStyle={styles.content}
-        data={rest}
+        data={warm ? rest : []}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         numColumns={2}
@@ -250,7 +250,7 @@ export default function EventsScreen() {
                 <CreateCard onPress={() => setCreating(true)} />
               </View>
             ) : null}
-            {featured ? (
+            {featured && warm ? (
               <View style={styles.lead}>
                 <EventCard
                   event={featured}

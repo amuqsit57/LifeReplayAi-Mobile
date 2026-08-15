@@ -72,8 +72,6 @@ export default function PostCard({ post, media, liked, onToggleLike, onOpen, onO
               contentFit="cover"
           transition={0}
               recyclingKey={post.id}
-              onLoadStart={() => console.log('[warm] poster load START', post.id.slice(0, 8))}
-              onLoad={() => console.log('[warm] poster load DONE ', post.id.slice(0, 8))}
             />
           ) : (
             <View style={[styles.poster, styles.posterEmpty]}>

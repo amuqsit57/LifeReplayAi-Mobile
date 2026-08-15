@@ -149,7 +149,11 @@ export default function FeedScreen() {
 
       <FlatList
         contentContainerStyle={styles.content}
-        data={list}
+        // Empty until the posters are decoded, so ListEmptyComponent shows the
+        // skeleton. The gate used to sit only on that component, which renders
+        // exclusively when the list *is* empty — so with posts present it never
+        // ran, and the feed drew every card straight into its placeholders.
+        data={warm ? list : []}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListHeaderComponent={
