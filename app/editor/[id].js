@@ -460,17 +460,7 @@ export default function EditorScreen() {
     })
   ).current;
 
-  // Dragging a shot's out point is one continuous gesture, so it takes one undo
-  // snapshot when it starts and none after. Without this a single stretch buries
-  // the history under forty near-identical plans and undo becomes useless.
   const resizing = useRef(false);
-  const resize = useCallback(
-    (index, value) => {
-      edit((p) => updateClip(p, index, { seconds: value }), { snapshot: !resizing.current });
-      resizing.current = true;
-    },
-    [edit]
-  );
 
   // A transition belongs to the join it leaves, so the shot arriving is shaped
   // by the one before it.
@@ -495,6 +485,22 @@ export default function EditorScreen() {
     // The film on file no longer matches what is on screen.
     setChangedSinceRender(true);
   }, []);
+
+  // Dragging a shot's out point is one continuous gesture, so it takes one undo
+  // snapshot when it starts and none after. Without this a single stretch buries
+  // the history under forty near-identical plans and undo becomes useless.
+  //
+  // Declared after `edit`, not before it. A dependency array is evaluated the
+  // moment the hook is called, so naming `edit` above its own `const` read it
+  // inside the temporal dead zone — `Cannot access 'edit' before initialization`,
+  // thrown on the first render, every time the editor was opened.
+  const resize = useCallback(
+    (index, value) => {
+      edit((p) => updateClip(p, index, { seconds: value }), { snapshot: !resizing.current });
+      resizing.current = true;
+    },
+    [edit]
+  );
 
   const undo = () => {
     if (!history.length) return;

@@ -25,6 +25,7 @@ import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
 import { Segmented } from '../../src/ui/press';
+import ErrorState from '../../src/ui/ErrorState';
 import FilmCard from '../../src/ui/FilmCard';
 import Photo from '../../src/ui/Photo';
 import { DetailSkeleton } from '../../src/ui/Skeleton';
@@ -294,6 +295,34 @@ export default function EventScreen() {
   // half-drawn page in miniature. `isFetched` turns true on a failed fetch too,
   // so a query that errors cannot hold the page shut.
   const ready = event.isFetched && memories.isFetched && people.isFetched && warm;
+
+  // Before the ready gate, not after it. `isFetched` turns true on a failed
+  // fetch as well as a successful one, so a dead connection would otherwise sail
+  // through and draw the page with no photographs in it — "Nothing here yet",
+  // about an event that is full.
+  const failed = event.error ?? memories.error ?? null;
+  if (failed) {
+    return (
+      <View style={styles.screen}>
+        <View style={[styles.loadingBar, { top: insets.top + spacing.md }]}>
+          <RoundButton name="chevron-left" label="Back" onPress={() => router.back()} />
+        </View>
+        <View style={styles.centre}>
+          <ErrorState
+            title="Could not open this event"
+            error={failed}
+            onRetry={() => {
+              event.refetch();
+              memories.refetch();
+              people.refetch();
+              albums.refetch();
+            }}
+            retrying={event.isFetching || memories.isFetching}
+          />
+        </View>
+      </View>
+    );
+  }
 
   if (!ready) {
     return (
@@ -903,7 +932,10 @@ export default function EventScreen() {
         onRequestClose={() => setShowingPeople(false)}
       >
         <Pressable style={styles.sheetBack} onPress={() => setShowingPeople(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <Pressable
+            style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}
+            onPress={(e) => e.stopPropagation()}
+          >
             <Text style={styles.sheetTitle}>In this event</Text>
             <Text style={styles.sheetHint}>
               Everyone here can add photos and make films. Counts are what each person contributed.
@@ -957,7 +989,10 @@ export default function EventScreen() {
 
       <Modal visible={albumSheet} transparent animationType="fade" onRequestClose={() => setAlbumSheet(false)}>
         <Pressable style={styles.sheetBack} onPress={() => setAlbumSheet(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <Pressable
+            style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}
+            onPress={(e) => e.stopPropagation()}
+          >
             <Text style={styles.sheetTitle}>Name the album</Text>
             <Text style={styles.sheetHint}>
               {selected.length} {selected.length === 1 ? 'item' : 'items'} go in it. An album can have
@@ -1007,7 +1042,8 @@ const styles = StyleSheet.create({
   heroSpacer: { height: spacing.sm },
   heroImage: { ...StyleSheet.absoluteFillObject },
   // Over the skeleton's hero, on the same gutter as the real one.
-  loadingBar: { position: 'absolute', left: spacing.lg },
+  loadingBar: { position: 'absolute', left: spacing.lg, zIndex: 1 },
+  centre: { flex: 1, justifyContent: 'center' },
   heroBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroText: { gap: spacing.sm },
   title: { ...type.title, color: '#fff' },

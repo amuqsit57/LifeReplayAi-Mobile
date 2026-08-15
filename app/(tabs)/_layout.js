@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../src/store';
 import { colors, type } from '../../src/theme';
@@ -20,6 +21,11 @@ const TABS = [
 export default function TabsLayout() {
   const session = useAuth((s) => s.session);
   const ready = useAuth((s) => s.ready);
+  // Measured, not assumed. The heights were fixed per platform — 84/26 on iOS,
+  // 64/8 everywhere else — which is too tall on an iPad or an iPhone SE and too
+  // short on an Android phone using gesture navigation, where the labels ended
+  // up inside the swipe strip.
+  const insets = useSafeAreaInsets();
 
   if (ready && !session) return <Redirect href="/auth/sign-in" />;
 
@@ -28,7 +34,10 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarStyle: styles.bar,
+        tabBarStyle: [
+          styles.bar,
+          { height: 58 + insets.bottom, paddingBottom: insets.bottom + 6 },
+        ],
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
@@ -62,9 +71,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopColor: colors.border,
     borderTopWidth: StyleSheet.hairlineWidth,
-    height: Platform.OS === 'ios' ? 84 : 64,
     paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 26 : 8,
   },
   item: { alignItems: 'center', gap: 3, width: 72 },
   label: { ...type.tiny, color: colors.textMuted },

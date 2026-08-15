@@ -9,6 +9,7 @@ import { api } from '../../src/lib/api';
 import { supabase } from '../../src/lib/supabase';
 import { useWarmImages } from '../../src/lib/warm';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
+import ErrorState from '../../src/ui/ErrorState';
 import { ScreenHeader, SearchBar } from '../../src/ui/Header';
 import Photo from '../../src/ui/Photo';
 import { Tappable } from '../../src/ui/press';
@@ -177,7 +178,14 @@ export default function AlbumsScreen() {
         />
       </ScreenHeader>
 
-      {albums.isLoading || !warm ? (
+      {albums.isError ? (
+        <ErrorState
+          title="Could not load your albums"
+          error={albums.error}
+          onRetry={albums.refetch}
+          retrying={albums.isFetching}
+        />
+      ) : albums.isLoading || !warm ? (
         <CardsSkeleton pairs={3} />
       ) : (
         <FlatList

@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
 import { Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, radius, shadow, spacing, type } from '../theme';
 
@@ -14,6 +15,7 @@ import { colors, radius, shadow, spacing, type } from '../theme';
  * one of two ways to leave it.
  */
 export default function InviteSheet({ visible, onClose, event }) {
+  const insets = useSafeAreaInsets();
   const [copied, setCopied] = useState(false);
   const code = event?.invite_code ?? '';
 
@@ -26,7 +28,10 @@ export default function InviteSheet({ visible, onClose, event }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
+          onPress={(e) => e.stopPropagation()}
+        >
           <View style={styles.grabber} />
 
           <View style={styles.head}>
@@ -87,7 +92,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     padding: spacing.xl,
-    paddingBottom: spacing.xxl,
     gap: spacing.lg,
     ...shadow.raised,
   },

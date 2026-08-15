@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, radius, shadow, spacing, type } from '../theme';
 
@@ -56,10 +57,17 @@ export function applySort(rows, sort, kind) {
 }
 
 export default function SortSheet({ visible, onClose, options, value, onChange }) {
+  // The last row otherwise sits under the home indicator, where the gesture
+  // area swallows the tap.
+  const insets = useSafeAreaInsets();
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
+          onPress={(e) => e.stopPropagation()}
+        >
           <View style={styles.grabber} />
           <Text style={styles.title}>Sort by</Text>
 
@@ -104,7 +112,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     padding: spacing.xl,
-    paddingBottom: spacing.xxl,
     gap: spacing.xs,
     ...shadow.raised,
   },

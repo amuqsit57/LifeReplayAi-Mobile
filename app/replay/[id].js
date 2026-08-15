@@ -6,27 +6,47 @@ import { useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Share,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../src/lib/api';
 import { myProfile } from '../../src/lib/data';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import Comments from '../../src/ui/Comments';
+import ErrorState from '../../src/ui/ErrorState';
 import FilmCard from '../../src/ui/FilmCard';
 import { RoundButton, ScreenHeader } from '../../src/ui/Header';
 import { Shimmer } from '../../src/ui/Skeleton';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-
 export default function ReplayScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
+  // As big as the film can be while still fitting on the screen.
+  //
+  // The height was `width * 16 / 9` outright, which is exactly right on a tall
+  // phone and taller than the whole display on a short one — on an SE the film
+  // ran past the bottom edge and the shots, runtime and comments underneath
+  // could only be reached by scrolling the picture off screen. Clamping the
+  // height and taking the width back from it keeps the 9:16 exact, so there is
+  // still nothing to letterbox: full bleed wherever it fits, scaled to fit
+  // where it does not.
+  //
+  // Measured from the window rather than the module, so a rotation or a foldable
+  // opening re-lays it out instead of keeping the size the app launched with.
+  const room = windowHeight - insets.top - 104;
+  const playerHeight = Math.min(Math.round((windowWidth * 16) / 9), room);
+  const playerWidth = Math.round((playerHeight * 9) / 16);
 
   const replay = useQuery({
     queryKey: ['replay', id],
@@ -119,8 +139,24 @@ export default function ReplayScreen() {
         }
       />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {ready ? (
+      {/* The comment box is the last thing on this screen, so on a phone the
+          keyboard opened straight over it — you typed into a field you could
+          not see. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {replay.isError ? (
+          <View style={styles.gutter}>
+            <ErrorState
+              title="Could not load this film"
+              error={replay.error}
+              onRetry={replay.refetch}
+              retrying={replay.isFetching}
+            />
+          </View>
+        ) : ready ? (
           // Full bleed, and sized to the film's own shape so `contain` has
           // nothing to letterbox. The bars were the 9:16 film sitting inside a
           // box that was neither its width nor its ratio.
@@ -130,7 +166,7 @@ export default function ReplayScreen() {
           // player is staying bare until it is worth finding out which.
           <VideoView
             player={player}
-            style={styles.player}
+            style={[styles.player, { width: playerWidth, height: playerHeight }]}
             contentFit="contain"
             nativeControls
           />
@@ -149,7 +185,7 @@ export default function ReplayScreen() {
           // its idle state — a "Make Highlights" offer — for the half second
           // before the finished film arrived, which is what was flashing up when
           // you opened a video from the feed.
-          <Shimmer style={styles.playerSkeleton} />
+          <Shimmer style={[styles.playerSkeleton, { width: playerWidth, height: playerHeight }]} />
         ) : (
           // The same card the event page uses, so a film being made looks the
           // same wherever you meet it — with the real stage and progress rather
@@ -185,6 +221,7 @@ export default function ReplayScreen() {
           </View>
         ) : null}
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -210,19 +247,12 @@ const styles = StyleSheet.create({
   eyebrow: { ...type.tiny, color: colors.primary, textTransform: 'uppercase' },
   title: { ...type.title, color: colors.text },
 
-  // The films are rendered 1080x1920, so the height follows the screen width at
-  // that ratio. Measured rather than guessed at, which is why there are no bars.
-  player: {
-    width: SCREEN_WIDTH,
-    height: Math.round((SCREEN_WIDTH * 16) / 9),
-    backgroundColor: '#000',
-  },
+  // The films are rendered 1080x1920 and the box is sized to that ratio exactly,
+  // which is why there are no bars. Width and height come from the component,
+  // where the window is known.
+  player: { alignSelf: 'center', backgroundColor: '#000' },
   // The same footprint as the player, so nothing shifts when the film arrives.
-  playerSkeleton: {
-    width: SCREEN_WIDTH,
-    height: Math.round((SCREEN_WIDTH * 16) / 9),
-    borderRadius: 0,
-  },
+  playerSkeleton: { alignSelf: 'center', borderRadius: 0 },
 
   card: {
     alignItems: 'center',

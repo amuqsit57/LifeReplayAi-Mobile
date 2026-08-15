@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useWarmImages } from '../../lib/warm';
 import { colors, radius, shadow, spacing, type } from '../../theme';
@@ -26,6 +27,10 @@ const COLUMNS = 3;
  * not a tick, so that ordering is visible while it is being made.
  */
 export default function AddShots({ visible, onClose, library, onInsert }) {
+  // The header was held off the top by a fixed 32pt, which is less than the
+  // status bar on any notched phone — so Add shots and the close control sat
+  // under the clock.
+  const insets = useSafeAreaInsets();
   const [chosen, setChosen] = useState([]);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('all');
@@ -60,7 +65,7 @@ export default function AddShots({ visible, onClose, library, onInsert }) {
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.screen}>
+      <View style={[styles.screen, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.head}>
           <Pressable onPress={onClose} hitSlop={10}>
             <Feather name="x" size={22} color={colors.text} />
@@ -151,7 +156,7 @@ export default function AddShots({ visible, onClose, library, onInsert }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.xxl },
+  screen: { flex: 1, backgroundColor: colors.background },
   head: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -14,6 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { createEvent, joinEvent } from '../lib/data';
 import { colors, radius, shadow, spacing, type } from '../theme';
@@ -37,6 +38,7 @@ function Row({ icon, children }) {
 export default function CreateEventSheet({ visible, onClose }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState('create');
   const [title, setTitle] = useState('');
@@ -76,7 +78,7 @@ export default function CreateEventSheet({ visible, onClose }) {
         <Pressable style={{ flex: 1 }} onPress={onClose} />
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.sheet}>
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
             <View style={styles.grabber} />
 
             <View style={styles.tabs}>
@@ -184,7 +186,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.xl,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
     gap: spacing.lg,
     ...shadow.raised,
   },

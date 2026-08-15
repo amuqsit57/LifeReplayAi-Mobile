@@ -97,13 +97,17 @@ export function Field({ label, error, style, ...inputProps }) {
 }
 
 export function Pill({ label, tone = 'neutral', icon }) {
+  // Every tone reads off the palette. Success, warning and danger were still
+  // carrying literal near-black backgrounds from when this was a dark theme —
+  // three ink-coloured chips in the middle of a white app, with the tinted
+  // tokens for exactly this sitting unused beside them.
   const tones = {
     neutral: { bg: colors.surfaceAlt, fg: colors.textMuted },
     primary: { bg: colors.primarySoft, fg: colors.primary },
     accent: { bg: colors.accentSoft, fg: colors.accent },
-    success: { bg: '#183626', fg: colors.success },
-    warning: { bg: '#3A2E15', fg: colors.warning },
-    danger: { bg: '#3A1F1F', fg: colors.danger },
+    success: { bg: colors.successSoft, fg: colors.success },
+    warning: { bg: colors.warningSoft, fg: colors.warning },
+    danger: { bg: colors.dangerSoft, fg: colors.danger },
   };
   const palette = tones[tone] ?? tones.neutral;
 

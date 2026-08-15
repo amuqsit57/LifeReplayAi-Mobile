@@ -11,6 +11,7 @@ import { useWarmImages } from '../../src/lib/warm';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import CreateCard from '../../src/ui/CreateCard';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
+import ErrorState from '../../src/ui/ErrorState';
 import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
 import Photo from '../../src/ui/Photo';
 import { Tappable } from '../../src/ui/press';
@@ -251,7 +252,14 @@ export default function EventsScreen() {
           </View>
         }
         ListEmptyComponent={
-          events.isLoading || !warm ? (
+          events.isError ? (
+            <ErrorState
+              title="Could not load your events"
+              error={events.error}
+              onRetry={events.refetch}
+              retrying={events.isFetching}
+            />
+          ) : events.isLoading || !warm ? (
             <CardsSkeleton pairs={3} />
           ) : query ? (
             <Text style={styles.none}>No events match “{query}”.</Text>
