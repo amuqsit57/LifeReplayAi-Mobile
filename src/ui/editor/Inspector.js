@@ -42,6 +42,7 @@ export default function Inspector({
   onMove,
   onDelete,
   onDuplicate,
+  onSplit,
   onApplyAll,
 }) {
   const [tab, setTab] = useState('shot');
@@ -159,6 +160,12 @@ export default function Inspector({
                   label="Later"
                   disabled={index >= total - 1}
                   onPress={() => onMove(1)}
+                />
+                <Tool
+                  icon="scissors"
+                  label="Split"
+                  disabled={Number(clip.seconds) < 0.8}
+                  onPress={onSplit}
                 />
                 <Tool icon="copy" label="Duplicate" onPress={onDuplicate} />
                 <Tool icon="trash-2" label="Remove" tone="danger" onPress={onDelete} />

@@ -33,6 +33,7 @@ import {
   removeClip,
   setMusic,
   shotMillis,
+  splitClip,
   updateClip,
 } from '../../src/lib/plan';
 import { colors, radius, spacing, type } from '../../src/theme';
@@ -87,6 +88,10 @@ export default function EditorScreen() {
     queryKey: ['editable', id],
     queryFn: () => api.editable(id),
     enabled: !!id,
+    // The film's state is read from this. Without a refetch on return, an edit
+    // that had just been rendered still reported "No film yet" from whatever was
+    // cached when the editor first opened.
+    refetchOnMount: 'always',
   });
 
   useEffect(() => {
@@ -716,6 +721,13 @@ export default function EditorScreen() {
         onResizeEnd={() => {
           resizing.current = false;
         }}
+        onReorder={(from, to) => {
+          const at = Math.max(0, Math.min(clips.length - 1, to));
+          if (at === from) return;
+          stop();
+          edit((current) => moveClip(current, from, at));
+          setSelected(at);
+        }}
         onAdd={() => setAdding(true)}
         onOpenMusic={() => {
           stop();
@@ -759,6 +771,10 @@ export default function EditorScreen() {
             setSelected(Math.max(0, Math.min(clips.length - 1, to)));
           }}
           onDuplicate={() => edit((p) => duplicateClip(p, selected))}
+          onSplit={() => {
+            stop();
+            edit((p) => splitClip(p, selected));
+          }}
           onDelete={() => {
             edit((p) => removeClip(p, selected));
             setSelected((index) => Math.max(0, Math.min(index, clips.length - 2)));

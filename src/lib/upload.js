@@ -61,6 +61,10 @@ function capturedAt(asset) {
 
 const STAGING_DIR = `${FileSystem.cacheDirectory}lifereplay-uploads/`;
 
+// How many files go up at once. Enough to hide the round trip on each one,
+// few enough that a phone's upstream is not split into uselessly thin shares.
+const UPLOAD_LANES = 3;
+
 async function ensureStagingDir() {
   const info = await FileSystem.getInfoAsync(STAGING_DIR);
   if (!info.exists) {
@@ -149,27 +153,49 @@ export async function uploadAll(eventId, assets, onEach) {
   onEach?.({ index: 0, total: assets.length, phase: 'preparing' });
   const staged = await stageAssets(assets);
 
-  const results = [];
-  try {
-    for (const [index, item] of staged.entries()) {
+  const results = new Array(staged.length);
+  let done = 0;
+
+  // Three at a time.
+  //
+  // One at a time meant every file waited out the round trip of the one before
+  // it — a ticket, the bytes, a confirmation — and on a batch of thirty that is
+  // mostly latency rather than transfer. Three keeps the connection busy without
+  // the phone splitting its upstream so many ways that each one crawls.
+  const queue = staged.map((item, index) => ({ item, index }));
+
+  async function worker() {
+    while (queue.length) {
+      const { item, index } = queue.shift();
+
       if (item.error) {
         console.warn(`[upload] ${item.filename} could not be staged: ${item.error}`);
-        results.push({ ok: false, error: item.error, file: item.filename });
+        results[index] = { ok: false, error: item.error, file: item.filename };
+        done += 1;
         continue;
       }
 
       try {
         const memory = await uploadStaged(eventId, item, (phase) =>
-          onEach?.({ index, total: staged.length, phase })
+          onEach?.({ index: done, total: staged.length, phase })
         );
-        results.push({ ok: true, memory });
+        results[index] = { ok: true, memory };
       } catch (error) {
         // One bad file should not abandon the rest of someone's upload, but the
         // reason has to survive — a bare count is impossible to act on.
         console.warn(`[upload] ${item.filename} failed:`, error);
-        results.push({ ok: false, error: error.message, file: item.filename });
+        results[index] = { ok: false, error: error.message, file: item.filename };
       }
+
+      done += 1;
+      onEach?.({ index: done, total: staged.length, phase: 'uploading' });
     }
+  }
+
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(UPLOAD_LANES, staged.length) }, worker)
+    );
   } finally {
     await clearStaging();
   }

@@ -66,6 +66,9 @@ function clock(seconds) {
  */
 export default function FilmCard({ style, replay, onGenerate, onOpen }) {
   const meta = STYLE_META[style] ?? {};
+  // An edit is called what its author called it. Showing the style name made a
+  // custom cut announce itself as "Highlights", which is not what they made.
+  const name = replay?.is_edit ? replay.title || 'My edit' : meta.label;
   const status = replay?.status;
   const busy = status === 'queued' || status === 'running';
   const done = status === 'succeeded';
@@ -88,7 +91,7 @@ export default function FilmCard({ style, replay, onGenerate, onOpen }) {
       <View style={[styles.card, styles.cardBusy]}>
         <View style={styles.row}>
           <ActivityIndicator size="small" color={meta.tint ?? colors.primary} />
-          <Text style={styles.label}>{meta.label}</Text>
+          <Text style={styles.label} numberOfLines={1}>{name}</Text>
           <View style={{ flex: 1 }} />
           <Text style={styles.percent}>
             {progress > 0 ? `${Math.round(progress * 100)}%` : 'starting'}
@@ -129,7 +132,7 @@ export default function FilmCard({ style, replay, onGenerate, onOpen }) {
             <Feather name="play" size={16} color={meta.tint ?? colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.label}>{meta.label}</Text>
+            <Text style={styles.label} numberOfLines={1}>{name}</Text>
             <Text style={styles.sub}>Ready to watch</Text>
           </View>
           <Feather name="chevron-right" size={18} color={colors.textMuted} />
@@ -148,7 +151,7 @@ export default function FilmCard({ style, replay, onGenerate, onOpen }) {
           <Feather name="zap" size={16} color={meta.tint ?? colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.label}>{meta.label}</Text>
+          <Text style={styles.label} numberOfLines={1}>{name}</Text>
           <Text style={styles.sub} numberOfLines={1}>
             {failed ? 'Failed — tap to try again' : meta.blurb ?? 'Tap to make this film'}
           </Text>

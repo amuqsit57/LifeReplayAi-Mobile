@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -19,13 +19,18 @@ import { colors, radius, spacing, type } from '../../theme';
 // A shot is as wide as it is long. The reason to look at a timeline rather than
 // a list is to see the shape of the film — where it lingers, where it hurries.
 const BASE_WIDTH = 30;
+
+// Pixels per second, and the zoom steps around it. A six minute clip at 15px/s is
+// five thousand pixels of lane, so a timeline that only shows two second shots
+// well is not a timeline.
 export const PER_SECOND = 15;
+const ZOOMS = [1.5, 3, 6, 15, 40, 90];
 const LANE = 58;
 const JOIN = 24;
 const GUTTER = 16;
 
-export const widthFor = (seconds) =>
-  BASE_WIDTH + Math.max(0, Number(seconds) || 0) * PER_SECOND;
+export const widthFor = (seconds, scale = PER_SECOND) =>
+  BASE_WIDTH + Math.max(0, Number(seconds) || 0) * scale;
 
 /**
  * The tracks.
@@ -45,11 +50,13 @@ export default function Tracks({
   onSelectJoin,
   onResize,
   onResizeEnd,
+  onReorder,
   onAdd,
   onOpenMusic,
 }) {
   const scroller = useRef(null);
   const head = useRef(new Animated.Value(0)).current;
+  const [zoom, setZoom] = useState(PER_SECOND);
 
   // Where each shot begins, in pixels. Recomputed whenever a length changes so
   // the playhead and the auto-scroll never drift from what is drawn.
@@ -58,12 +65,13 @@ export default function Tracks({
     let x = GUTTER;
     clips.forEach((clip, index) => {
       out.push(x);
-      x += widthFor(clip.seconds) + (index < clips.length - 1 ? JOIN : 0);
+      x += widthFor(clip.seconds, zoom) + (index < clips.length - 1 ? JOIN : 0);
     });
     return out;
-  }, [clips]);
+  }, [clips, zoom]);
 
-  const total = (offsets[clips.length - 1] ?? GUTTER) + widthFor(clips[clips.length - 1]?.seconds);
+  const total =
+    (offsets[clips.length - 1] ?? GUTTER) + widthFor(clips[clips.length - 1]?.seconds, zoom);
 
   // The playhead crosses the selected shot over its own duration, then the next
   // one takes over — the same handoff the stage makes.
@@ -72,7 +80,7 @@ export default function Tracks({
     if (start == null) return undefined;
 
     const clip = clips[selected];
-    const width = widthFor(clip?.seconds);
+    const width = widthFor(clip?.seconds, zoom);
     head.setValue(start);
 
     if (!playing) return undefined;
@@ -88,7 +96,7 @@ export default function Tracks({
     });
     run.start();
     return () => run.stop();
-  }, [playing, selected, clips, offsets, head]);
+  }, [playing, selected, clips, offsets, head, zoom]);
 
   // Follow the playhead, and keep a newly selected shot on screen. Suppressed
   // while scrubbing: the scroll and the finger end up chasing each other.
@@ -140,8 +148,32 @@ export default function Tracks({
     })
   ).current;
 
+  const step = (by) => {
+    const at = ZOOMS.indexOf(zoom);
+    const next = ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (at < 0 ? 3 : at) + by))];
+    if (next !== zoom) {
+      Haptics.selectionAsync().catch(() => {});
+      setZoom(next);
+    }
+  };
+
   return (
     <View style={styles.wrap}>
+      <View style={styles.ruler}>
+        <Text style={styles.rulerText}>
+          {clips.length} {clips.length === 1 ? 'shot' : 'shots'}
+        </Text>
+        <View style={styles.zoom}>
+          <Pressable onPress={() => step(-1)} hitSlop={8} style={styles.zoomBtn}>
+            <Feather name="minus" size={14} color={colors.textSoft} />
+          </Pressable>
+          <Text style={styles.zoomText}>{zoom < 10 ? 'wide' : zoom > 30 ? 'close' : 'fit'}</Text>
+          <Pressable onPress={() => step(1)} hitSlop={8} style={styles.zoomBtn}>
+            <Feather name="plus" size={14} color={colors.textSoft} />
+          </Pressable>
+        </View>
+      </View>
+
       <ScrollView
         ref={scroller}
         horizontal
@@ -170,10 +202,17 @@ export default function Tracks({
                 memory={byId[clip.memory_id]}
                 selected={index === selected}
                 last={index === clips.length - 1}
+                zoom={zoom}
                 onSelect={() => onSelect(index)}
                 onSelectJoin={() => onSelectJoin(index)}
                 onResize={(seconds) => onResize(index, seconds)}
                 onResizeEnd={onResizeEnd}
+                onDrag={(dx) => {
+                  // One step per shot-width dragged, so a long shot does not need
+                  // a longer drag to move one place.
+                  const step = Math.round(dx / (widthFor(clip.seconds, zoom) + JOIN));
+                  if (step) onReorder(index, index + step);
+                }}
               />
             ))}
 
@@ -231,16 +270,57 @@ export default function Tracks({
 }
 
 /** One shot, with a handle on its out point. */
-function Shot({ clip, memory, selected, last, onSelect, onSelectJoin, onResize, onResizeEnd }) {
-  const width = widthFor(clip.seconds);
+function Shot({
+  clip, memory, selected, last, zoom, onSelect, onSelectJoin, onResize, onResizeEnd, onDrag,
+}) {
+  const width = widthFor(clip.seconds, zoom);
 
   // The responder is built once, so anything it reads has to come from a ref.
   // Closing over the props directly meant the second drag measured from the
   // length the shot had on first render — which is why stretching twice snapped
   // back to where the first stretch began.
-  const now = useRef({ seconds: clip.seconds, onResize, onResizeEnd, onSelect });
-  now.current = { seconds: clip.seconds, onResize, onResizeEnd, onSelect };
+  const now = useRef({});
+  now.current = { seconds: clip.seconds, onResize, onResizeEnd, onSelect, onDrag };
   const start = useRef(1);
+
+  // Hold, then slide, to move a shot. A plain drag would fight the lane's own
+  // scrolling; the hold is what says this gesture is about one shot.
+  const held = useRef(false);
+  const holdTimer = useRef(null);
+  const [holding, setHolding] = useState(false);
+
+  const move = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => held.current,
+      onPanResponderTerminationRequest: () => !held.current,
+      onPanResponderGrant: () => {
+        holdTimer.current = setTimeout(() => {
+          held.current = true;
+          setHolding(true);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          now.current.onSelect();
+        }, 260);
+      },
+      onPanResponderMove: (_event, gesture) => {
+        if (!held.current && Math.abs(gesture.dx) > 6) {
+          clearTimeout(holdTimer.current);
+        }
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        clearTimeout(holdTimer.current);
+        if (held.current) now.current.onDrag?.(gesture.dx);
+        else if (Math.abs(gesture.dx) < 6) now.current.onSelect();
+        held.current = false;
+        setHolding(false);
+      },
+      onPanResponderTerminate: () => {
+        clearTimeout(holdTimer.current);
+        held.current = false;
+        setHolding(false);
+      },
+    })
+  ).current;
 
   const drag = useRef(
     PanResponder.create({
@@ -267,7 +347,10 @@ function Shot({ clip, memory, selected, last, onSelect, onSelectJoin, onResize, 
 
   return (
     <View style={styles.unit}>
-      <Pressable onPress={onSelect} style={[styles.shot, { width }, selected && styles.shotOn]}>
+      <View
+        {...move.panHandlers}
+        style={[styles.shot, { width }, selected && styles.shotOn, holding && styles.shotHeld]}
+      >
         {memory?.thumbnail_url ? (
           <Image
             source={{ uri: memory.thumbnail_url }}
@@ -299,7 +382,7 @@ function Shot({ clip, memory, selected, last, onSelect, onSelectJoin, onResize, 
             <View style={styles.handleGrip} />
           </View>
         ) : null}
-      </Pressable>
+      </View>
 
       {!last ? (
         <Pressable
@@ -322,7 +405,28 @@ function Shot({ clip, memory, selected, last, onSelect, onSelectJoin, onResize, 
 }
 
 const styles = StyleSheet.create({
-  wrap: { backgroundColor: colors.surfaceAlt, paddingVertical: spacing.sm },
+  wrap: { backgroundColor: colors.surfaceAlt, paddingBottom: spacing.sm },
+  ruler: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: 6,
+    paddingBottom: 4,
+  },
+  rulerText: { ...type.tiny, fontSize: 10, color: colors.textMuted },
+  zoom: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  zoomBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  zoomText: { ...type.tiny, fontSize: 10, color: colors.textMuted, width: 34, textAlign: 'center' },
   canvas: { paddingHorizontal: GUTTER, paddingRight: 80 },
   lane: { flexDirection: 'row', alignItems: 'center' },
   unit: { flexDirection: 'row', alignItems: 'center' },
@@ -336,6 +440,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   shotOn: { borderColor: colors.primary },
+  shotHeld: { opacity: 0.7, borderColor: colors.accent },
   shotEmpty: { alignItems: 'center', justifyContent: 'center' },
 
   stamp: {
@@ -421,16 +526,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -8,
     bottom: -2,
-    width: 34,
-    marginLeft: -16,
+    width: 46,
+    marginLeft: -22,
     alignItems: 'center',
   },
-  headGrab: { width: 34, height: 22, alignItems: 'center', justifyContent: 'center' },
+  headGrab: { width: 46, height: 28, alignItems: 'center', justifyContent: 'center' },
   headLine: { flex: 1, width: 2, backgroundColor: colors.accent },
   headKnob: {
-    width: 13,
-    height: 13,
-    borderRadius: 7,
+    width: 17,
+    height: 17,
+    borderRadius: 9,
     backgroundColor: colors.accent,
     borderWidth: 2,
     borderColor: '#fff',

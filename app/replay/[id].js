@@ -90,9 +90,11 @@ export default function ReplayScreen() {
         compact
         title={
           <View>
-            <Text style={styles.eyebrow}>{meta.label ?? 'Film'}</Text>
+            <Text style={styles.eyebrow}>
+              {data?.is_edit ? 'Custom edit' : meta.label ?? 'Film'}
+            </Text>
             <Text style={styles.title} numberOfLines={1}>
-              {plan.title ?? 'Your film'}
+              {plan.title ?? (data?.is_edit ? 'My edit' : 'Your film')}
             </Text>
           </View>
         }

@@ -108,6 +108,7 @@ export default function Stage({
   // A video shot only takes the player once it has a file to play. Until then it
   // shows its own still — an empty player is a black rectangle, and a black
   // rectangle is indistinguishable from a broken one.
+  const view = useRef(null);
   const isVideo = memory?.kind === 'video' && !!memory?.url && hasSource;
   const filter = GRADE_FILTER[clip?.grade] ?? null;
 
@@ -209,6 +210,7 @@ export default function Stage({
         // arrives the way its transition says it should.
         <Animated.View style={[styles.videoWrap, isVideo ? entering : null]}>
           <VideoView
+            ref={view}
             player={player}
             style={[{ width: SCREEN_WIDTH, height }, filter ? { filter } : null]}
             contentFit="contain"
@@ -298,6 +300,19 @@ export default function Stage({
           <Text style={styles.waitText}>Skipping</Text>
         </View>
       ) : total ? (
+        <>
+          {/* Only while paused: it is a way to look closer at a shot, not
+              something to reach past a playing picture. */}
+          {isVideo && !playing ? (
+            <Pressable
+              style={styles.expand}
+              hitSlop={8}
+              onPress={() => view.current?.enterFullscreen?.()}
+              accessibilityLabel="Full screen"
+            >
+              <Feather name="maximize" size={15} color="#fff" />
+            </Pressable>
+          ) : null}
         <Pressable
           style={styles.play}
           onPress={onTogglePlay}
@@ -311,6 +326,7 @@ export default function Stage({
             style={playing ? null : { marginLeft: 2 }}
           />
         </Pressable>
+        </>
       ) : null}
 
       {clip ? (
@@ -378,6 +394,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   waitText: { ...type.caption, color: 'rgba(255,255,255,0.8)' },
+  expand: {
+    position: 'absolute',
+    right: spacing.md,
+    top: spacing.md,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(12,9,20,0.6)',
+  },
   play: {
     position: 'absolute',
     alignSelf: 'center',

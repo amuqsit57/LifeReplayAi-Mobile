@@ -236,6 +236,9 @@ export const SPEED_RATE = { normal: 1, slight_slow: 0.8, slow: 0.5, quick: 1.3 }
 
 export const MIN_SECONDS = 0.4;
 export const MAX_SECONDS = 15;
+// A video shot may run its whole length. Truncating a six minute clip to
+// fifteen seconds was deciding for the person who chose to add it.
+export const MAX_VIDEO_SECONDS = 900;
 export const MAX_CLIPS = 150;
 
 const label = (list, value, fallback) =>
@@ -266,9 +269,10 @@ export function clipFor(memory) {
 
   return {
     memory_id: memory.id,
-    // A still needs long enough to read; a clip of video says what it has to say
-    // faster, and four seconds is where an untrimmed shot starts to drag.
-    seconds: isVideo ? Math.min(4, Math.max(MIN_SECONDS, available || 4)) : 2.5,
+    // A video arrives whole and gets trimmed down; a still needs long enough to
+    // read. Starting video at four seconds silently threw away everything past
+    // that, and nobody expects adding a clip to cut it.
+    seconds: isVideo ? Math.max(MIN_SECONDS, Math.min(MAX_VIDEO_SECONDS, available || 4)) : 2.5,
     start_at: 0,
     transition: 'dissolve',
     grade: 'natural',
@@ -341,6 +345,35 @@ export function applyToAll(plan, patch) {
  * track back to the composed score kept the `path`, and the backend, seeing a
  * path, went on using the file.
  */
+/**
+ * Cut one shot into two at `fraction` along it.
+ *
+ * The second half picks up where the first leaves off — for video that means its
+ * in-point moves — so the two together play exactly what the one did. The join
+ * between them is a straight cut, since a dissolve onto itself is a dip.
+ */
+export function splitClip(plan, index, fraction = 0.5) {
+  const clip = plan.clips[index];
+  if (!clip) return plan;
+
+  const total = Number(clip.seconds) || 0;
+  const first = Math.max(MIN_SECONDS, Math.min(total - MIN_SECONDS, total * fraction));
+  if (total < MIN_SECONDS * 2) return plan;
+
+  const head = { ...clip, seconds: Number(first.toFixed(2)), transition: 'cut' };
+  const tail = {
+    ...clip,
+    seconds: Number((total - first).toFixed(2)),
+    start_at: Number(((Number(clip.start_at) || 0) + first).toFixed(2)),
+  };
+  // A caption belongs to the moment it was written on, not to both halves.
+  delete tail.caption;
+
+  const clips = [...plan.clips];
+  clips.splice(index, 1, head, tail);
+  return { ...plan, clips };
+}
+
 export function setMusic(plan, music) {
   return { ...plan, music };
 }
