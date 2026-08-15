@@ -718,6 +718,16 @@ export default function EditorScreen() {
           setSelected(index);
         }}
         onResize={resize}
+        onTrimHead={(index, startAt, secs) => {
+          const source = byId[clips[index]?.memory_id];
+          const room = Number(source?.duration_seconds) || Infinity;
+          // Never past the end of the file it was cut from.
+          if (startAt + secs > room) return;
+          edit((current) => updateClip(current, index, { start_at: startAt, seconds: secs }), {
+            snapshot: !resizing.current,
+          });
+          resizing.current = true;
+        }}
         onResizeEnd={() => {
           resizing.current = false;
         }}

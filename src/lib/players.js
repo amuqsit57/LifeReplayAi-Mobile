@@ -32,7 +32,11 @@ export function usePlayerPool(videos, local, enabled) {
   const [opened, setOpened] = useState(0);
 
   const wanted = videos.slice(0, MAX_PLAYERS);
-  const key = wanted.map((v) => `${v.id}:${local[v.id] ? 'disk' : 'net'}`).join(',');
+  // Sorted for the same reason as the clip cache: which clips, not which order.
+  const key = wanted
+    .map((v) => `${v.id}:${local[v.id] ? 'disk' : 'net'}`)
+    .sort()
+    .join(',');
 
   useEffect(() => {
     if (!enabled) return undefined;

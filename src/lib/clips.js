@@ -74,10 +74,14 @@ export function useClipCache(videos, stills = [], enabled = true) {
 
   // Standing in for the list itself: comparing the array would restart the queue
   // on every render.
-  // Includes the object each clip resolves to, so switching a clip to its
-  // proxy re-runs the queue rather than reporting the original as a hit.
-  const key = videos.map((v) => `${v.id}|${stampFor(v.url)}`).join(',');
-  const stillKey = stills.join(',');
+  // Sorted, so this describes *which* clips are needed and not what order they
+  // sit in. Reordering the timeline used to change the key, restart the queue and
+  // put the preparing screen back over the editor mid-drag.
+  const key = videos
+    .map((v) => `${v.id}|${stampFor(v.url)}`)
+    .sort()
+    .join(',');
+  const stillKey = [...stills].sort().join(',');
 
   const skip = useCallback(() => setSkipped(true), []);
 

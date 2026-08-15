@@ -85,6 +85,45 @@ export default function Inspector({
       >
         {tab === 'shot' ? (
           <>
+            {isVideo ? (
+              <>
+                <Section title="Speed" icon="fast-forward" />
+                <Group title="Speed">
+                  <ChipRow
+                    options={SPEEDS}
+                    value={clip.speed ?? 'normal'}
+                    onChange={(speed) => onChange({ speed })}
+                  />
+                </Group>
+              </>
+            ) : null}
+
+            <Section title="Order" icon="move" />
+            <Group title="Move it">
+              <View style={styles.actions}>
+                <Tool
+                  icon="arrow-left"
+                  label="Earlier"
+                  disabled={index === 0}
+                  onPress={() => onMove(-1)}
+                />
+                <Tool
+                  icon="arrow-right"
+                  label="Later"
+                  disabled={index >= total - 1}
+                  onPress={() => onMove(1)}
+                />
+                <Tool
+                  icon="scissors"
+                  label="Split"
+                  disabled={Number(clip.seconds) < 0.8}
+                  onPress={onSplit}
+                />
+                <Tool icon="copy" label="Duplicate" onPress={onDuplicate} />
+                <Tool icon="trash-2" label="Remove" tone="danger" onPress={onDelete} />
+              </View>
+            </Group>
+
             <Section title="Timing" icon="clock" />
             <Group
               title="How long it holds"
@@ -124,16 +163,6 @@ export default function Inspector({
               </Group>
             ) : null}
 
-            {isVideo ? (
-              <Group title="Speed">
-                <ChipRow
-                  options={SPEEDS}
-                  value={clip.speed ?? 'normal'}
-                  onChange={(speed) => onChange({ speed })}
-                />
-              </Group>
-            ) : null}
-
             <Section
               title="Transition"
               icon="git-commit"
@@ -146,31 +175,6 @@ export default function Inspector({
               </Pressable>
             </Group>
 
-            <Section title="Order" icon="move" />
-            <Group title="Move it">
-              <View style={styles.actions}>
-                <Tool
-                  icon="arrow-left"
-                  label="Earlier"
-                  disabled={index === 0}
-                  onPress={() => onMove(-1)}
-                />
-                <Tool
-                  icon="arrow-right"
-                  label="Later"
-                  disabled={index >= total - 1}
-                  onPress={() => onMove(1)}
-                />
-                <Tool
-                  icon="scissors"
-                  label="Split"
-                  disabled={Number(clip.seconds) < 0.8}
-                  onPress={onSplit}
-                />
-                <Tool icon="copy" label="Duplicate" onPress={onDuplicate} />
-                <Tool icon="trash-2" label="Remove" tone="danger" onPress={onDelete} />
-              </View>
-            </Group>
           </>
         ) : null}
 

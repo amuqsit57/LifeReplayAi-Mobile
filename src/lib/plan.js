@@ -61,9 +61,22 @@ export const GRADE_FILTER = {
   bw: [{ grayscale: 1 }],
 };
 
-/** Textures are grain and light bleed — there is no honest way to draw those
- *  without the noise plate the renderer uses, so the preview says so instead. */
-export const TEXTURE_PREVIEWABLE = false;
+/**
+ * Textures, as the preview can draw them.
+ *
+ * `grain` is a tiled noise plate laid over the picture at low opacity — the same
+ * idea as the renderer's, at a size a phone can composite. `bloom` and `halation`
+ * are light spreading, which is a brightness and contrast lift plus a warm wash.
+ * None of it matches FFmpeg frame for frame; all of it shows the difference
+ * between choosing one and choosing none.
+ */
+export const TEXTURE_PREVIEW = {
+  none: null,
+  grain: { grain: 0.16 },
+  heavy_grain: { grain: 0.3 },
+  bloom: { filter: [{ brightness: 1.08 }, { contrast: 0.94 }], wash: 'rgba(255,255,255,0.06)' },
+  halation: { filter: [{ brightness: 1.05 }, { saturate: 1.1 }], wash: 'rgba(255,138,80,0.10)' },
+};
 
 /** Film grain and light bloom. Sparingly — on every shot it reads as a filter. */
 export const TEXTURES = [

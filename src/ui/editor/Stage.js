@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 
-import { GRADE_FILTER } from '../../lib/plan';
+import { GRADE_FILTER, TEXTURE_PREVIEW } from '../../lib/plan';
 import { colors, spacing, type } from '../../theme';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -110,7 +110,10 @@ export default function Stage({
   // rectangle is indistinguishable from a broken one.
   const view = useRef(null);
   const isVideo = memory?.kind === 'video' && !!memory?.url && hasSource;
-  const filter = GRADE_FILTER[clip?.grade] ?? null;
+  const grade = GRADE_FILTER[clip?.grade] ?? null;
+  const texture = TEXTURE_PREVIEW[clip?.texture] ?? null;
+  // The grade and the texture's own lift, as one chain.
+  const filter = texture?.filter ? [...(grade ?? []), ...texture.filter] : grade;
 
   // The camera move, and the way the shot arrives. Both native-driver friendly.
   const move = useRef(new Animated.Value(0)).current;
@@ -271,6 +274,21 @@ export default function Stage({
         />
       ) : null}
 
+      {texture?.grain ? (
+        <Image
+          source={require('../../../assets/grain.png')}
+          style={[styles.fill, { opacity: texture.grain }]}
+          contentFit="cover"
+          // Tiled rather than stretched: a 128px plate blown up to the screen is
+          // blur, not grain.
+          contentPosition="top left"
+          pointerEvents="none"
+        />
+      ) : null}
+      {texture?.wash ? (
+        <View pointerEvents="none" style={[styles.fill, { backgroundColor: texture.wash }]} />
+      ) : null}
+
       {/* The title, where it will actually land.
           Mirrors what the renderer draws — a dimmed band, a short rule, and the
           words in caps with wide tracking — so a caption can be placed by
@@ -340,7 +358,7 @@ export default function Stage({
               : isVideo
                 ? 'Preview'
                 : clip.texture && clip.texture !== 'none'
-                  ? 'Grain shows in the render'
+                  ? 'Preview'
                   : 'Preview'}
           </Text>
         </View>

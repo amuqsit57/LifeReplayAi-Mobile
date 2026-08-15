@@ -29,6 +29,12 @@ const LANE = 58;
 const JOIN = 24;
 const GUTTER = 16;
 
+/** m:ss, which is how anyone reads a running time. */
+const stamp = (seconds) => {
+  const whole = Math.max(0, Math.round(seconds));
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+};
+
 export const widthFor = (seconds, scale = PER_SECOND) =>
   BASE_WIDTH + Math.max(0, Number(seconds) || 0) * scale;
 
@@ -49,6 +55,7 @@ export default function Tracks({
   onSelect,
   onSelectJoin,
   onResize,
+  onTrimHead,
   onResizeEnd,
   onReorder,
   onAdd,
@@ -72,6 +79,12 @@ export default function Tracks({
 
   const total =
     (offsets[clips.length - 1] ?? GUTTER) + widthFor(clips[clips.length - 1]?.seconds, zoom);
+
+  // The film's own clock, and how often to write a number on it — chosen so the
+  // marks stay about eighty pixels apart at any zoom rather than crowding.
+  const runtime = clips.reduce((sum, c) => sum + (Number(c.seconds) || 0), 0);
+  const tickEvery =
+    [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300].find((n) => n * zoom >= 80) ?? 600;
 
   // The playhead crosses the selected shot over its own duration, then the next
   // one takes over — the same handoff the stage makes.
@@ -148,6 +161,31 @@ export default function Tracks({
     })
   ).current;
 
+  // Pinch to zoom, tracked by hand. Two touches, the distance between them, and
+  // the scale it was at when they landed — which is all a pinch is.
+  const pinch = useRef({ from: 0, at: PER_SECOND });
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
+  const gaps = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: (event) => event.nativeEvent.touches.length === 2,
+      onMoveShouldSetPanResponder: (event) => event.nativeEvent.touches.length === 2,
+      onPanResponderGrant: (event) => {
+        const [a, b] = event.nativeEvent.touches;
+        if (!a || !b) return;
+        pinch.current = { from: Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY), at: zoomRef.current };
+      },
+      onPanResponderMove: (event) => {
+        const [a, b] = event.nativeEvent.touches;
+        if (!a || !b || !pinch.current.from) return;
+        const now = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
+        const next = pinch.current.at * (now / pinch.current.from);
+        setZoom(Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], next)));
+      },
+    })
+  ).current;
+
   const step = (by) => {
     const at = ZOOMS.indexOf(zoom);
     const next = ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (at < 0 ? 3 : at) + by))];
@@ -161,7 +199,7 @@ export default function Tracks({
     <View style={styles.wrap}>
       <View style={styles.ruler}>
         <Text style={styles.rulerText}>
-          {clips.length} {clips.length === 1 ? 'shot' : 'shots'}
+          {clips.length} {clips.length === 1 ? 'shot' : 'shots'} · {stamp(runtime)}
         </Text>
         <View style={styles.zoom}>
           <Pressable onPress={() => step(-1)} hitSlop={8} style={styles.zoomBtn}>
@@ -192,7 +230,20 @@ export default function Tracks({
           });
         }}
       >
-        <View>
+        <View {...gaps.panHandlers}>
+          {/* ------------------------------------------- seconds, honestly */}
+          <View style={[styles.ticks, { width: Math.max(total, 160) }]}>
+            {Array.from({ length: Math.ceil(runtime / tickEvery) + 1 }).map((_, i) => {
+              const at = i * tickEvery;
+              return (
+                <View key={at} style={[styles.tick, { left: GUTTER + at * zoom }]}>
+                  <View style={styles.tickMark} />
+                  <Text style={styles.tickText}>{stamp(at)}</Text>
+                </View>
+              );
+            })}
+          </View>
+
           {/* ------------------------------------------------ the picture */}
           <View style={styles.lane}>
             {clips.map((clip, index) => (
@@ -206,6 +257,7 @@ export default function Tracks({
                 onSelect={() => onSelect(index)}
                 onSelectJoin={() => onSelectJoin(index)}
                 onResize={(seconds) => onResize(index, seconds)}
+                onTrimHead={(startAt, seconds) => onTrimHead(index, startAt, seconds)}
                 onResizeEnd={onResizeEnd}
                 onDrag={(dx) => {
                   // One step per shot-width dragged, so a long shot does not need
@@ -271,7 +323,8 @@ export default function Tracks({
 
 /** One shot, with a handle on its out point. */
 function Shot({
-  clip, memory, selected, last, zoom, onSelect, onSelectJoin, onResize, onResizeEnd, onDrag,
+  clip, memory, selected, last, zoom,
+  onSelect, onSelectJoin, onResize, onResizeEnd, onDrag, onTrimHead,
 }) {
   const width = widthFor(clip.seconds, zoom);
 
@@ -280,8 +333,18 @@ function Shot({
   // length the shot had on first render — which is why stretching twice snapped
   // back to where the first stretch began.
   const now = useRef({});
-  now.current = { seconds: clip.seconds, onResize, onResizeEnd, onSelect, onDrag };
+  now.current = {
+    seconds: clip.seconds,
+    start_at: clip.start_at,
+    zoom,
+    onResize,
+    onResizeEnd,
+    onSelect,
+    onDrag,
+    onTrimHead,
+  };
   const start = useRef(1);
+  const began = useRef(0);
 
   // Hold, then slide, to move a shot. A plain drag would fight the lane's own
   // scrolling; the hold is what says this gesture is about one shot.
@@ -322,6 +385,35 @@ function Shot({
     })
   ).current;
 
+  const canTrimHead = memory?.kind === 'video';
+
+  const head = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) > 2,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        Haptics.selectionAsync().catch(() => {});
+        start.current = Number(now.current.seconds) || 1;
+        began.current = Number(now.current.start_at) || 0;
+        now.current.onSelect();
+      },
+      onPanResponderMove: (_event, gesture) => {
+        const by = gesture.dx / now.current.zoom;
+        // The out-point stays put, so what the head gives up the length loses.
+        const at = Math.max(0, began.current + by);
+        const length = start.current - (at - began.current);
+        if (length < MIN_SECONDS) return;
+        now.current.onTrimHead(
+          Math.round(at * 100) / 100,
+          Math.round(length * 100) / 100
+        );
+      },
+      onPanResponderRelease: () => now.current.onResizeEnd?.(),
+      onPanResponderTerminate: () => now.current.onResizeEnd?.(),
+    })
+  ).current;
+
   const drag = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -335,7 +427,7 @@ function Shot({
         now.current.onSelect();
       },
       onPanResponderMove: (_event, gesture) => {
-        const next = start.current + gesture.dx / PER_SECOND;
+        const next = start.current + gesture.dx / now.current.zoom;
         now.current.onResize(
           Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, Math.round(next * 10) / 10))
         );
@@ -375,12 +467,23 @@ function Shot({
           </View>
         ) : null}
 
-        {/* Drag to hold longer. Only on the selected shot: a handle on every one
-            turns the whole lane into a minefield of accidental trims. */}
+        {/* One handle per edge, on the selected shot only — a handle on every
+            shot turns the lane into a minefield of accidental trims.
+
+            The left one moves the in-point and holds the out-point still, which
+            is what trimming the head of a shot means and the only workable way
+            to trim a six minute clip. The right one changes the length. */}
         {selected ? (
-          <View style={styles.handle} {...drag.panHandlers}>
-            <View style={styles.handleGrip} />
-          </View>
+          <>
+            {canTrimHead ? (
+              <View style={[styles.handle, styles.handleLeft]} {...head.panHandlers}>
+                <View style={styles.handleGrip} />
+              </View>
+            ) : null}
+            <View style={styles.handle} {...drag.panHandlers}>
+              <View style={styles.handleGrip} />
+            </View>
+          </>
         ) : null}
       </View>
 
@@ -415,6 +518,10 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   rulerText: { ...type.tiny, fontSize: 10, color: colors.textMuted },
+  ticks: { height: 18, marginBottom: 2 },
+  tick: { position: 'absolute', alignItems: 'flex-start' },
+  tickMark: { width: 1, height: 5, backgroundColor: colors.borderStrong },
+  tickText: { ...type.tiny, fontSize: 9, color: colors.textMuted, marginTop: 1 },
   zoom: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   zoomBtn: {
     width: 24,
@@ -472,6 +579,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(107,78,230,0.85)',
   },
+  handleLeft: { left: 0, right: undefined },
   handleGrip: {
     width: 3,
     height: 20,
