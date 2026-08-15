@@ -49,7 +49,7 @@ function EventCard({ event, cover, onPress }) {
             source={{ uri: cover }}
             style={styles.cover}
             contentFit="cover"
-            transition={160}
+          transition={0}
             recyclingKey={event.id}
           />
         ) : (
@@ -115,7 +115,7 @@ function EventTile({ event, cover, onPress }) {
             source={{ uri: cover }}
             style={styles.tileCover}
             contentFit="cover"
-            transition={160}
+          transition={0}
             recyclingKey={event.id}
           />
         ) : (

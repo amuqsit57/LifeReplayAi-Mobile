@@ -47,7 +47,7 @@ function AlbumTile({ album, cover, onPress }) {
             source={{ uri: cover }}
             style={styles.cover}
             contentFit="cover"
-            transition={160}
+          transition={0}
             recyclingKey={album.id}
           />
         ) : (

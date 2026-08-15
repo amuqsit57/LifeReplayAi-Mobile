@@ -120,7 +120,7 @@ export function MediaTile({
           source={{ uri }}
           style={[styles.tileImage, selected && styles.tileSelected, dimmed && { opacity: 0.4 }]}
           contentFit="cover"
-          transition={120}
+          transition={0}
         />
       ) : (
         <View style={[styles.tileImage, styles.tileEmpty]}>

@@ -19,6 +19,8 @@ import { useEffect, useRef, useState } from 'react';
  * @param {number} visible how many are on screen at once
  * @param {boolean} settled whether those URLs are final, or still being fetched
  */
+const log = (...parts) => console.log('[warm]', ...parts);
+
 export function useWarmImages(urls, visible = 6, settled = true) {
   const [ready, setReady] = useState(false);
   const clean = urls.filter(Boolean);
@@ -28,11 +30,13 @@ export function useWarmImages(urls, visible = 6, settled = true) {
   useEffect(() => {
     // Still waiting to be told what the pictures are.
     if (!settled) {
+      log('holding: urls not final yet');
       setReady(false);
       return undefined;
     }
 
     if (!clean.length) {
+      log('nothing to warm');
       setReady(true);
       return undefined;
     }
@@ -52,8 +56,12 @@ export function useWarmImages(urls, visible = 6, settled = true) {
       if (!cancelled) setReady(true);
     }, 4000);
 
+    const began = Date.now();
+    log(`prefetching ${first.length} of ${clean.length}`);
+
     Image.prefetch(first, 'memory-disk')
-      .catch(() => {})
+      .then((ok) => log(`prefetch ${ok ? 'hit' : 'FAILED'} in ${Date.now() - began}ms`))
+      .catch((e) => log('prefetch threw:', e?.message))
       .finally(() => {
         if (cancelled) return;
         setReady(true);

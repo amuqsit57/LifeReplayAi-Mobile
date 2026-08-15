@@ -104,7 +104,7 @@ export default function AddShots({ visible, onClose, library, onInsert }) {
                   source={{ uri: item.thumbnail_url }}
                   style={styles.tileImage}
                   contentFit="cover"
-                  transition={120}
+          transition={0}
                   recyclingKey={item.id}
                 />
                 {item.kind === 'video' ? (
