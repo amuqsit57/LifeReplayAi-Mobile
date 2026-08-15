@@ -41,6 +41,7 @@ import AddShots from '../../src/ui/editor/AddShots';
 import AudioPanel from '../../src/ui/editor/AudioPanel';
 import Inspector from '../../src/ui/editor/Inspector';
 import Stage from '../../src/ui/editor/Stage';
+import TrimSheet from '../../src/ui/editor/TrimSheet';
 import Tracks from '../../src/ui/editor/Tracks';
 
 // A third of the screen for the picture. An even split with the panel below left
@@ -78,6 +79,7 @@ export default function EditorScreen() {
   const [scoring, setScoring] = useState(false);
   const [naming, setNaming] = useState(false);
   const [tab, setTab] = useState('shot');
+  const [trimming, setTrimming] = useState(false);
 
   // Undo is a stack of whole plans. They are small — a hundred shots of nine
   // short fields — and keeping snapshots means every operation is undoable
@@ -785,7 +787,7 @@ export default function EditorScreen() {
           style={styles.barItem}
           onPress={() => {
             stop();
-            setTab('shot');
+            setTrimming(true);
           }}
           disabled={!clip}
         >
@@ -919,6 +921,14 @@ export default function EditorScreen() {
           edit((p) => addClips(p, memories, at));
           setSelected(at);
         }}
+      />
+
+      <TrimSheet
+        visible={trimming && !!clip}
+        onClose={() => setTrimming(false)}
+        clip={clip}
+        memory={memory}
+        onChange={(patch) => edit((current) => updateClip(current, selected, patch))}
       />
 
       <AudioPanel
