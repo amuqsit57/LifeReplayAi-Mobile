@@ -384,6 +384,20 @@ export default function EditorScreen() {
   // Touching anything mid-playback stops it, rather than fighting the timer.
   const stop = useCallback(() => setPlaying(false), []);
 
+  // Whether there is a film yet, and whether it still matches the edit.
+  //
+  // Saving keeps the document; only rendering makes the film. Without saying so,
+  // an edit that saves itself looks finished — and the difference only surfaces
+  // when someone goes looking for a video that was never made.
+  const [changedSinceRender, setChangedSinceRender] = useState(false);
+  const rendered = source.data?.replay?.status === 'succeeded';
+
+  const filmState = !rendered
+    ? { label: 'No film yet', action: 'Render film', tint: colors.accent }
+    : changedSinceRender
+      ? { label: 'Film is out of date', action: 'Render again', tint: colors.warning }
+      : { label: 'Film is up to date', action: 'Render again', tint: colors.success };
+
   // ---- how much of the screen the picture gets ----------------------------
   // Judging a grade wants a big picture; arranging forty shots wants the panel.
   // Rather than pick one, it drags.
@@ -443,6 +457,8 @@ export default function EditorScreen() {
       return typeof next === 'function' ? next(current) : next;
     });
     setDirty(true);
+    // The film on file no longer matches what is on screen.
+    setChangedSinceRender(true);
   }, []);
 
   const undo = () => {
@@ -728,20 +744,6 @@ export default function EditorScreen() {
                 : 'Music'}
           </Text>
         </Pressable>
-        <Pressable
-          style={[styles.render, (!clips.length || !!busy) && styles.renderOff]}
-          onPress={() => save({ render: true })}
-          disabled={!clips.length || !!busy}
-        >
-          {busy === 'render' ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Feather name="play" size={15} color="#fff" />
-              <Text style={styles.renderText}>Render</Text>
-            </>
-          )}
-        </Pressable>
       </View>
 
       {clip ? (
@@ -775,6 +777,40 @@ export default function EditorScreen() {
           </Pressable>
         </View>
       )}
+
+      {/* The last thing on the screen, and the only thing that makes a film.
+          As one of three equal pills it read as a peer of Add and Music, and
+          nothing said the edit stays a document until this is pressed. So it
+          gets the width, the bottom edge, and a line saying where the film
+          currently stands. */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
+        <View style={styles.state}>
+          <View style={[styles.dot, { backgroundColor: filmState.tint }]} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.stateText, { color: filmState.tint }]} numberOfLines={1}>
+              {filmState.label}
+            </Text>
+            <Text style={styles.stateSub} numberOfLines={1}>
+              {clips.length} {clips.length === 1 ? 'shot' : 'shots'} · {formatSeconds(seconds)}
+            </Text>
+          </View>
+        </View>
+
+        <Pressable
+          style={[styles.render, (!clips.length || !!busy) && styles.renderOff]}
+          onPress={() => save({ render: true })}
+          disabled={!clips.length || !!busy}
+        >
+          {busy === 'render' ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Feather name="film" size={16} color="#fff" />
+              <Text style={styles.renderText}>{filmState.action}</Text>
+            </>
+          )}
+        </Pressable>
+      </View>
 
       <AddShots
         visible={adding}
@@ -884,18 +920,32 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   barText: { ...type.label, color: colors.textSoft },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  state: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  dot: { width: 7, height: 7, borderRadius: 4 },
+  stateText: { ...type.label },
+  stateSub: { ...type.caption, color: colors.textMuted },
   render: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
+    gap: 7,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: 13,
     borderRadius: radius.pill,
     backgroundColor: colors.primary,
   },
   renderOff: { backgroundColor: colors.borderStrong },
-  renderText: { ...type.label, color: '#fff' },
+  renderText: { ...type.bodyStrong, color: '#fff' },
 
   blank: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.xl },
   blankTitle: { ...type.heading, color: colors.text },
