@@ -77,6 +77,7 @@ export default function EditorScreen() {
   const [adding, setAdding] = useState(false);
   const [scoring, setScoring] = useState(false);
   const [naming, setNaming] = useState(false);
+  const [tab, setTab] = useState('shot');
 
   // Undo is a stack of whole plans. They are small — a hundred shots of nine
   // short fields — and keeping snapshots means every operation is undoable
@@ -92,6 +93,12 @@ export default function EditorScreen() {
     // that had just been rendered still reported "No film yet" from whatever was
     // cached when the editor first opened.
     refetchOnMount: 'always',
+    // And while one is being made, so the footer moves from making to made
+    // without having to leave and come back.
+    refetchInterval: (query) => {
+      const state = query.state.data?.replay?.status;
+      return state === 'queued' || state === 'running' ? 3000 : false;
+    },
   });
 
   useEffect(() => {
@@ -402,13 +409,24 @@ export default function EditorScreen() {
   // an edit that saves itself looks finished — and the difference only surfaces
   // when someone goes looking for a video that was never made.
   const [changedSinceRender, setChangedSinceRender] = useState(false);
-  const rendered = source.data?.replay?.status === 'succeeded';
+  const status = source.data?.replay?.status;
 
-  const filmState = !rendered
-    ? { label: 'No film yet', action: 'Render film', tint: colors.accent }
-    : changedSinceRender
-      ? { label: 'Film is out of date', action: 'Render again', tint: colors.warning }
-      : { label: 'Film is up to date', action: 'Render again', tint: colors.success };
+  // Every state a film can be in, not just "finished or nothing".
+  //
+  // Treating anything short of succeeded as "no film yet" meant a render in
+  // progress reported the same as never having rendered at all — so it looked
+  // like nothing had happened until a later attempt happened to land while the
+  // screen was open.
+  const filmState =
+    status === 'queued' || status === 'running'
+      ? { label: 'Making the film now', action: 'Rendering', tint: colors.primary, busy: true }
+      : status === 'failed'
+        ? { label: 'Last render failed', action: 'Try again', tint: colors.danger }
+        : status !== 'succeeded'
+          ? { label: 'No film yet', action: 'Render film', tint: colors.accent }
+          : changedSinceRender
+            ? { label: 'Film is out of date', action: 'Render again', tint: colors.warning }
+            : { label: 'Film is up to date', action: 'Render again', tint: colors.success };
 
   // ---- how much of the screen the picture gets ----------------------------
   // Judging a grade wants a big picture; arranging forty shots wants the panel.
@@ -490,6 +508,8 @@ export default function EditorScreen() {
       await api.savePlan(id, plan, render);
       setDirty(false);
       if (render) {
+        // The film being made is this edit, so it is no longer behind it.
+        setChangedSinceRender(false);
         // Straight to the film, where the existing progress screen takes over.
         router.replace(`/replay/${id}`);
       }
@@ -765,6 +785,41 @@ export default function EditorScreen() {
           style={styles.barItem}
           onPress={() => {
             stop();
+            setTab('shot');
+          }}
+          disabled={!clip}
+        >
+          <Feather name="crop" size={16} color={clip ? colors.textSoft : colors.borderStrong} />
+          <Text style={[styles.barText, !clip && { color: colors.borderStrong }]}>Trim</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.barItem}
+          onPress={() => {
+            stop();
+            edit((current) => splitClip(current, selected));
+          }}
+          disabled={!clip || Number(clip?.seconds) < 0.8}
+        >
+          <Feather
+            name="scissors"
+            size={16}
+            color={clip && Number(clip.seconds) >= 0.8 ? colors.textSoft : colors.borderStrong}
+          />
+          <Text
+            style={[
+              styles.barText,
+              (!clip || Number(clip?.seconds) < 0.8) && { color: colors.borderStrong },
+            ]}
+          >
+            Split
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.barItem}
+          onPress={() => {
+            stop();
             setScoring(true);
           }}
         >
@@ -801,6 +856,8 @@ export default function EditorScreen() {
             setSelected((index) => Math.max(0, Math.min(index, clips.length - 2)));
           }}
           onApplyAll={(patch) => edit((p) => applyToAll(p, patch))}
+          tab={tab}
+          onTab={setTab}
         />
       ) : (
         <View style={styles.blank}>
@@ -834,11 +891,14 @@ export default function EditorScreen() {
         </View>
 
         <Pressable
-          style={[styles.render, (!clips.length || !!busy) && styles.renderOff]}
+          style={[
+            styles.render,
+            (!clips.length || !!busy || filmState.busy) && styles.renderOff,
+          ]}
           onPress={() => save({ render: true })}
-          disabled={!clips.length || !!busy}
+          disabled={!clips.length || !!busy || filmState.busy}
         >
-          {busy === 'render' ? (
+          {busy === 'render' || filmState.busy ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <>

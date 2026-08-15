@@ -45,8 +45,9 @@ export default function Inspector({
   onDuplicate,
   onSplit,
   onApplyAll,
+  tab,
+  onTab,
 }) {
-  const [tab, setTab] = useState('shot');
   const [picking, setPicking] = useState(false);
 
   const isVideo = memory?.kind === 'video';
@@ -69,7 +70,7 @@ export default function Inspector({
             <Pressable
               key={item.value}
               style={[styles.tab, on && styles.tabOn]}
-              onPress={() => setTab(item.value)}
+              onPress={() => onTab(item.value)}
             >
               <Feather
                 name={item.icon}
