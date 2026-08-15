@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -67,6 +68,8 @@ export default function AlbumScreen() {
   const all = everything.data ?? [];
   const contents = all.filter((m) => inAlbum.has(m.id));
   const available = all.filter((m) => !inAlbum.has(m.id));
+  const generated = (replays.data ?? []).filter((r) => r.album_id === id && !r.is_edit);
+  const albumEdits = (replays.data ?? []).filter((r) => r.album_id === id && r.is_edit);
   const albumReplays = (replays.data ?? []).filter((r) => r.album_id === id);
   const cover = contents.find((m) => m.thumbnail_url)?.thumbnail_url ?? null;
 
@@ -78,6 +81,21 @@ export default function AlbumScreen() {
     12,
     everything.isFetched && memberIds.isFetched
   );
+
+  // A blank edit scoped to this album, so its shots come from here.
+  const startEdit = useMutation({
+    mutationFn: () =>
+      api.draft({
+        event_id: album.data?.event_id,
+        album_id: id,
+        title: `${album.data?.title ?? 'Album'} — my edit`,
+      }),
+    onSuccess: (draft) => {
+      queryClient.invalidateQueries({ queryKey: ['replays', album.data?.event_id] });
+      router.push(`/editor/${draft.id}`);
+    },
+    onError: (error) => Alert.alert('Could not open the editor', error.message),
+  });
 
   const add = useMutation({
     mutationFn: () => addToAlbum(id, staged),
@@ -129,7 +147,7 @@ export default function AlbumScreen() {
         }
       >
         <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
-          {cover ? (
+          {cover && warm ? (
             <Image
           cachePolicy="memory-disk" source={{ uri: cover }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={30} />
           ) : null}
@@ -243,8 +261,10 @@ export default function AlbumScreen() {
                 <Text style={styles.explainText}>Put something in the album first.</Text>
               </View>
             ) : null}
+            <Text style={styles.sectionTitle}>AI generated films</Text>
+
             {Object.keys(STYLE_META).map((style) => {
-              const existing = albumReplays.find((r) => r.style === style);
+              const existing = generated.find((r) => r.style === style);
               return (
                 <FilmCard
                   key={style}
@@ -255,6 +275,51 @@ export default function AlbumScreen() {
                 />
               );
             })}
+
+            <Text style={styles.sectionTitle}>Custom films</Text>
+
+            {albumEdits.map((edit) => (
+              <Pressable
+                key={edit.id}
+                style={styles.editRow}
+                onPress={() =>
+                  router.push(
+                    edit.status === 'succeeded' ? `/replay/${edit.id}` : `/editor/${edit.id}`
+                  )
+                }
+              >
+                <View style={styles.editIcon}>
+                  <Feather
+                    name={edit.status === 'succeeded' ? 'play' : 'edit-3'}
+                    size={16}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.editTitle} numberOfLines={1}>
+                    {edit.title || 'Untitled edit'}
+                  </Text>
+                  <Text style={styles.explainText} numberOfLines={1}>
+                    {edit.shot_count} {edit.shot_count === 1 ? 'shot' : 'shots'} ·{' '}
+                    {edit.status === 'succeeded' ? 'ready' : 'not rendered'}
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.textMuted} />
+              </Pressable>
+            ))}
+
+            <Pressable
+              style={[styles.startEdit, !contents.length && { opacity: 0.5 }]}
+              onPress={() => contents.length && startEdit.mutate()}
+              disabled={!contents.length || startEdit.isPending}
+            >
+              {startEdit.isPending ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Feather name="scissors" size={16} color={colors.primary} />
+              )}
+              <Text style={styles.startEditText}>Cut one yourself</Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>
@@ -359,6 +424,38 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.lg },
 
   films: { gap: spacing.sm, paddingHorizontal: spacing.lg },
+  sectionTitle: { ...type.heading, color: colors.text, paddingTop: spacing.md },
+  editRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  editIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editTitle: { ...type.bodyStrong, color: colors.text },
+  startEdit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.borderStrong,
+  },
+  startEditText: { ...type.label, color: colors.primary },
   explain: {
     flexDirection: 'row',
     gap: spacing.sm,

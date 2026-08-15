@@ -283,7 +283,7 @@ export default function EventScreen() {
             gradient over it — the blurred white wash before this drained the one
             image on the screen of everything that made it worth looking at. */}
         <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
-          {cover ? (
+          {cover && warm ? (
             <>
               <Image
           cachePolicy="memory-disk" source={{ uri: cover }} style={styles.heroImage} contentFit="cover" />
@@ -349,7 +349,20 @@ export default function EventScreen() {
             style={({ pressed }) => [styles.action, styles.actionMain, pressed && styles.pressed]}
           >
             <Feather name="zap" size={15} color="#fff" />
-            <Text style={styles.actionMainText}>Generate film with AI</Text>
+            <Text style={styles.actionMainText}>Generate with AI</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              setTab('films');
+              if (list.length) startEdit.mutate();
+            }}
+            disabled={!list.length || startEdit.isPending}
+            style={({ pressed }) => [styles.action, styles.actionAlt, pressed && styles.pressed]}
+          >
+            <Feather name="scissors" size={15} color={colors.primary} />
+            <Text style={styles.actionAltText}>Custom</Text>
           </Pressable>
 
           <Pressable
@@ -362,7 +375,7 @@ export default function EventScreen() {
               size={15}
               color={colors.primary}
             />
-            <Text style={styles.actionAltText}>{progress ? 'Adding' : 'Add media'}</Text>
+            <Text style={styles.actionAltText}>{progress ? 'Adding' : 'Add'}</Text>
           </Pressable>
         </View>
 
@@ -912,7 +925,7 @@ const styles = StyleSheet.create({
   actionMain: { flex: 1, backgroundColor: colors.primary, ...shadow.card },
   actionMainText: { ...type.label, color: '#fff' },
   actionAlt: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     backgroundColor: colors.primarySoft,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.primary + '2E',
