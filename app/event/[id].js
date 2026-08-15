@@ -308,7 +308,7 @@ export default function EventScreen() {
             }}
             style={({ pressed }) => [styles.action, styles.actionMain, pressed && styles.pressed]}
           >
-            <Feather name="zap" size={16} color="#fff" />
+            <Feather name="zap" size={15} color="#fff" />
             <Text style={styles.actionMainText}>Generate film with AI</Text>
           </Pressable>
 
@@ -319,8 +319,8 @@ export default function EventScreen() {
           >
             <Feather
               name={progress ? 'upload-cloud' : 'plus'}
-              size={16}
-              color={colors.primary}
+              size={15}
+              color={colors.accent}
             />
             <Text style={styles.actionAltText}>{progress ? 'Adding' : 'Add media'}</Text>
           </Pressable>
@@ -797,20 +797,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
-    height: 46,
+    height: 44,
     borderRadius: radius.md,
   },
-  // The one that makes something takes the room; the one that adds to it sits
-  // beside, quieter, and only as wide as its own words.
-  actionMain: { flex: 1, backgroundColor: colors.primary, ...shadow.card },
-  actionMainText: { ...type.bodyStrong, color: '#fff' },
+  // The accent is the mark's orange, and it earns its place by being the only
+  // colour in the row: one thing to press, and everything else quiet around it.
+  actionMain: { flex: 1, backgroundColor: colors.accent, ...shadow.card },
+  actionMainText: { ...type.label, color: '#fff' },
   actionAlt: {
     paddingHorizontal: spacing.lg,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.accentSoft,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderColor: colors.accent + '33',
   },
-  actionAltText: { ...type.label, color: colors.primary },
+  actionAltText: { ...type.label, color: colors.accent },
   pressed: { opacity: 0.85 },
   round: {
     width: 52,
