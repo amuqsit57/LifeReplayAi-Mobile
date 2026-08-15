@@ -26,23 +26,26 @@ export function useWarmImages(urls, visible = 6, settled = true) {
   const clean = urls.filter(Boolean);
   const key = `${settled ? 1 : 0}|${clean.join(',')}`;
   const timer = useRef(null);
+  // Once the page has been shown, it is never taken away again. Re-signing a URL
+  // or fetching one more row changes the key, and blanking back to a skeleton at
+  // that point is the second flash — the content was already correct.
+  const shown = useRef(false);
 
   useEffect(() => {
     // Still waiting to be told what the pictures are.
     if (!settled) {
-      log('holding: urls not final yet');
-      setReady(false);
+      if (!shown.current) setReady(false);
       return undefined;
     }
 
     if (!clean.length) {
-      log('nothing to warm');
+      shown.current = true;
       setReady(true);
       return undefined;
     }
 
     let cancelled = false;
-    setReady(false);
+    if (!shown.current) setReady(false);
 
     const first = clean.slice(0, visible);
     // A few screenfuls ahead, not the whole list. The memory cache is bounded,
@@ -53,7 +56,9 @@ export function useWarmImages(urls, visible = 6, settled = true) {
     // Never a reason to sit on an empty screen: a slow or unreachable image
     // should cost the polish, not the page.
     timer.current = setTimeout(() => {
-      if (!cancelled) setReady(true);
+      if (cancelled) return;
+      shown.current = true;
+      setReady(true);
     }, 4000);
 
     const began = Date.now();
@@ -64,6 +69,7 @@ export function useWarmImages(urls, visible = 6, settled = true) {
       .catch((e) => log('prefetch threw:', e?.message))
       .finally(() => {
         if (cancelled) return;
+        shown.current = true;
         setReady(true);
         // Everything below the fold, warmed while it is being looked at.
         if (rest.length) Image.prefetch(rest, 'memory-disk').catch(() => {});

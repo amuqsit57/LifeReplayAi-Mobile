@@ -71,7 +71,7 @@ export default function FeedScreen() {
   const warm = useWarmImages(
     all.map((post) => media.data?.[post.id]?.thumbnail_url),
     2,
-    !all.length || media.isFetched
+    posts.isFetched && (!all.length || media.isFetched)
   );
 
   const likedSet = useMemo(() => new Set(liked.data ?? []), [liked.data]);

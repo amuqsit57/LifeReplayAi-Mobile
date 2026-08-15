@@ -163,7 +163,7 @@ export default function EventsScreen() {
   const warm = useWarmImages(
     (events.data ?? []).map((e) => covers.data?.[e.id]),
     5,
-    !(events.data ?? []).length || covers.isFetched
+    events.isFetched && (!(events.data ?? []).length || covers.isFetched)
   );
 
   const list = useMemo(() => {

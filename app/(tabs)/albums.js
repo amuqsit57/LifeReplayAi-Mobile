@@ -139,7 +139,7 @@ export default function AlbumsScreen() {
   const warm = useWarmImages(
     all.map((album) => covers.data?.[album.event_id]),
     5,
-    !all.length || covers.isFetched
+    albums.isFetched && (!all.length || covers.isFetched)
   );
 
   const list = useMemo(() => {
