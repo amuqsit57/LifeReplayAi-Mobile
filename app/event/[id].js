@@ -309,7 +309,7 @@ export default function EventScreen() {
             style={({ pressed }) => [styles.action, styles.actionMain, pressed && styles.pressed]}
           >
             <Feather name="zap" size={16} color="#fff" />
-            <Text style={styles.actionMainText}>Generate a film</Text>
+            <Text style={styles.actionMainText}>Generate film with AI</Text>
           </Pressable>
 
           <Pressable
@@ -322,7 +322,7 @@ export default function EventScreen() {
               size={16}
               color={colors.primary}
             />
-            <Text style={styles.actionAltText}>{progress ? 'Adding' : 'Add'}</Text>
+            <Text style={styles.actionAltText}>{progress ? 'Adding' : 'Add media'}</Text>
           </Pressable>
         </View>
 

@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
 
 import { colors, radius, shadow, spacing, type } from '../theme';
@@ -117,14 +117,21 @@ export function Segmented({ options, value, onChange }) {
   const index = Math.max(0, options.findIndex((o) => o.value === value));
   const each = width ? width / options.length : 0;
 
-  const move = (to) => {
+  // The indicator follows `value`, wherever the change came from.
+  //
+  // It used to be moved inside onPress only, so selecting a tab from elsewhere —
+  // the Generate button switching to Films — changed the content and the label
+  // colours while the pill stayed put. A controlled component cannot keep its own
+  // idea of what is selected.
+  useEffect(() => {
+    if (!each) return;
     Animated.spring(slide, {
-      toValue: to,
+      toValue: each * index,
       useNativeDriver: true,
       speed: 20,
       bounciness: 8,
     }).start();
-  };
+  }, [index, each, slide]);
 
   return (
     <View
@@ -144,14 +151,13 @@ export function Segmented({ options, value, onChange }) {
         />
       ) : null}
 
-      {options.map((option, position) => {
+      {options.map((option) => {
         const active = option.value === value;
         return (
           <Pressable
             key={option.value}
             style={styles.segment}
             onPress={() => {
-              move(each * position);
               Haptics.selectionAsync().catch(() => {});
               onChange(option.value);
             }}
