@@ -101,6 +101,39 @@ export function CardsSkeleton({ pairs = 3 }) {
   );
 }
 
+/**
+ * A whole detail page: the header photograph, the row of actions, the tabs, and
+ * the first screenful of tiles.
+ *
+ * The event and album pages used to draw their chrome the moment they opened and
+ * gate only the grid, so the title appeared over an empty hero, the buttons
+ * arrived under it, and the photographs turned up last — one page assembling
+ * itself in three visible steps. The feed never did that: it holds the shape of
+ * the whole thing until the whole thing is ready. This is that shape, for a page
+ * led by a picture rather than a list.
+ *
+ * @param {number} topInset the safe area, since the hero runs under the notch
+ * @param {number} actions how many buttons sit under the hero — three on an
+ *   event, two on an album
+ */
+export function DetailSkeleton({ topInset = 0, heroHeight = 210, actions = 3, tiles = 9 }) {
+  return (
+    <View style={styles.detail}>
+      <Shimmer style={[styles.detailHero, { height: heroHeight + topInset }]} />
+      <View style={styles.detailBody}>
+        <View style={styles.detailActions}>
+          {Array.from({ length: actions }).map((_, index) => (
+            // The first one leads and is wider, the way the real row reads.
+            <Shimmer key={index} style={[styles.detailAction, index === 0 && { flex: 1.7 }]} />
+          ))}
+        </View>
+        <Shimmer style={styles.detailTabs} />
+        <GridSkeleton count={tiles} />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   block: { backgroundColor: colors.surfaceSunk, borderRadius: radius.sm },
 
@@ -136,4 +169,18 @@ const styles = StyleSheet.create({
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   tile: { width: '31.5%', aspectRatio: 1 },
+
+  detail: { flex: 1 },
+  // Square at the top so it runs off the screen edge, rounded at the bottom
+  // where the real hero is.
+  detailHero: {
+    width: '100%',
+    borderRadius: 0,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+  },
+  detailBody: { padding: spacing.lg, gap: spacing.lg },
+  detailActions: { flexDirection: 'row', gap: spacing.sm },
+  detailAction: { flex: 1, height: 44, borderRadius: radius.md },
+  detailTabs: { height: 44, borderRadius: radius.md },
 });

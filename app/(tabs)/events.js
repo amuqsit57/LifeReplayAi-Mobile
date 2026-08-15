@@ -1,6 +1,5 @@
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -13,6 +12,7 @@ import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import CreateCard from '../../src/ui/CreateCard';
 import CreateEventSheet from '../../src/ui/CreateEventSheet';
 import { RoundButton, ScreenHeader, SearchBar } from '../../src/ui/Header';
+import Photo from '../../src/ui/Photo';
 import { Tappable } from '../../src/ui/press';
 import { CardsSkeleton } from '../../src/ui/Skeleton';
 import SortSheet, { SORTS, applySort } from '../../src/ui/SortSheet';
@@ -44,14 +44,7 @@ function EventCard({ event, cover, onPress }) {
     <Tappable onPress={onPress} haptic scaleTo={0.985} style={styles.card}>
       <View style={styles.coverWrap}>
         {cover ? (
-          <Image
-          cachePolicy="memory-disk"
-            source={{ uri: cover }}
-            style={styles.cover}
-            contentFit="cover"
-          transition={0}
-            recyclingKey={event.id}
-          />
+          <Photo uri={cover} style={styles.cover} recyclingKey={event.id} />
         ) : (
           <View style={[styles.cover, styles.coverEmpty]}>
             <Feather name="image" size={22} color={colors.textMuted} />
@@ -110,14 +103,7 @@ function EventTile({ event, cover, onPress }) {
     <Tappable onPress={onPress} haptic scaleTo={0.97} fill style={styles.tile}>
       <View style={styles.tileCoverWrap}>
         {cover ? (
-          <Image
-          cachePolicy="memory-disk"
-            source={{ uri: cover }}
-            style={styles.tileCover}
-            contentFit="cover"
-          transition={0}
-            recyclingKey={event.id}
-          />
+          <Photo uri={cover} style={styles.tileCover} recyclingKey={event.id} />
         ) : (
           <View style={[styles.tileCover, styles.coverEmpty]}>
             <Feather name="image" size={18} color={colors.textMuted} />

@@ -1,6 +1,5 @@
 import { Feather } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
@@ -30,7 +29,8 @@ import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/the
 import { Segmented } from '../../src/ui/press';
 import FilmCard from '../../src/ui/FilmCard';
 import { RoundButton, SearchBar } from '../../src/ui/Header';
-import { GridSkeleton } from '../../src/ui/Skeleton';
+import Photo from '../../src/ui/Photo';
+import { DetailSkeleton } from '../../src/ui/Skeleton';
 import { MediaTile } from '../../src/ui/social';
 import Viewer from '../../src/ui/Viewer';
 
@@ -182,6 +182,27 @@ export default function AlbumScreen() {
     },
   });
 
+  // The whole page at once, the way the feed does it: the cover, the title, the
+  // counts and the first screenful of tiles land together rather than the page
+  // assembling itself around an empty header.
+  //
+  // First visit only — `warm` never returns to false once it has shown, so
+  // pulling to refresh does not blank an album you are already looking at.
+  const ready = album.isFetched && everything.isFetched && memberIds.isFetched && warm;
+
+  if (!ready) {
+    return (
+      <View style={styles.screen}>
+        <DetailSkeleton topInset={insets.top} heroHeight={165} actions={2} />
+        {/* Live, not a shape: leaving is the one thing you should still be able
+            to do while a page is loading. */}
+        <View style={[styles.loadingBar, { top: insets.top + spacing.md }]}>
+          <RoundButton name="chevron-left" label="Back" onPress={() => router.back()} />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <>
       <ScrollView
@@ -200,9 +221,8 @@ export default function AlbumScreen() {
         }
       >
         <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
-          {cover && warm ? (
-            <Image
-          cachePolicy="memory-disk" source={{ uri: cover }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={30} />
+          {cover ? (
+            <Photo uri={cover} style={StyleSheet.absoluteFill} blurRadius={30} />
           ) : null}
           <View style={[StyleSheet.absoluteFill, styles.veil]} />
 
@@ -282,12 +302,11 @@ export default function AlbumScreen() {
           />
         </View>
 
+        {/* No skeleton of its own any more — the page does not draw until the
+            first screenful is decoded, and each tile holds its own shimmer for
+            whatever is below the fold. */}
         {tab === 'contents' ? (
-          !warm ? (
-            <View style={styles.gutter}>
-              <GridSkeleton count={9} />
-            </View>
-          ) : inside.length === 0 ? (
+          inside.length === 0 ? (
             <View style={styles.blank}>
               <View style={styles.blankIcon}>
                 <Feather name="image" size={22} color={colors.primary} />
@@ -536,6 +555,8 @@ const styles = StyleSheet.create({
 
   hero: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.lg },
   veil: { backgroundColor: 'rgba(255,255,255,0.85)' },
+  // Over the skeleton's hero, on the same gutter as the real one.
+  loadingBar: { position: 'absolute', left: spacing.lg },
   heroBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroText: { gap: spacing.xs },
   crumb: { flexDirection: 'row', alignItems: 'center', gap: 5 },

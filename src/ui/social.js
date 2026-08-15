@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, type } from '../theme';
+import Photo from './Photo';
 
 // `xs` is for chips and inline labels, where 28 is already too loud.
 const SIZES = { xs: 18, sm: 28, md: 38, lg: 56 };
@@ -115,12 +116,12 @@ export function MediaTile({
       style={[styles.tile, style]}
     >
       {uri ? (
-        <Image
-          cachePolicy="memory-disk"
-          source={{ uri }}
+        // Shimmers in its own frame until this tile's picture has fully loaded,
+        // so a grid fills in finished tiles rather than grey boxes that become
+        // photographs a moment later.
+        <Photo
+          uri={uri}
           style={[styles.tileImage, selected && styles.tileSelected, dimmed && { opacity: 0.4 }]}
-          contentFit="cover"
-          transition={0}
         />
       ) : (
         <View style={[styles.tileImage, styles.tileEmpty]}>

@@ -1,6 +1,5 @@
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -11,6 +10,7 @@ import { supabase } from '../../src/lib/supabase';
 import { useWarmImages } from '../../src/lib/warm';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import { ScreenHeader, SearchBar } from '../../src/ui/Header';
+import Photo from '../../src/ui/Photo';
 import { Tappable } from '../../src/ui/press';
 import { CardsSkeleton } from '../../src/ui/Skeleton';
 import SortSheet, { SORTS, applySort } from '../../src/ui/SortSheet';
@@ -42,14 +42,7 @@ function AlbumTile({ album, cover, onPress }) {
     <Tappable onPress={onPress} haptic fill style={styles.tile}>
       <View style={styles.coverWrap}>
         {cover ? (
-          <Image
-          cachePolicy="memory-disk"
-            source={{ uri: cover }}
-            style={styles.cover}
-            contentFit="cover"
-          transition={0}
-            recyclingKey={album.id}
-          />
+          <Photo uri={cover} style={styles.cover} recyclingKey={album.id} />
         ) : (
           <View style={[styles.cover, styles.coverEmpty]}>
             <Feather name="folder" size={22} color={colors.textMuted} />
@@ -80,8 +73,7 @@ function FeaturedAlbum({ album, cover, onPress }) {
   return (
     <Tappable onPress={onPress} haptic scaleTo={0.985} style={styles.feature}>
       {cover ? (
-        <Image
-          cachePolicy="memory-disk" source={{ uri: cover }} style={styles.featureCover} contentFit="cover" transition={160} />
+        <Photo uri={cover} style={styles.featureCover} recyclingKey={album.id} />
       ) : (
         <View style={[styles.featureCover, styles.coverEmpty]}>
           <Feather name="folder" size={26} color={colors.textMuted} />

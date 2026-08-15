@@ -1,7 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -27,7 +26,8 @@ import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/the
 import { Empty } from '../../src/ui';
 import { Segmented } from '../../src/ui/press';
 import FilmCard from '../../src/ui/FilmCard';
-import { GridSkeleton } from '../../src/ui/Skeleton';
+import Photo from '../../src/ui/Photo';
+import { DetailSkeleton } from '../../src/ui/Skeleton';
 import UploadSheet from '../../src/ui/UploadSheet';
 import { RoundButton, SearchBar } from '../../src/ui/Header';
 import InviteSheet from '../../src/ui/InviteSheet';
@@ -283,6 +283,31 @@ export default function EventScreen() {
   const info = event.data;
   const cover = list.find((m) => m.thumbnail_url)?.thumbnail_url ?? null;
 
+  // The whole page arrives at once or not at all, the way the feed does. Drawing
+  // the hero and the buttons first and gating only the grid meant the page put
+  // itself together in three visible steps, over an empty header.
+  //
+  // Only the first visit: `warm` never goes back to false once it has shown, so
+  // pulling to refresh does not blank the page you are already reading.
+  // `people` is in here because the hero states a count: without it the header
+  // reads "0 people" for a beat and then corrects itself, which is the same
+  // half-drawn page in miniature. `isFetched` turns true on a failed fetch too,
+  // so a query that errors cannot hold the page shut.
+  const ready = event.isFetched && memories.isFetched && people.isFetched && warm;
+
+  if (!ready) {
+    return (
+      <View style={styles.screen}>
+        <DetailSkeleton topInset={insets.top} heroHeight={215} actions={3} />
+        {/* Live, not a shape: leaving is the one thing you should still be able
+            to do while a page is loading. */}
+        <View style={[styles.loadingBar, { top: insets.top + spacing.md }]}>
+          <RoundButton name="chevron-left" label="Back" onPress={() => router.back()} />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <>
       <ScrollView
@@ -305,10 +330,9 @@ export default function EventScreen() {
             gradient over it — the blurred white wash before this drained the one
             image on the screen of everything that made it worth looking at. */}
         <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
-          {cover && warm ? (
+          {cover ? (
             <>
-              <Image
-          cachePolicy="memory-disk" source={{ uri: cover }} style={styles.heroImage} contentFit="cover" />
+              <Photo uri={cover} style={styles.heroImage} />
               <LinearGradient
                 colors={colors.heroScrim}
                 style={styles.heroImage}
@@ -414,12 +438,11 @@ export default function EventScreen() {
         </View>
 
         {/* ---------------------------------------------------------- gallery */}
+        {/* No skeleton of its own any more — by the time the page is drawn the
+            first screenful of tiles is already decoded, and each tile holds its
+            own shimmer for whatever is below the fold. */}
         {tab === 'gallery' ? (
-          memories.isLoading || !warm ? (
-            <View style={styles.gutter}>
-              <GridSkeleton count={9} />
-            </View>
-          ) : list.length === 0 ? (
+          list.length === 0 ? (
             <Empty icon="📸" title="Nothing here yet" body="Add photos and videos — no need to sort them first." />
           ) : (
             <>
@@ -983,6 +1006,8 @@ const styles = StyleSheet.create({
   // it never collides with the tabs beneath.
   heroSpacer: { height: spacing.sm },
   heroImage: { ...StyleSheet.absoluteFillObject },
+  // Over the skeleton's hero, on the same gutter as the real one.
+  loadingBar: { position: 'absolute', left: spacing.lg },
   heroBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroText: { gap: spacing.sm },
   title: { ...type.title, color: '#fff' },
