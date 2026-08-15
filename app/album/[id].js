@@ -328,7 +328,7 @@ export default function AlbumScreen() {
                         >
                           <Feather
                             name={option.icon}
-                            size={12}
+                            size={11}
                             color={on ? '#fff' : colors.textSoft}
                           />
                           <Text style={[styles.chipText, on && styles.chipTextOn]}>
@@ -352,7 +352,7 @@ export default function AlbumScreen() {
                         >
                           <Feather
                             name={option.icon}
-                            size={12}
+                            size={11}
                             color={on ? '#fff' : colors.textSoft}
                           />
                           <Text style={[styles.chipText, on && styles.chipTextOn]}>
@@ -606,14 +606,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: spacing.md,
-    paddingVertical: 7,
+    paddingVertical: 6,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceAlt,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
   chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { ...type.label, color: colors.textSoft },
+  chipText: { ...type.label, fontSize: 11.5, lineHeight: 15, color: colors.textSoft },
   chipTextOn: { color: '#fff' },
 
   films: { gap: spacing.sm, paddingHorizontal: spacing.lg },

@@ -434,7 +434,7 @@ export default function EventScreen() {
                       >
                         <Feather
                           name={option.icon}
-                          size={12}
+                          size={11}
                           color={on ? '#fff' : colors.textSoft}
                         />
                         <Text style={[styles.filterText, on && styles.filterTextOn]}>
@@ -506,7 +506,7 @@ export default function EventScreen() {
                       >
                         <Feather
                           name={option.icon}
-                          size={12}
+                          size={11}
                           color={active ? '#fff' : colors.textSoft}
                         />
                         <Text style={[styles.filterText, active && styles.filterTextOn]}>
@@ -961,16 +961,16 @@ const styles = StyleSheet.create({
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     paddingHorizontal: spacing.md,
-    paddingVertical: 7,
+    paddingVertical: 6,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceAlt,
   },
   filterChipOn: { backgroundColor: colors.primary },
-  filterText: { ...type.label, color: colors.textSoft },
+  filterText: { ...type.label, fontSize: 11.5, lineHeight: 15, color: colors.textSoft },
   filterTextOn: { color: '#fff' },
-  filterCount: { ...type.tiny, color: colors.textMuted },
+  filterCount: { ...type.tiny, fontSize: 9.5, color: colors.textMuted },
 
   hint: { ...type.caption, color: colors.textMuted, paddingHorizontal: spacing.lg },
   grid: {
