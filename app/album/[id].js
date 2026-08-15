@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../src/lib/api';
+import { useWarmImages } from '../../src/lib/warm';
 import {
   addToAlbum,
   albumMemoryIds,
@@ -27,6 +28,7 @@ import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/the
 import { Segmented } from '../../src/ui/press';
 import FilmCard from '../../src/ui/FilmCard';
 import { RoundButton } from '../../src/ui/Header';
+import { GridSkeleton } from '../../src/ui/Skeleton';
 import { MediaTile } from '../../src/ui/social';
 import Viewer from '../../src/ui/Viewer';
 
@@ -67,6 +69,15 @@ export default function AlbumScreen() {
   const available = all.filter((m) => !inAlbum.has(m.id));
   const albumReplays = (replays.data ?? []).filter((r) => r.album_id === id);
   const cover = contents.find((m) => m.thumbnail_url)?.thumbnail_url ?? null;
+
+  // The tiles you can see, decoded before the grid is drawn; the rest warm behind
+  // them. Not settled until the memories have actually arrived — an empty list
+  // before then means "not yet", not "nothing to load".
+  const warm = useWarmImages(
+    contents.map((m) => m.thumbnail_url ?? m.url),
+    12,
+    everything.isFetched && memberIds.isFetched
+  );
 
   const add = useMutation({
     mutationFn: () => addToAlbum(id, staged),
@@ -182,14 +193,18 @@ export default function AlbumScreen() {
         </View>
 
         {tab === 'contents' ? (
-          contents.length === 0 ? (
+          !warm ? (
+            <View style={styles.gutter}>
+              <GridSkeleton count={9} />
+            </View>
+          ) : contents.length === 0 ? (
             <View style={styles.blank}>
               <View style={styles.blankIcon}>
                 <Feather name="image" size={22} color={colors.primary} />
               </View>
               <Text style={styles.blankTitle}>Nothing in here yet</Text>
               <Text style={styles.blankBody}>
-                Add photos and videos from the event above, then make a film from just these.
+                Add photos and videos from the event above, then generate a film from just these.
               </Text>
             </View>
           ) : (

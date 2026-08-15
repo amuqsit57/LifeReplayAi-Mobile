@@ -300,7 +300,7 @@ export default function EventScreen() {
             scaleTo={0.9}
             style={[styles.round, styles.roundAlt]}
           >
-            <Feather name="zap" size={20} color={colors.primary} />
+            <Feather name="zap" size={20} color="#fff" />
           </Tappable>
 
           <Tappable
@@ -797,6 +797,10 @@ const styles = StyleSheet.create({
     borderColor: colors.background,
     ...shadow.raised,
   },
+  // The two are told apart by colour. `roundAlt` went missing in an earlier
+  // edit, so generate fell back to the same purple as add — with a purple icon
+  // on it, which is why the icon was not there.
+  roundAlt: { backgroundColor: colors.accent },
 
   filterRow: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: 2 },
   filterChip: {

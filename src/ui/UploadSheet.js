@@ -58,7 +58,7 @@ export default function UploadSheet({ progress, done, onClose, onGenerate }) {
 
               <Pressable style={styles.cta} onPress={onGenerate}>
                 <Feather name="zap" size={17} color="#fff" />
-                <Text style={styles.ctaText}>Make a film from these</Text>
+                <Text style={styles.ctaText}>Generate a film from these</Text>
               </Pressable>
               <Pressable style={styles.ghost} onPress={onClose}>
                 <Text style={styles.ghostText}>Not now</Text>

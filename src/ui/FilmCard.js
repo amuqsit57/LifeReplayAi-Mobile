@@ -160,7 +160,7 @@ export default function FilmCard({ style, replay, onGenerate, onOpen }) {
           </Text>
         </View>
         <View style={[styles.makeChip, { backgroundColor: meta.tint ?? colors.primary }]}>
-          <Text style={styles.makeChipText}>Make</Text>
+          <Text style={styles.makeChipText}>Generate</Text>
         </View>
       </View>
     </Pressable>
