@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import {
   GRADES,
   MAX_SECONDS,
+  MAX_VIDEO_SECONDS,
   MIN_SECONDS,
   CAPTION_PLACES,
   MOTIONS,
@@ -50,9 +51,13 @@ export default function Inspector({
 
   const isVideo = memory?.kind === 'video';
   const available = Number(memory?.duration_seconds) || 0;
-  // A shot can never run past the end of what it was cut from.
-  const ceiling = isVideo && available
-    ? Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, available - (clip.start_at || 0)))
+  // A shot can never run past the end of what it was cut from. The fifteen
+  // second ceiling is for stills; applying it to video here was silently cutting
+  // a six minute clip back to fifteen the moment its slider was touched.
+  const ceiling = isVideo
+    ? available
+      ? Math.max(MIN_SECONDS, Math.min(MAX_VIDEO_SECONDS, available - (clip.start_at || 0)))
+      : MAX_VIDEO_SECONDS
     : MAX_SECONDS;
 
   return (

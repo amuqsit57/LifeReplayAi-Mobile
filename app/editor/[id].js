@@ -205,20 +205,27 @@ export default function EditorScreen() {
   // its surface away, and the next video would have to build one again inside
   // its own two seconds — which is exactly why the first pass showed a still and
   // the second showed the picture.
-  const [held, setHeld] = useState(null);
+  //
+  // An id rather than the player itself. Holding the object meant keeping a
+  // reference the pool had already released on unmount, and handing a released
+  // player to the view throws "cannot use shared object that was already
+  // released". Resolving through the pool each render cannot go stale.
+  const [heldId, setHeldId] = useState(null);
   useEffect(() => {
-    if (player) setHeld(player);
-  }, [player]);
+    if (player && memory?.id) setHeldId(memory.id);
+  }, [player, memory?.id]);
 
   // Seeded the moment the pool opens, so the view is mounted and its surface up
   // from the first frame of the editor — not from the first video shot reached.
   // An edit that opens on a photograph would otherwise still pay for the mount
   // when it got to one.
   useEffect(() => {
-    if (!players.ready || held) return;
-    const first = players.pool.values().next().value;
-    if (first) setHeld(first);
-  }, [players.ready, players.pool, held]);
+    if (!players.ready || heldId) return;
+    const first = players.pool.keys().next().value;
+    if (first) setHeldId(first);
+  }, [players.ready, players.pool, heldId]);
+
+  const mounted = player ?? (heldId ? players.pool.get(heldId) ?? null : null);
 
   // Park each clip on its own in-point once the pool is open, so the first frame
   // of every shot is decoded and waiting rather than fetched when it is reached.
@@ -688,7 +695,7 @@ export default function EditorScreen() {
         hasSource={!!player}
         frameReady={frameReady}
         onFirstFrame={noteFrame}
-        player={player ?? held}
+        player={mounted}
         entrance={entrance}
         height={stageHeight}
         onTogglePlay={() => setPlaying((on) => !on)}
@@ -730,6 +737,10 @@ export default function EditorScreen() {
         }}
         onResizeEnd={() => {
           resizing.current = false;
+        }}
+        onSplit={() => {
+          stop();
+          edit((current) => splitClip(current, selected));
         }}
         onReorder={(from, to) => {
           const at = Math.max(0, Math.min(clips.length - 1, to));

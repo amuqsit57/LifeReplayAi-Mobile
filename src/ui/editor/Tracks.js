@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Dimensions,
   Easing,
   PanResponder,
   Pressable,
@@ -13,7 +14,7 @@ import {
   View,
 } from 'react-native';
 
-import { MAX_SECONDS, MIN_SECONDS, transitionLabel } from '../../lib/plan';
+import { MAX_SECONDS, MAX_VIDEO_SECONDS, MIN_SECONDS, transitionLabel } from '../../lib/plan';
 import { colors, radius, spacing, type } from '../../theme';
 
 // A shot is as wide as it is long. The reason to look at a timeline rather than
@@ -28,6 +29,7 @@ const ZOOMS = [1.5, 3, 6, 15, 40, 90];
 const LANE = 58;
 const JOIN = 24;
 const GUTTER = 16;
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 /** m:ss, which is how anyone reads a running time. */
 const stamp = (seconds) => {
@@ -58,12 +60,17 @@ export default function Tracks({
   onTrimHead,
   onResizeEnd,
   onReorder,
+  onSplit,
   onAdd,
   onOpenMusic,
 }) {
   const scroller = useRef(null);
   const head = useRef(new Animated.Value(0)).current;
   const [zoom, setZoom] = useState(PER_SECOND);
+  // Fit the whole edit on screen the first time it is seen. Opening on a scale
+  // that only shows the first few seconds of a six minute cut is not a view of
+  // the film.
+  const fitted = useRef(false);
 
   // Where each shot begins, in pixels. Recomputed whenever a length changes so
   // the playhead and the auto-scroll never drift from what is drawn.
@@ -79,6 +86,16 @@ export default function Tracks({
 
   const total =
     (offsets[clips.length - 1] ?? GUTTER) + widthFor(clips[clips.length - 1]?.seconds, zoom);
+
+  // Fit once, as soon as there is something to fit.
+  useEffect(() => {
+    if (fitted.current || !clips.length) return;
+    const span = clips.reduce((sum, c) => sum + (Number(c.seconds) || 0), 0);
+    if (!span) return;
+    fitted.current = true;
+    const room = SCREEN_WIDTH - GUTTER * 2 - clips.length * (BASE_WIDTH + JOIN);
+    setZoom(Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], room / span)));
+  }, [clips]);
 
   // The film's own clock, and how often to write a number on it — chosen so the
   // marks stay about eighty pixels apart at any zoom rather than crowding.
@@ -186,6 +203,13 @@ export default function Tracks({
     })
   ).current;
 
+  const onFit = () => {
+    const span = clips.reduce((sum, c) => sum + (Number(c.seconds) || 0), 0) || 1;
+    const room = SCREEN_WIDTH - GUTTER * 2 - clips.length * (BASE_WIDTH + JOIN);
+    Haptics.selectionAsync().catch(() => {});
+    setZoom(Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], room / span)));
+  };
+
   const step = (by) => {
     const at = ZOOMS.indexOf(zoom);
     const next = ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (at < 0 ? 3 : at) + by))];
@@ -201,6 +225,17 @@ export default function Tracks({
         <Text style={styles.rulerText}>
           {clips.length} {clips.length === 1 ? 'shot' : 'shots'} · {stamp(runtime)}
         </Text>
+        <View style={styles.tools}>
+          <Pressable onPress={onSplit} hitSlop={8} style={styles.tool}>
+            <Feather name="scissors" size={13} color={colors.textSoft} />
+            <Text style={styles.toolText}>Split</Text>
+          </Pressable>
+          <Pressable onPress={onFit} hitSlop={8} style={styles.tool}>
+            <Feather name="minimize-2" size={13} color={colors.textSoft} />
+            <Text style={styles.toolText}>Fit</Text>
+          </Pressable>
+        </View>
+
         <View style={styles.zoom}>
           <Pressable onPress={() => step(-1)} hitSlop={8} style={styles.zoomBtn}>
             <Feather name="minus" size={14} color={colors.textSoft} />
@@ -326,7 +361,18 @@ function Shot({
   clip, memory, selected, last, zoom,
   onSelect, onSelectJoin, onResize, onResizeEnd, onDrag, onTrimHead,
 }) {
-  const width = widthFor(clip.seconds, zoom);
+  // While a handle is held this shot draws itself from its own state, and the
+  // plan is only told on release. Calling up on every move re-rendered the stage,
+  // the inspector and every other shot for each pixel of a drag, which is what
+  // made trimming feel like wading.
+  const [live, setLive] = useState(null);
+  const seconds = live?.seconds ?? Number(clip.seconds);
+  const width = widthFor(seconds, zoom);
+
+  const ceiling =
+    memory?.kind === 'video'
+      ? Math.max(MIN_SECONDS, Number(memory.duration_seconds) || MAX_VIDEO_SECONDS)
+      : MAX_SECONDS;
 
   // The responder is built once, so anything it reads has to come from a ref.
   // Closing over the props directly meant the second drag measured from the
@@ -337,11 +383,15 @@ function Shot({
     seconds: clip.seconds,
     start_at: clip.start_at,
     zoom,
+    ceiling,
     onResize,
     onResizeEnd,
     onSelect,
     onDrag,
     onTrimHead,
+    setLive,
+    // The last value the drag produced, read once on release.
+    livePeek: live,
   };
   const start = useRef(1);
   const began = useRef(0);
@@ -404,13 +454,22 @@ function Shot({
         const at = Math.max(0, began.current + by);
         const length = start.current - (at - began.current);
         if (length < MIN_SECONDS) return;
-        now.current.onTrimHead(
-          Math.round(at * 100) / 100,
-          Math.round(length * 100) / 100
-        );
+        now.current.setLive({
+          seconds: Math.round(length * 100) / 100,
+          start_at: Math.round(at * 100) / 100,
+        });
       },
-      onPanResponderRelease: () => now.current.onResizeEnd?.(),
-      onPanResponderTerminate: () => now.current.onResizeEnd?.(),
+      onPanResponderRelease: () => {
+        const held = now.current;
+        const value = held.livePeek;
+        held.setLive(null);
+        if (value?.start_at != null) held.onTrimHead(value.start_at, value.seconds);
+        held.onResizeEnd?.();
+      },
+      onPanResponderTerminate: () => {
+        now.current.setLive(null);
+        now.current.onResizeEnd?.();
+      },
     })
   ).current;
 
@@ -428,12 +487,23 @@ function Shot({
       },
       onPanResponderMove: (_event, gesture) => {
         const next = start.current + gesture.dx / now.current.zoom;
-        now.current.onResize(
-          Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, Math.round(next * 10) / 10))
+        const clamped = Math.min(
+          now.current.ceiling,
+          Math.max(MIN_SECONDS, Math.round(next * 10) / 10)
         );
+        now.current.setLive({ seconds: clamped });
       },
-      onPanResponderRelease: () => now.current.onResizeEnd?.(),
-      onPanResponderTerminate: () => now.current.onResizeEnd?.(),
+      onPanResponderRelease: () => {
+        const held = now.current;
+        const value = held.livePeek?.seconds;
+        held.setLive(null);
+        if (value != null) held.onResize(value);
+        held.onResizeEnd?.();
+      },
+      onPanResponderTerminate: () => {
+        now.current.setLive(null);
+        now.current.onResizeEnd?.();
+      },
     })
   ).current;
 
@@ -458,7 +528,7 @@ function Shot({
         )}
 
         <View style={styles.stamp}>
-          <Text style={styles.stampText}>{Number(clip.seconds).toFixed(1)}s</Text>
+          <Text style={styles.stampText}>{stamp(seconds)}</Text>
         </View>
 
         {memory?.kind === 'video' ? (
@@ -522,6 +592,9 @@ const styles = StyleSheet.create({
   tick: { position: 'absolute', alignItems: 'flex-start' },
   tickMark: { width: 1, height: 5, backgroundColor: colors.borderStrong },
   tickText: { ...type.tiny, fontSize: 9, color: colors.textMuted, marginTop: 1 },
+  tools: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1, justifyContent: 'center' },
+  tool: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  toolText: { ...type.tiny, fontSize: 10, color: colors.textSoft },
   zoom: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   zoomBtn: {
     width: 24,

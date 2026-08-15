@@ -91,8 +91,12 @@ export default function FilmCard({ style, replay, onGenerate, onOpen }) {
       <View style={[styles.card, styles.cardBusy]}>
         <View style={styles.row}>
           <ActivityIndicator size="small" color={meta.tint ?? colors.primary} />
-          <Text style={styles.label} numberOfLines={1}>{name}</Text>
-          <View style={{ flex: 1 }} />
+          {/* The title takes what is left and truncates. A spacer between them
+              let a long name — and a custom edit's name is a sentence — push the
+              percentage off the edge of the card. */}
+          <Text style={[styles.label, styles.grow]} numberOfLines={1}>
+            {name}
+          </Text>
           <Text style={styles.percent}>
             {progress > 0 ? `${Math.round(progress * 100)}%` : 'starting'}
           </Text>
@@ -114,10 +118,9 @@ export default function FilmCard({ style, replay, onGenerate, onOpen }) {
         </View>
 
         <View style={styles.row}>
-          <Text style={styles.stage} numberOfLines={1}>
+          <Text style={[styles.stage, styles.grow]} numberOfLines={1}>
             {replay?.stage ?? (status === 'queued' ? 'Waiting to start' : 'Working')}
           </Text>
-          <View style={{ flex: 1 }} />
           {left ? <Text style={styles.left}>{left}</Text> : null}
         </View>
       </View>
@@ -201,6 +204,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fill: { height: '100%', borderRadius: 3 },
-  stage: { ...type.caption, color: colors.textSoft, flexShrink: 1 },
+  stage: { ...type.caption, color: colors.textSoft },
+  grow: { flex: 1, minWidth: 0 },
   left: { ...type.caption, color: colors.textMuted },
 });
