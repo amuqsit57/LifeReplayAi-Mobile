@@ -522,7 +522,11 @@ export default function EventScreen() {
               ) : null}
 
               <Text style={styles.hint}>
-                {selecting ? `${selected.length} selected` : 'Tap to open · hold to select'}
+                {shown.length === 0
+                  ? 'Nothing here matches that.'
+                  : selecting
+                    ? `${selected.length} selected`
+                    : 'Tap to open · hold to select'}
               </Text>
               <View style={styles.grid}>
                 {shown.map((memory) => (
@@ -947,7 +951,11 @@ const styles = StyleSheet.create({
   // edit, so generate fell back to the same purple as add — with a purple icon
   // on it, which is why the icon was not there.
 
-  filterRow: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: 2 },
+  filterRow: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+  },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',

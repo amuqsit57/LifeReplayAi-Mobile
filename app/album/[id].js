@@ -238,33 +238,36 @@ export default function AlbumScreen() {
         </View>
 
         <View style={[styles.gutter, styles.addRow]}>
-          <Pressable style={[styles.addBar, { flex: 1 }]} onPress={() => setAdding(true)}>
-            <View style={styles.addIcon}>
-              <Feather name="grid" size={17} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.addTitle}>From the event</Text>
-              <Text style={styles.meta} numberOfLines={1}>
-                {available.length} not in here yet
-              </Text>
-            </View>
+          {/* Two ways in, and they look like two of the same thing: what is
+              already in the event, and what is still on your phone. */}
+          <Pressable
+            style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
+            onPress={() => setAdding(true)}
+          >
+            <Feather name="grid" size={15} color={colors.primary} />
+            <Text style={styles.addBtnText} numberOfLines={1}>
+              From event
+            </Text>
+            {available.length ? (
+              <View style={styles.addPip}>
+                <Text style={styles.addPipText}>{available.length}</Text>
+              </View>
+            ) : null}
           </Pressable>
 
-          {/* Straight from the phone into this album — it went to the event and
-              then had to be found again in the picker. */}
           <Pressable
-            style={styles.addBar}
+            style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
             onPress={addOwnMedia}
             disabled={Boolean(progress)}
           >
-            <View style={styles.addIcon}>
-              <Feather
-                name={progress ? 'upload-cloud' : 'plus'}
-                size={17}
-                color={colors.primary}
-              />
-            </View>
-            <Text style={styles.addTitle}>{progress ? 'Adding' : 'Add media'}</Text>
+            <Feather
+              name={progress ? 'upload-cloud' : 'plus'}
+              size={15}
+              color={colors.primary}
+            />
+            <Text style={styles.addBtnText} numberOfLines={1}>
+              {progress ? 'Adding' : 'Add media'}
+            </Text>
           </Pressable>
         </View>
 
@@ -284,7 +287,7 @@ export default function AlbumScreen() {
             <View style={styles.gutter}>
               <GridSkeleton count={9} />
             </View>
-          ) : contents.length === 0 ? (
+          ) : inside.length === 0 ? (
             <View style={styles.blank}>
               <View style={styles.blankIcon}>
                 <Feather name="image" size={22} color={colors.primary} />
@@ -360,7 +363,13 @@ export default function AlbumScreen() {
                 </>
               ) : null}
 
-              <Text style={styles.hint}>Tap to open · hold to take out</Text>
+              {contents.length === 0 ? (
+                <Text style={styles.nothing}>
+                  Nothing in this album matches that.
+                </Text>
+              ) : (
+                <Text style={styles.hint}>Tap to open · hold to take out</Text>
+              )}
               <View style={styles.grid}>
                 {contents.map((memory) => (
                   <MediaTile
@@ -532,7 +541,28 @@ const styles = StyleSheet.create({
   title: { ...type.display, color: colors.text },
   meta: { ...type.caption, color: colors.textMuted },
 
-  addRow: { flexDirection: 'row', gap: spacing.sm },
+  addRow: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs },
+  addBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.primary + '2E',
+  },
+  addBtnText: { ...type.label, color: colors.primary },
+  addPip: {
+    minWidth: 18,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
+  addPipText: { ...type.tiny, fontSize: 9.5, color: '#fff', textAlign: 'center' },
   addBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -557,7 +587,13 @@ const styles = StyleSheet.create({
   hint: { ...type.caption, color: colors.textMuted, paddingHorizontal: spacing.lg },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.lg },
 
-  chips: { gap: spacing.sm, paddingVertical: 2 },
+  nothing: {
+    ...type.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: spacing.xl,
+  },
+  chips: { gap: spacing.sm, paddingVertical: spacing.xs },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
