@@ -184,6 +184,9 @@ export default function Forgot() {
         textContentType="emailAddress"
         autoFocus
         returnKeyType="go"
+        // A rejected address should leave you in the field, not staring at a red
+        // line with the keyboard gone.
+        blurOnSubmit={false}
         onSubmitEditing={send}
       />
 

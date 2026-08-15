@@ -62,9 +62,17 @@ export default function Reset() {
     again: touched.again ? problems.again : null,
   };
 
+  const passwordRef = useRef(null);
+
   async function submit() {
     setTouched({ password: true, again: true });
-    if (problems.password || problems.again) return;
+
+    // Straight to whichever half is wrong, keyboard still up.
+    const firstBad = problems.password ? passwordRef : problems.again ? againRef : null;
+    if (firstBad) {
+      firstBad.current?.focus();
+      return;
+    }
 
     setBusy(true);
     setFailure(null);
@@ -124,6 +132,7 @@ export default function Reset() {
 
       <View>
         <AuthField
+          ref={passwordRef}
           icon="lock"
           label="New password"
           secure
@@ -141,8 +150,8 @@ export default function Reset() {
           textContentType="newPassword"
           autoFocus
           returnKeyType="next"
+          blurOnSubmit={false}
           onSubmitEditing={() => againRef.current?.focus()}
-          submitBehavior="submit"
         />
         <Strength password={password} />
       </View>
@@ -164,6 +173,7 @@ export default function Reset() {
         autoComplete="new-password"
         textContentType="newPassword"
         returnKeyType="go"
+        blurOnSubmit={false}
         onSubmitEditing={submit}
       />
 

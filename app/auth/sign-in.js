@@ -10,6 +10,7 @@ import { emailProblem, humanise, passwordProblem } from '../../src/ui/auth/messa
 
 export default function SignIn() {
   const router = useRouter();
+  const emailRef = useRef(null);
   const passwordRef = useRef(null);
 
   const [email, setEmail] = useState('');
@@ -34,7 +35,17 @@ export default function SignIn() {
     // Everything is touched on submit, so pressing the button on an empty form
     // marks what is missing rather than doing nothing.
     setTouched({ email: true, password: true });
-    if (problems.email || problems.password) return;
+
+    // Straight to the first thing that is wrong, with the keyboard still up.
+    // Returning here used to leave the form red and the keyboard gone, which
+    // read as the app rejecting you rather than as one field wanting filling —
+    // and the return key reaches this before you have finished the form far more
+    // often than the button does.
+    const firstBad = problems.email ? emailRef : problems.password ? passwordRef : null;
+    if (firstBad) {
+      firstBad.current?.focus();
+      return;
+    }
 
     setBusy(true);
     setFailure(null);
@@ -64,6 +75,7 @@ export default function SignIn() {
       <AuthAlert message={failure} />
 
       <AuthField
+        ref={emailRef}
         icon="mail"
         label="Email"
         value={email}
@@ -81,9 +93,11 @@ export default function SignIn() {
         textContentType="emailAddress"
         returnKeyType="next"
         // Straight on to the password rather than dismissing the keyboard and
-        // making them reach back up the screen.
+        // making them reach back up the screen. `blurOnSubmit` rather than
+        // `submitBehavior`: the newer prop was being ignored here, so the
+        // keyboard shut on every return press.
+        blurOnSubmit={false}
         onSubmitEditing={() => passwordRef.current?.focus()}
-        submitBehavior="submit"
       />
 
       <View style={styles.passwordBlock}>
@@ -104,6 +118,9 @@ export default function SignIn() {
           autoComplete="current-password"
           textContentType="password"
           returnKeyType="go"
+          // Held open on a failed attempt; `submit` puts the cursor in whichever
+          // field is at fault, and a keyboard that vanished would undo that.
+          blurOnSubmit={false}
           onSubmitEditing={submit}
         />
 

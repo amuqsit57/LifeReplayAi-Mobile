@@ -40,6 +40,7 @@ function Strength({ password }) {
 
 export default function SignUp() {
   const router = useRouter();
+  const nameRef = useRef(null);
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
 
@@ -64,7 +65,22 @@ export default function SignUp() {
 
   async function submit() {
     setTouched({ fullName: true, email: true, password: true });
-    if (problems.fullName || problems.email || problems.password) return;
+
+    // Straight to the first thing that is wrong, keyboard still up. Reaching
+    // this from the return key while halfway down the form used to turn every
+    // field red at once — including the name you had not got to yet — and take
+    // the keyboard away with it.
+    const firstBad = problems.fullName
+      ? nameRef
+      : problems.email
+        ? emailRef
+        : problems.password
+          ? passwordRef
+          : null;
+    if (firstBad) {
+      firstBad.current?.focus();
+      return;
+    }
 
     setBusy(true);
     setFailure(null);
@@ -133,6 +149,7 @@ export default function SignUp() {
       <AuthAlert message={failure} />
 
       <AuthField
+        ref={nameRef}
         icon="user"
         label="Your name"
         value={fullName}
@@ -149,7 +166,7 @@ export default function SignUp() {
         textContentType="name"
         returnKeyType="next"
         onSubmitEditing={() => emailRef.current?.focus()}
-        submitBehavior="submit"
+        blurOnSubmit={false}
       />
 
       <AuthField
@@ -171,7 +188,7 @@ export default function SignUp() {
         textContentType="emailAddress"
         returnKeyType="next"
         onSubmitEditing={() => passwordRef.current?.focus()}
-        submitBehavior="submit"
+        blurOnSubmit={false}
       />
 
       <View>
@@ -193,6 +210,7 @@ export default function SignUp() {
           autoComplete="new-password"
           textContentType="newPassword"
           returnKeyType="go"
+          blurOnSubmit={false}
           onSubmitEditing={submit}
         />
         <Strength password={password} />
