@@ -800,9 +800,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: radius.md,
   },
-  // The accent is the mark's orange, and it earns its place by being the only
-  // colour in the row: one thing to press, and everything else quiet around it.
-  actionMain: { flex: 1, backgroundColor: colors.accent, ...shadow.card },
+  // Purple leads, the mark's orange answers it — the same pairing the logo makes.
+  actionMain: { flex: 1, backgroundColor: colors.primary, ...shadow.card },
   actionMainText: { ...type.label, color: '#fff' },
   actionAlt: {
     paddingHorizontal: spacing.lg,
