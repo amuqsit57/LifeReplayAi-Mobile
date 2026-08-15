@@ -138,7 +138,8 @@ export default function AlbumsScreen() {
   // The covers you can see, fetched before the grid appears.
   const warm = useWarmImages(
     all.map((album) => covers.data?.[album.event_id]),
-    5
+    5,
+    !all.length || covers.isFetched
   );
 
   const list = useMemo(() => {

@@ -65,9 +65,13 @@ export default function FeedScreen() {
   });
 
   // The posters for the first couple of posts, before anything is drawn.
+  // Not settled until the signing request has answered: the posters come from a
+  // second call, so before it lands there is nothing to prefetch and an empty
+  // list must not read as "nothing to load".
   const warm = useWarmImages(
     all.map((post) => media.data?.[post.id]?.thumbnail_url),
-    2
+    2,
+    !all.length || media.isFetched
   );
 
   const likedSet = useMemo(() => new Set(liked.data ?? []), [liked.data]);

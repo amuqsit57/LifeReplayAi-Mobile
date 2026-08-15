@@ -162,7 +162,8 @@ export default function EventsScreen() {
   // The covers you can see, fetched before the grid appears.
   const warm = useWarmImages(
     (events.data ?? []).map((e) => covers.data?.[e.id]),
-    5
+    5,
+    !(events.data ?? []).length || covers.isFetched
   );
 
   const list = useMemo(() => {

@@ -128,7 +128,7 @@ export default function EventScreen() {
 
   // The gallery's own thumbnails: wait on the first rows, warm the rest behind
   // them, so scrolling never starts a download.
-  const warm = useWarmImages(list.map((memory) => memory.thumbnail_url), 12);
+  const warm = useWarmImages(list.map((memory) => memory.thumbnail_url), 12, memories.isFetched);
 
   const shown = useMemo(() => {
     const option = FILTERS.find((f) => f.value === filter) ?? FILTERS[0];

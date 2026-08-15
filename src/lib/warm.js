@@ -4,27 +4,34 @@ import { useEffect, useRef, useState } from 'react';
 /**
  * Have the pictures before the page.
  *
- * A grid that paints its titles first and fills the images in over the next
- * second reads as broken: the text lands, the layout settles, then everything
- * twitches as each picture arrives.
+ * Two parts. The first screenful is waited for — nothing is drawn until those
+ * images are decoded and in memory, so what appears is finished. The rest are
+ * fetched immediately behind them without holding anything up, so scrolling
+ * arrives at pictures that are already there.
  *
- * Two parts, and both matter. The first screenful is *waited for* — nothing is
- * drawn until those images are in the cache, so what appears is finished. The
- * rest are fetched immediately afterwards in the background, without holding
- * anything up, so scrolling finds them already there rather than starting a
- * download when a row comes into view. That is the difference between lazy
- * loading and loading late.
+ * `settled` is the part that was missing and the reason this appeared to do
+ * nothing. Thumbnails arrive from a second request, so on the first render there
+ * are no URLs at all — and an empty list read as "nothing to load, go ahead".
+ * The gate opened, the rows drew their placeholders, and the images turned up
+ * afterwards. An empty list means *not yet* until the caller says otherwise.
  *
  * @param {Array<string>} urls thumbnails, in the order they are drawn
  * @param {number} visible how many are on screen at once
+ * @param {boolean} settled whether those URLs are final, or still being fetched
  */
-export function useWarmImages(urls, visible = 6) {
+export function useWarmImages(urls, visible = 6, settled = true) {
   const [ready, setReady] = useState(false);
   const clean = urls.filter(Boolean);
-  const key = clean.join(',');
+  const key = `${settled ? 1 : 0}|${clean.join(',')}`;
   const timer = useRef(null);
 
   useEffect(() => {
+    // Still waiting to be told what the pictures are.
+    if (!settled) {
+      setReady(false);
+      return undefined;
+    }
+
     if (!clean.length) {
       setReady(true);
       return undefined;
@@ -34,13 +41,16 @@ export function useWarmImages(urls, visible = 6) {
     setReady(false);
 
     const first = clean.slice(0, visible);
-    const rest = clean.slice(visible);
+    // A few screenfuls ahead, not the whole list. The memory cache is bounded,
+    // and pushing sixty posters through it would evict the ones being looked at
+    // — which would be this bug again, caused by the fix for it.
+    const rest = clean.slice(visible, visible * 5);
 
     // Never a reason to sit on an empty screen: a slow or unreachable image
     // should cost the polish, not the page.
     timer.current = setTimeout(() => {
       if (!cancelled) setReady(true);
-    }, 2500);
+    }, 4000);
 
     Image.prefetch(first, 'memory-disk')
       .catch(() => {})
