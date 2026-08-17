@@ -478,7 +478,7 @@ export default function EventScreen() {
               style={({ pressed }) => [styles.lead, pressed && styles.pressed]}
             >
               <Feather name="zap" size={18} color="#fff" />
-              <Text style={styles.leadText}>Generate a film</Text>
+              <Text style={styles.leadText}>Generate a film with AI</Text>
               <Feather name="arrow-right" size={17} color="rgba(255,255,255,0.85)" />
             </Pressable>
           ) : (
@@ -534,16 +534,6 @@ export default function EventScreen() {
                 numberOfLines={1}
               >
                 Cut your own
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setInviting(true)}
-              style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
-            >
-              <Feather name="user-plus" size={16} color={colors.primary} />
-              <Text style={styles.secondaryText} numberOfLines={1}>
-                Invite
               </Text>
             </Pressable>
           </View>
