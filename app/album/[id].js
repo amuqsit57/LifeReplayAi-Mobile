@@ -26,9 +26,17 @@ import {
   addToAlbum,
   albumMemoryIds,
   deleteAlbum,
+  eventPeople,
   getAlbum,
   removeFromAlbum,
 } from '../../src/lib/data';
+import {
+  PersonBand,
+  PersonChips,
+  countsByPerson,
+  groupByPerson,
+  indexPeople,
+} from '../../src/ui/gallery';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Segmented } from '../../src/ui/press';
 import ErrorState from '../../src/ui/ErrorState';
@@ -70,11 +78,23 @@ export default function AlbumScreen() {
     },
   });
 
+  // Who is in the event this album belongs to, so a tile can say whose it is.
+  const people = useQuery({
+    queryKey: ['people', eventId],
+    queryFn: () => eventPeople(eventId),
+    enabled: Boolean(eventId),
+  });
+  const peopleById = useMemo(() => indexPeople(people.data ?? []), [people.data]);
+
   const inAlbum = useMemo(() => new Set(memberIds.data ?? []), [memberIds.data]);
   const all = everything.data ?? [];
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('all');
   const [sort, setSort] = useState('newest');
+  const [by, setBy] = useState(null);
+  // On by default, the same as the event page. An album drawn from a shared
+  // event is still several people's photographs.
+  const [byPerson, setByPerson] = useState(true);
 
   const inside = all.filter((m) => inAlbum.has(m.id));
 
@@ -82,8 +102,12 @@ export default function AlbumScreen() {
     const needle = query.trim().toLowerCase();
     const rows = inside.filter((m) => {
       if (kind !== 'all' && m.kind !== kind) return false;
+      if (by && m.uploaded_by !== by) return false;
       if (!needle) return true;
-      return [m.description, ...(m.tags ?? [])]
+      // Who added it counts as searchable text: "find Sara's photos" is a thing
+      // people type, and it is faster than reaching for the chips.
+      const who = peopleById.get(m.uploaded_by)?.full_name ?? '';
+      return [m.description, who, ...(m.tags ?? [])]
         .filter(Boolean)
         .some((field) => field.toLowerCase().includes(needle));
     });
@@ -99,8 +123,32 @@ export default function AlbumScreen() {
       return when(b) - when(a);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [all, inAlbum, query, kind, sort]);
+  }, [all, inAlbum, query, kind, sort, by, peopleById]);
+
+  // Grouping means anything only with more than one contributor, and only while
+  // nobody has been singled out already.
+  const grouped = byPerson && !by && (people.data ?? []).length > 1;
+  const groups = useMemo(
+    () => (grouped ? groupByPerson(contents, peopleById) : []),
+    [grouped, contents, peopleById]
+  );
+  // Counted against everything in the album, not the filtered view — a chip
+  // whose number changed as you typed would be describing the search rather
+  // than the person.
+  const personCounts = useMemo(() => countsByPerson(inside), [inside]);
   const available = all.filter((m) => !inAlbum.has(m.id));
+
+  // Declared after `available`, not before it. A dependency array is evaluated
+  // the moment the hook is called, so naming it above its own `const` would read
+  // it inside the temporal dead zone and throw on the first render — the same
+  // fault that used to crash the editor on open.
+  //
+  // The picker is always banded: it is the longest list in the app, and "the
+  // ones Sara took" is how anybody narrows three hundred photographs.
+  const pickerGroups = useMemo(
+    () => groupByPerson(available, peopleById),
+    [available, peopleById]
+  );
   const generated = (replays.data ?? []).filter((r) => r.album_id === id && !r.is_edit);
   const albumEdits = (replays.data ?? []).filter((r) => r.album_id === id && r.is_edit);
   const albumReplays = (replays.data ?? []).filter((r) => r.album_id === id);
@@ -387,9 +435,28 @@ export default function AlbumScreen() {
                       value={query}
                       onChangeText={setQuery}
                       onClear={() => setQuery('')}
-                      placeholder="Search what is in them"
+                      placeholder="Search what is in them, or who added them"
                     />
                   </View>
+
+                  {/* Whose photographs these are — the same control the event
+                      page carries, from the same component, so the two cannot
+                      drift apart. */}
+                  <PersonChips
+                    people={people.data ?? []}
+                    counts={personCounts}
+                    grouped={grouped}
+                    by={by}
+                    onGrouped={(on) => {
+                      setBy(null);
+                      setByPerson(on);
+                    }}
+                    onPerson={(id) => {
+                      setBy(id);
+                      if (id) setByPerson(false);
+                    }}
+                  />
+
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -453,23 +520,60 @@ export default function AlbumScreen() {
               ) : (
                 <Text style={styles.hint}>Tap to open · hold to take out</Text>
               )}
-              <View style={styles.grid}>
-                {contents.map((memory) => (
-                  <MediaTile
-                    key={memory.id}
-                    uri={memory.thumbnail_url ?? memory.url}
-                    kind={memory.kind}
-                    style={{ width: '31.5%' }}
-                    onPress={() => setViewing(memory.id)}
-                    onLongPress={() =>
-                      Alert.alert('Take out of album?', 'The photo stays in the event.', [
-                        { text: 'Keep', style: 'cancel' },
-                        { text: 'Take out', onPress: () => takeOut.mutate(memory.id) },
-                      ])
-                    }
-                  />
-                ))}
-              </View>
+              {grouped ? (
+                groups.map((group) => (
+                  <View key={group.id}>
+                    <PersonBand
+                      person={group.person}
+                      count={group.items.length}
+                      onPress={() => {
+                        setBy(group.id);
+                        setByPerson(false);
+                      }}
+                    />
+                    <View style={styles.grid}>
+                      {group.items.map((memory) => (
+                        <MediaTile
+                          key={memory.id}
+                          uri={memory.thumbnail_url ?? memory.url}
+                          kind={memory.kind}
+                          style={{ width: '31.5%' }}
+                          onPress={() => setViewing(memory.id)}
+                          onLongPress={() =>
+                            Alert.alert('Take out of album?', 'The photo stays in the event.', [
+                              { text: 'Keep', style: 'cancel' },
+                              { text: 'Take out', onPress: () => takeOut.mutate(memory.id) },
+                            ])
+                          }
+                        />
+                      ))}
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.grid}>
+                  {contents.map((memory) => (
+                    <MediaTile
+                      key={memory.id}
+                      uri={memory.thumbnail_url ?? memory.url}
+                      kind={memory.kind}
+                      uploader={
+                        (people.data ?? []).length > 1
+                          ? peopleById.get(memory.uploaded_by)
+                          : null
+                      }
+                      style={{ width: '31.5%' }}
+                      onPress={() => setViewing(memory.id)}
+                      onLongPress={() =>
+                        Alert.alert('Take out of album?', 'The photo stays in the event.', [
+                          { text: 'Keep', style: 'cancel' },
+                          { text: 'Take out', onPress: () => takeOut.mutate(memory.id) },
+                        ])
+                      }
+                    />
+                  ))}
+                </View>
+              )}
             </>
           )
         ) : (
@@ -575,26 +679,37 @@ export default function AlbumScreen() {
             </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={styles.pickerGrid}>
-            {available.map((memory) => (
-              <MediaTile
-                key={memory.id}
-                uri={memory.thumbnail_url ?? memory.url}
-                kind={memory.kind}
-                selected={staged.includes(memory.id)}
-                style={{ width: '31.5%' }}
-                onPress={() =>
-                  setStaged((current) =>
-                    current.includes(memory.id)
-                      ? current.filter((value) => value !== memory.id)
-                      : [...current, memory.id]
-                  )
-                }
-              />
-            ))}
+          {/* Banded by contributor here too. Choosing from three hundred
+              photographs is the screen that needs the grouping most — "the ones
+              Sara took" is how people actually narrow it down. */}
+          <ScrollView contentContainerStyle={styles.pickerScroll}>
             {available.length === 0 ? (
               <Text style={styles.hint}>Everything in this event is already in the album.</Text>
-            ) : null}
+            ) : (
+              pickerGroups.map((group) => (
+                <View key={group.id}>
+                  <PersonBand person={group.person} count={group.items.length} />
+                  <View style={styles.pickerGrid}>
+                    {group.items.map((memory) => (
+                      <MediaTile
+                        key={memory.id}
+                        uri={memory.thumbnail_url ?? memory.url}
+                        kind={memory.kind}
+                        selected={staged.includes(memory.id)}
+                        style={{ width: '31.5%' }}
+                        onPress={() =>
+                          setStaged((current) =>
+                            current.includes(memory.id)
+                              ? current.filter((value) => value !== memory.id)
+                              : [...current, memory.id]
+                          )
+                        }
+                      />
+                    ))}
+                  </View>
+                </View>
+              ))
+            )}
           </ScrollView>
         </View>
       </Modal>
@@ -636,14 +751,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
-    height: 44,
+    gap: 6,
+    height: 46,
+    paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
     backgroundColor: colors.primarySoft,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.primary + '2E',
   },
-  addBtnText: { ...type.label, color: colors.primary },
+  // Shrinkable and one size down, so "Upload media" and a count pip can share a
+  // half-width button on a narrow phone without either being clipped.
+  addBtnText: { ...type.label, fontSize: 12.5, color: colors.primary, flexShrink: 1 },
   addPip: {
     minWidth: 18,
     paddingHorizontal: 5,
@@ -777,6 +895,8 @@ const styles = StyleSheet.create({
   pickerTitle: { ...type.bodyStrong, color: colors.text },
   pickerCancel: { ...type.label, color: colors.textMuted },
   pickerDone: { ...type.label, color: colors.primary },
+  // The scroller pads the ends; each band lays its own tiles out inside it.
+  pickerScroll: { paddingBottom: spacing.xxxl },
   pickerGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

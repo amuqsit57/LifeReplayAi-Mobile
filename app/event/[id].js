@@ -456,73 +456,97 @@ export default function EventScreen() {
             which looked like an afterthought and — because the rows underneath
             covered their lower halves — swallowed roughly half the taps aimed at
             them. Laid out normally, they are aligned and every pixel is live. */}
-        {/* Which of these leads changes with the event.
+        {/* One action leading, two supporting it underneath.
 
-            An empty event cannot generate anything, so offering that first was
-            pointing at the one button that would not work. Uploading takes the
-            lead until there is something to work with, then stands down — the
-            same three actions throughout, ordered by what is actually next. */}
+            Three buttons abreast could not fit: each needs an icon and a real
+            label, and on a narrow phone the first one was clipped mid-word —
+            which is the worst outcome, because the clipped one was the thing the
+            page exists to do. Stacking gives the main action the full width it
+            deserves and lets the other two be honestly labelled instead of
+            squeezed into one word each.
+
+            Which action leads changes with the event: an empty one cannot
+            generate anything, so offering that first pointed at the one button
+            guaranteed not to work. */}
         <View style={styles.actions}>
           {list.length ? (
-            <>
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  setTab('films');
-                }}
-                style={({ pressed }) => [styles.action, styles.actionMain, pressed && styles.pressed]}
-              >
-                <Feather name="zap" size={16} color="#fff" />
-                <Text style={styles.actionMainText}>Generate film</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={addMemories}
-                disabled={Boolean(progress)}
-                style={({ pressed }) => [styles.action, styles.actionAlt, pressed && styles.pressed]}
-              >
-                <Feather name="upload-cloud" size={16} color={colors.primary} />
-                <Text style={styles.actionAltText}>
-                  {progress ? 'Uploading' : 'Upload'}
-                </Text>
-              </Pressable>
-            </>
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                setTab('films');
+              }}
+              style={({ pressed }) => [styles.lead, pressed && styles.pressed]}
+            >
+              <Feather name="zap" size={18} color="#fff" />
+              <Text style={styles.leadText}>Generate a film</Text>
+              <Feather name="arrow-right" size={17} color="rgba(255,255,255,0.85)" />
+            </Pressable>
           ) : (
             <Pressable
               onPress={addMemories}
               disabled={Boolean(progress)}
-              style={({ pressed }) => [styles.action, styles.actionMain, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.lead, pressed && styles.pressed]}
             >
-              <Feather name="upload-cloud" size={16} color="#fff" />
-              <Text style={styles.actionMainText}>
-                {progress ? 'Uploading…' : 'Upload media'}
+              <Feather name="upload-cloud" size={18} color="#fff" />
+              <Text style={styles.leadText}>
+                {progress ? 'Uploading…' : 'Upload photos and video'}
               </Text>
+              {progress ? null : (
+                <Feather name="arrow-right" size={17} color="rgba(255,255,255,0.85)" />
+              )}
             </Pressable>
           )}
 
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-              setTab('films');
-              requestEdit();
-            }}
-            disabled={!list.length || startEdit.isPending}
-            style={({ pressed }) => [
-              styles.action,
-              styles.actionAlt,
-              !list.length && styles.actionOff,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Feather
-              name="scissors"
-              size={16}
-              color={list.length ? colors.primary : colors.textMuted}
-            />
-            <Text style={[styles.actionAltText, !list.length && { color: colors.textMuted }]}>
-              Cut your own
-            </Text>
-          </Pressable>
+          <View style={styles.secondaries}>
+            {list.length ? (
+              <Pressable
+                onPress={addMemories}
+                disabled={Boolean(progress)}
+                style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
+              >
+                <Feather name="upload-cloud" size={16} color={colors.primary} />
+                <Text style={styles.secondaryText} numberOfLines={1}>
+                  {progress ? 'Uploading' : 'Upload more'}
+                </Text>
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                setTab('films');
+                requestEdit();
+              }}
+              disabled={!list.length || startEdit.isPending}
+              style={({ pressed }) => [
+                styles.secondary,
+                !list.length && styles.secondaryOff,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Feather
+                name="scissors"
+                size={16}
+                color={list.length ? colors.primary : colors.textMuted}
+              />
+              <Text
+                style={[styles.secondaryText, !list.length && { color: colors.textMuted }]}
+                numberOfLines={1}
+              >
+                Cut your own
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setInviting(true)}
+              style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
+            >
+              <Feather name="user-plus" size={16} color={colors.primary} />
+              <Text style={styles.secondaryText} numberOfLines={1}>
+                Invite
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.gutter}>
@@ -1152,33 +1176,48 @@ const styles = StyleSheet.create({
 
   heroActions: { flexDirection: 'row', gap: spacing.sm },
   actions: {
-    flexDirection: 'row',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
   },
-  action: {
+
+  // The one thing this page is for, at full width, with an arrow saying it goes
+  // somewhere. Tall enough to be the obvious target for a thumb.
+  lead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    height: 52,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    ...shadow.card,
+  },
+  // `flex: 1` on the label rather than the row, so the arrow stays pinned right
+  // however long the label gets in another language.
+  leadText: { ...type.bodyStrong, fontSize: 15, color: '#fff', flex: 1 },
+
+  // Equal thirds. Each one owns its share of the width instead of being sized by
+  // its text, so no label can push a neighbour off the screen.
+  secondaries: { flexDirection: 'row', gap: spacing.sm },
+  secondary: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
-    height: 44,
+    gap: 6,
+    height: 42,
+    paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
-  },
-  // Purple leads, the mark's orange answers it — the same pairing the logo makes.
-  actionMain: { flex: 1, backgroundColor: colors.primary, ...shadow.card },
-  actionMainText: { ...type.label, color: '#fff' },
-  actionAlt: {
-    paddingHorizontal: spacing.md,
     backgroundColor: colors.primarySoft,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.primary + '2E',
   },
-  actionAltText: { ...type.label, color: colors.primary },
+  secondaryText: { ...type.label, fontSize: 12, color: colors.primary, flexShrink: 1 },
   // Visibly unavailable rather than merely inert. A button that looks live and
   // does nothing reads as the app being broken.
-  actionOff: { backgroundColor: colors.surfaceAlt, borderColor: 'transparent' },
+  secondaryOff: { backgroundColor: colors.surfaceAlt, borderColor: 'transparent' },
   pressed: { opacity: 0.85 },
   round: {
     width: 52,
