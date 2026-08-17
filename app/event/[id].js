@@ -38,6 +38,7 @@ import { Empty } from '../../src/ui';
 import { Segmented } from '../../src/ui/press';
 import ErrorState from '../../src/ui/ErrorState';
 import FilmCard from '../../src/ui/FilmCard';
+import FilterSheet, { FilterButton } from '../../src/ui/FilterSheet';
 import Photo from '../../src/ui/Photo';
 import { DetailSkeleton } from '../../src/ui/Skeleton';
 import UploadSheet from '../../src/ui/UploadSheet';
@@ -109,6 +110,7 @@ export default function EventScreen() {
   const [filmQuery, setFilmQuery] = useState('');
   const [filmSort, setFilmSort] = useState('recent');
   const [gallerySort, setGallerySort] = useState('newest');
+  const [filtering, setFiltering] = useState(false);
   // On by default: a shared event is several people's photographs, and saying
   // whose is the first thing the page should answer.
   const [byPerson, setByPerson] = useState(true);
@@ -215,6 +217,63 @@ export default function EventScreen() {
   // Grouping only means anything with more than one contributor, and only when
   // nobody has been singled out already.
   const grouped = byPerson && !by && (people.data ?? []).length > 1;
+
+  // What the button's badge counts: only choices that are actually narrowing
+  // something. The default sort is not a filter, and saying "1" for it would
+  // make the badge meaningless.
+  const activeFilters = (filter !== 'all' ? 1 : 0) + (by ? 1 : 0) + (gallerySort !== 'newest' ? 1 : 0);
+
+  /** Everything the sheet offers, described rather than drawn. */
+  const filterSections = [
+    {
+      title: 'SORT BY',
+      value: gallerySort,
+      onChange: setGallerySort,
+      options: [
+        { value: 'newest', label: 'Newest first', icon: 'arrow-down' },
+        { value: 'oldest', label: 'Oldest first', icon: 'arrow-up', detail: 'How the day happened' },
+        { value: 'best', label: 'Best first', icon: 'star', detail: 'What the analysis rated highest' },
+      ],
+    },
+    {
+      title: 'SHOW',
+      value: filter,
+      onChange: setFilter,
+      options: FILTERS.map((option) => ({
+        value: option.value,
+        label: option.label,
+        icon: option.icon,
+        detail:
+          option.value === 'all'
+            ? `${list.length} in this event`
+            : `${list.filter((memory) => option.match(memory, me.data?.id)).length}`,
+      })),
+    },
+  ];
+
+  // Only when there is more than one person to choose between: a filter with a
+  // single option is a control that cannot change anything.
+  if ((people.data ?? []).length > 1) {
+    filterSections.push({
+      title: 'WHO ADDED IT',
+      value: by,
+      onChange: (value) => {
+        setBy(value);
+        if (value) setByPerson(false);
+      },
+      options: [
+        { value: null, label: 'Everyone', icon: 'users' },
+        ...(people.data ?? [])
+          .filter((person) => list.some((memory) => memory.uploaded_by === person.user_id))
+          .map((person) => ({
+            value: person.user_id,
+            label: person.full_name ?? 'Someone',
+            avatar: person,
+            detail: `${list.filter((memory) => memory.uploaded_by === person.user_id).length} added`,
+          })),
+      ],
+    });
+  }
 
   const groups = useMemo(() => {
     if (!grouped) return [];
@@ -571,7 +630,9 @@ export default function EventScreen() {
               }}
               style={({ pressed }) => [styles.lead, pressed && styles.pressed]}
             >
-              <Feather name="zap" size={18} color="#fff" />
+              <View style={styles.leadIcon}>
+                <Feather name="zap" size={17} color="#fff" />
+              </View>
               <Text style={styles.leadText}>Generate a film with AI</Text>
               <Feather name="arrow-right" size={17} color="rgba(255,255,255,0.85)" />
             </Pressable>
@@ -581,7 +642,9 @@ export default function EventScreen() {
               disabled={Boolean(progress)}
               style={({ pressed }) => [styles.lead, pressed && styles.pressed]}
             >
-              <Feather name="upload-cloud" size={18} color="#fff" />
+              <View style={styles.leadIcon}>
+                <Feather name="upload-cloud" size={17} color="#fff" />
+              </View>
               <Text style={styles.leadText}>
                 {progress ? 'Uploading…' : 'Upload photos and video'}
               </Text>
@@ -654,150 +717,26 @@ export default function EventScreen() {
             <Empty icon="📸" title="Nothing here yet" body="Add photos and videos — no need to sort them first." />
           ) : (
             <>
-              {/* Filters appear only once there is enough to warrant sorting
-                  through. Below that they are three controls over nine photos. */}
+              {/* One row: search, and everything else behind a button.
+
+                  This was a search bar plus three sideways-scrolling rows of
+                  chips — sort, contributor, kind — which pushed the
+                  photographs off the first screenful and hid most of the
+                  options off the right-hand edge, where nobody found them. */}
               {list.length > 2 ? (
-                <View style={styles.gutter}>
-                  <SearchBar
-                    value={query}
-                    onChangeText={setQuery}
-                    onClear={() => setQuery('')}
-                    placeholder="Search what is in them, or who added them"
-                  />
+                <View style={[styles.gutter, styles.filterRow]}>
+                  <View style={{ flex: 1 }}>
+                    <SearchBar
+                      value={query}
+                      onChangeText={setQuery}
+                      onClear={() => setQuery('')}
+                      placeholder="Search photos or people"
+                    />
+                  </View>
+                  <FilterButton active={activeFilters} onPress={() => setFiltering(true)} />
                 </View>
               ) : null}
 
-              {list.length > 2 ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.filterRow}
-                >
-                  {[
-                    { value: 'newest', label: 'Newest', icon: 'arrow-down' },
-                    { value: 'oldest', label: 'Oldest', icon: 'arrow-up' },
-                    { value: 'best', label: 'Best first', icon: 'star' },
-                  ].map((option) => {
-                    const on = gallerySort === option.value;
-                    return (
-                      <Pressable
-                        key={option.value}
-                        onPress={() => setGallerySort(option.value)}
-                        style={[styles.filterChip, on && styles.filterChipOn]}
-                      >
-                        <Feather
-                          name={option.icon}
-                          size={11}
-                          color={on ? '#fff' : colors.textSoft}
-                        />
-                        <Text style={[styles.filterText, on && styles.filterTextOn]}>
-                          {option.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              ) : null}
-
-              {/* Who added what. One chip per person who actually contributed,
-                  which is the question people ask of a shared event. */}
-              {(people.data ?? []).length > 1 ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.filterRow}
-                >
-                  <Pressable
-                    onPress={() => {
-                      setBy(null);
-                      setByPerson(true);
-                    }}
-                    style={[styles.filterChip, grouped && styles.filterChipOn]}
-                  >
-                    <Feather name="users" size={11} color={grouped ? '#fff' : colors.textSoft} />
-                    <Text style={[styles.filterText, grouped && styles.filterTextOn]}>
-                      By person
-                    </Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => {
-                      setBy(null);
-                      setByPerson(false);
-                    }}
-                    style={[styles.filterChip, !grouped && !by && styles.filterChipOn]}
-                  >
-                    <Feather
-                      name="grid"
-                      size={11}
-                      color={!grouped && !by ? '#fff' : colors.textSoft}
-                    />
-                    <Text style={[styles.filterText, !grouped && !by && styles.filterTextOn]}>
-                      All together
-                    </Text>
-                  </Pressable>
-
-                  {(people.data ?? []).map((person) => {
-                    const mine = list.filter((m) => m.uploaded_by === person.user_id).length;
-                    if (!mine) return null;
-                    const active = by === person.user_id;
-                    return (
-                      <Pressable
-                        key={person.user_id}
-                        onPress={() => {
-                          setBy(active ? null : person.user_id);
-                          if (!active) setByPerson(false);
-                        }}
-                        style={[styles.filterChip, active && styles.filterChipOn]}
-                      >
-                        <Avatar url={person.avatar_url} name={person.full_name} size="xs" />
-                        <Text style={[styles.filterText, active && styles.filterTextOn]}>
-                          {person.full_name?.split(' ')[0] ?? 'Someone'}
-                        </Text>
-                        <Text style={[styles.filterCount, active && styles.filterTextOn]}>
-                          {mine}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              ) : null}
-
-              {list.length > 2 ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.filterRow}
-                >
-                  {FILTERS.map((option) => {
-                    const active = filter === option.value;
-                    const count =
-                      option.value === 'all'
-                        ? list.length
-                        : list.filter(option.match).length;
-                    if (!count && option.value !== 'all') return null;
-                    return (
-                      <Pressable
-                        key={option.value}
-                        onPress={() => setFilter(option.value)}
-                        style={[styles.filterChip, active && styles.filterChipOn]}
-                      >
-                        <Feather
-                          name={option.icon}
-                          size={11}
-                          color={active ? '#fff' : colors.textSoft}
-                        />
-                        <Text style={[styles.filterText, active && styles.filterTextOn]}>
-                          {option.label}
-                        </Text>
-                        <Text style={[styles.filterCount, active && styles.filterTextOn]}>
-                          {count}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              ) : null}
 
               <Text style={styles.hint}>
                 {shown.length === 0
@@ -1127,6 +1066,19 @@ export default function EventScreen() {
         }}
       />
 
+      <FilterSheet
+        visible={filtering}
+        onClose={() => setFiltering(false)}
+        sections={filterSections}
+        activeCount={activeFilters}
+        onClear={() => {
+          setFilter('all');
+          setBy(null);
+          setGallerySort('newest');
+          setByPerson(true);
+        }}
+      />
+
       <InviteSheet visible={inviting} onClose={() => setInviting(false)} event={info} />
 
       <Modal
@@ -1266,43 +1218,67 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
 
-  // The one thing this page is for, at full width, with an arrow saying it goes
-  // somewhere. Tall enough to be the obvious target for a thumb.
+  // The one thing this page is for.
+  //
+  // A pill rather than a rounded rectangle, and a coloured shadow rather than a
+  // grey one — the button casts light of its own colour, which is what makes a
+  // primary action look lit rather than merely filled. Tall enough to be the
+  // obvious target for a thumb.
   lead: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    height: 52,
+    height: 56,
     paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     backgroundColor: colors.primary,
-    ...shadow.card,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.32,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  // A disc behind the icon, so the mark reads as an object on the button rather
+  // than as decoration stuck to the text.
+  leadIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   // `flex: 1` on the label rather than the row, so the arrow stays pinned right
   // however long the label gets in another language.
-  leadText: { ...type.bodyStrong, fontSize: 15, color: '#fff', flex: 1 },
+  leadText: { ...type.bodyStrong, fontSize: 15.5, color: '#fff', flex: 1 },
 
-  // Equal thirds. Each one owns its share of the width instead of being sized by
-  // its text, so no label can push a neighbour off the screen.
+  // Equal halves. Each owns its share of the width instead of being sized by its
+  // text, so no label can push a neighbour off the screen.
   secondaries: { flexDirection: 'row', gap: spacing.sm },
   secondary: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 42,
+    gap: 7,
+    height: 46,
     paddingHorizontal: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: colors.primarySoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.primary + '2E',
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.primary + '24',
+    ...shadow.card,
   },
-  secondaryText: { ...type.label, fontSize: 12, color: colors.primary, flexShrink: 1 },
+  secondaryText: { ...type.label, fontSize: 12.5, color: colors.primary, flexShrink: 1 },
   // Visibly unavailable rather than merely inert. A button that looks live and
   // does nothing reads as the app being broken.
-  secondaryOff: { backgroundColor: colors.surfaceAlt, borderColor: 'transparent' },
-  pressed: { opacity: 0.85 },
+  secondaryOff: {
+    backgroundColor: colors.surfaceAlt,
+    borderColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.985 }] },
   round: {
     width: 52,
     height: 52,
@@ -1318,11 +1294,8 @@ const styles = StyleSheet.create({
   // edit, so generate fell back to the same purple as add — with a purple icon
   // on it, which is why the icon was not there.
 
-  filterRow: {
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xs,
-  },
+  // Search takes the width it can, the filter button takes what it needs.
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   // Already inside a padded parent, so this only needs the rhythm.
   sortRow: { gap: spacing.sm, paddingVertical: spacing.xs },
   filterChip: {

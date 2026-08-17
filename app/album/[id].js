@@ -751,18 +751,20 @@ const styles = StyleSheet.create({
   meta: { ...type.caption, color: colors.textMuted },
 
   addRow: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs },
+  // The same pill the event page uses, so the two read as one product.
   addBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 7,
     height: 46,
     paddingHorizontal: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: colors.primarySoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.primary + '2E',
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.primary + '24',
+    ...shadow.card,
   },
   // Shrinkable and one size down, so "Upload media" and a count pip can share a
   // half-width button on a narrow phone without either being clipped.
