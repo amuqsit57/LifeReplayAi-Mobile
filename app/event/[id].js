@@ -23,7 +23,15 @@ import { FREE_FILMS_PER_EVENT, allowance, filmsUsed } from '../../src/lib/limits
 import { showPaywall } from '../../src/lib/paywall';
 import { useWarmImages } from '../../src/lib/warm';
 import { usePro } from '../../src/store';
-import { createAlbum, eventPeople, getEvent, listAlbums, myProfile } from '../../src/lib/data';
+import {
+  createAlbum,
+  deleteEvent,
+  eventPeople,
+  getEvent,
+  leaveEvent,
+  listAlbums,
+  myProfile,
+} from '../../src/lib/data';
 import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
 import { Empty } from '../../src/ui';
@@ -285,6 +293,59 @@ export default function EventScreen() {
     onError: (error) => Alert.alert('Could not open the editor', error.message),
   });
 
+  // Whoever made the event can delete it; everybody else can only walk away
+  // from it. Two different actions, so the menu offers one or the other rather
+  // than showing a button that will be refused.
+  //
+  // Read off `event.data` rather than the `info` alias, which is declared
+  // further down: a const is not readable above its own declaration, and doing
+  // it would throw on the first render.
+  const mine = Boolean(
+    event.data?.created_by && me.data?.id && event.data.created_by === me.data.id
+  );
+
+  const scrapEvent = useMutation({
+    mutationFn: () => deleteEvent(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      router.replace('/(tabs)/events');
+    },
+    onError: (error) => Alert.alert('Could not delete this event', error.message),
+  });
+
+  const walkAway = useMutation({
+    mutationFn: () => leaveEvent(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      router.replace('/(tabs)/events');
+    },
+    onError: (error) => Alert.alert('Could not leave', error.message),
+  });
+
+  function openOptions() {
+    if (mine) {
+      return Alert.alert(
+        'Delete this event?',
+        'The photos, videos, albums and films in it go too. This cannot be undone.',
+        [
+          { text: 'Keep', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: () => scrapEvent.mutate() },
+        ]
+      );
+    }
+
+    Alert.alert(
+      'Leave this event?',
+      'It disappears from your events. What you added stays, so nobody else loses it — delete anything you want gone first.',
+      [
+        { text: 'Stay', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: () => walkAway.mutate() },
+      ]
+    );
+  }
+
   function toggle(memoryId) {
     setSelected((current) =>
       current.includes(memoryId)
@@ -421,6 +482,12 @@ export default function EventScreen() {
                 tone="onDark"
                 label="Members"
                 onPress={() => setShowingPeople(true)}
+              />
+              <RoundButton
+                name="more-horizontal"
+                tone="onDark"
+                label={mine ? 'Delete this event' : 'Leave this event'}
+                onPress={openOptions}
               />
               <RoundButton
                 name="user-plus"

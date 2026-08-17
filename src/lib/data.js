@@ -169,6 +169,40 @@ export async function joinEvent(code) {
   return unwrap(await supabase.rpc('join_event', { code }));
 }
 
+/**
+ * Delete an event, and everything that hung off it.
+ *
+ * Only whoever created it can — enforced by the policy, not by hiding the
+ * button, so somebody else's event cannot be removed by calling this directly.
+ * The albums, memories and films go with it on cascade, which is what deleting
+ * an event means to the person doing it.
+ */
+export async function deleteEvent(eventId) {
+  const { error } = await supabase.from('events').delete().eq('id', eventId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Leave an event you were invited to.
+ *
+ * Removes the membership, not the event — and deliberately not the photographs
+ * either. What somebody contributed to a shared day stays part of that day;
+ * taking it with them on the way out would quietly gut everybody else's film.
+ * Anything they want gone, they can delete first.
+ */
+export async function leaveEvent(eventId) {
+  const { data: auth } = await supabase.auth.getUser();
+  const me = auth?.user?.id;
+  if (!me) throw new Error('Not signed in');
+
+  const { error } = await supabase
+    .from('event_members')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('user_id', me);
+  if (error) throw new Error(error.message);
+}
+
 export async function eventPeople(eventId) {
   return unwrap(await supabase.rpc('event_people', { target_event: eventId })) ?? [];
 }
