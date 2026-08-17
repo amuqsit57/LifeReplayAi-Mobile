@@ -20,25 +20,39 @@ const { width } = Dimensions.get('window');
  */
 const STEPS = [
   {
-    icon: 'users',
-    title: 'One event, everyone’s camera',
+    icon: 'folder-plus',
+    title: 'Start with the occasion',
     body:
-      'Share the code. Everyone adds what they took.',
+      'A wedding, a holiday, a birthday. Make an event for it and you get a short code to share.',
     tint: colors.primary,
   },
   {
-    icon: 'eye',
-    title: 'It watches everything',
+    icon: 'users',
+    title: 'Everyone adds what they shot',
     body:
-      'Every photo and clip is read for what happens in it. Duplicates are dropped.',
+      'Anyone with the code joins and uploads their own photos and video. No account of yours to join, nothing to set up.',
     tint: colors.accent,
   },
   {
-    icon: 'film',
-    title: 'Then it cuts a film',
+    icon: 'search',
+    title: 'It finds the moments',
     body:
-      'Pick a style. It chooses the shots, paces, grades and scores them.',
+      'Every picture and clip is read for what is happening in it, so the best shots are chosen rather than the first ones.',
+    tint: colors.warning,
+  },
+  {
+    icon: 'film',
+    title: 'Pick a style, get a film',
+    body:
+      'Highlights, Celebration, Cinematic or Family Story. Each cuts the same day a different way — pacing, grading and all.',
     tint: colors.success,
+  },
+  {
+    icon: 'scissors',
+    title: 'Or cut it yourself',
+    body:
+      'Open any film in the editor to change every shot and join, and score it with music composed for your event or a track of your own.',
+    tint: colors.primary,
   },
 ];
 

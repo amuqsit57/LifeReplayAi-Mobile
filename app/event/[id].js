@@ -398,7 +398,19 @@ export default function EventScreen() {
               />
             </>
           ) : (
-            <View style={[styles.heroImage, { backgroundColor: colors.surfaceAlt }]} />
+            // An event with nothing in it yet still has a title, and everything
+            // in this header is white because it is normally sitting on a
+            // photograph. Against the pale surface that stood in for one, the
+            // title was white on near-white and effectively invisible. The brand
+            // gradient gives the words something to sit on, and reads as a
+            // deliberate cover rather than a missing one.
+            <LinearGradient
+              colors={[colors.primary, colors.accent]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroImage}
+              pointerEvents="none"
+            />
           )}
 
           <View style={styles.heroBar}>
@@ -444,17 +456,49 @@ export default function EventScreen() {
             which looked like an afterthought and — because the rows underneath
             covered their lower halves — swallowed roughly half the taps aimed at
             them. Laid out normally, they are aligned and every pixel is live. */}
+        {/* Which of these leads changes with the event.
+
+            An empty event cannot generate anything, so offering that first was
+            pointing at the one button that would not work. Uploading takes the
+            lead until there is something to work with, then stands down — the
+            same three actions throughout, ordered by what is actually next. */}
         <View style={styles.actions}>
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-              setTab('films');
-            }}
-            style={({ pressed }) => [styles.action, styles.actionMain, pressed && styles.pressed]}
-          >
-            <Feather name="zap" size={15} color="#fff" />
-            <Text style={styles.actionMainText}>Generate with AI</Text>
-          </Pressable>
+          {list.length ? (
+            <>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setTab('films');
+                }}
+                style={({ pressed }) => [styles.action, styles.actionMain, pressed && styles.pressed]}
+              >
+                <Feather name="zap" size={16} color="#fff" />
+                <Text style={styles.actionMainText}>Generate film</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={addMemories}
+                disabled={Boolean(progress)}
+                style={({ pressed }) => [styles.action, styles.actionAlt, pressed && styles.pressed]}
+              >
+                <Feather name="upload-cloud" size={16} color={colors.primary} />
+                <Text style={styles.actionAltText}>
+                  {progress ? 'Uploading' : 'Upload'}
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <Pressable
+              onPress={addMemories}
+              disabled={Boolean(progress)}
+              style={({ pressed }) => [styles.action, styles.actionMain, pressed && styles.pressed]}
+            >
+              <Feather name="upload-cloud" size={16} color="#fff" />
+              <Text style={styles.actionMainText}>
+                {progress ? 'Uploading…' : 'Upload media'}
+              </Text>
+            </Pressable>
+          )}
 
           <Pressable
             onPress={() => {
@@ -463,23 +507,21 @@ export default function EventScreen() {
               requestEdit();
             }}
             disabled={!list.length || startEdit.isPending}
-            style={({ pressed }) => [styles.action, styles.actionAlt, pressed && styles.pressed]}
-          >
-            <Feather name="scissors" size={15} color={colors.primary} />
-            <Text style={styles.actionAltText}>Custom</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={addMemories}
-            disabled={Boolean(progress)}
-            style={({ pressed }) => [styles.action, styles.actionAlt, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.action,
+              styles.actionAlt,
+              !list.length && styles.actionOff,
+              pressed && styles.pressed,
+            ]}
           >
             <Feather
-              name={progress ? 'upload-cloud' : 'plus'}
-              size={15}
-              color={colors.primary}
+              name="scissors"
+              size={16}
+              color={list.length ? colors.primary : colors.textMuted}
             />
-            <Text style={styles.actionAltText}>{progress ? 'Adding' : 'Add'}</Text>
+            <Text style={[styles.actionAltText, !list.length && { color: colors.textMuted }]}>
+              Cut your own
+            </Text>
           </Pressable>
         </View>
 
@@ -1134,6 +1176,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primary + '2E',
   },
   actionAltText: { ...type.label, color: colors.primary },
+  // Visibly unavailable rather than merely inert. A button that looks live and
+  // does nothing reads as the app being broken.
+  actionOff: { backgroundColor: colors.surfaceAlt, borderColor: 'transparent' },
   pressed: { opacity: 0.85 },
   round: {
     width: 52,

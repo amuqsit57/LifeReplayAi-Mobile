@@ -141,7 +141,17 @@ export function SectionHeader({ title, subtitle, action, onAction }) {
 
 export function Empty({ icon = '📼', title, body }) {
   return (
-    <Card style={{ alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xxl }}>
+    <Card
+      style={{
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingVertical: spacing.xxl,
+        // Its own gutter. The lists this sits in run edge to edge on purpose —
+        // the cards carry their own margin so posters reach the screen edges —
+        // which left this card butted against both sides of the phone.
+        marginHorizontal: spacing.lg,
+      }}
+    >
       <Text style={{ fontSize: 40 }}>{icon}</Text>
       <Text style={[type.bodyStrong, { color: colors.text, textAlign: 'center' }]}>{title}</Text>
       {body ? (

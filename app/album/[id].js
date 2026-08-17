@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
@@ -269,9 +270,24 @@ export default function AlbumScreen() {
       >
         <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
           {cover ? (
-            <Photo uri={cover} style={StyleSheet.absoluteFill} blurRadius={30} />
-          ) : null}
-          <View style={[StyleSheet.absoluteFill, styles.veil]} />
+            <>
+              <Photo uri={cover} style={StyleSheet.absoluteFill} blurRadius={30} />
+              <View style={[StyleSheet.absoluteFill, styles.veil]} />
+            </>
+          ) : (
+            // A warm tint rather than the bare page. The album's title is dark
+            // ink, so this stays light — the opposite choice to the event
+            // header, which is white text and needs a saturated ground. An empty
+            // album otherwise opened on a white rectangle with a heading floating
+            // in it and nothing to say where the header ended.
+            <LinearGradient
+              colors={[colors.accentSoft, colors.primarySoft]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+          )}
 
           <View style={styles.heroBar}>
             <RoundButton name="chevron-left" label="Back" onPress={() => router.back()} />
@@ -311,9 +327,9 @@ export default function AlbumScreen() {
             style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
             onPress={() => setAdding(true)}
           >
-            <Feather name="grid" size={15} color={colors.primary} />
+            <Feather name="grid" size={16} color={colors.primary} />
             <Text style={styles.addBtnText} numberOfLines={1}>
-              From event
+              Pick from event
             </Text>
             {available.length ? (
               <View style={styles.addPip}>
@@ -322,18 +338,17 @@ export default function AlbumScreen() {
             ) : null}
           </Pressable>
 
+          {/* "Upload media" rather than "Add media", because the one beside it
+              also adds — the difference is where it comes from, and that is what
+              the two labels should be saying. */}
           <Pressable
             style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
             onPress={addOwnMedia}
             disabled={Boolean(progress)}
           >
-            <Feather
-              name={progress ? 'upload-cloud' : 'plus'}
-              size={15}
-              color={colors.primary}
-            />
+            <Feather name="upload-cloud" size={16} color={colors.primary} />
             <Text style={styles.addBtnText} numberOfLines={1}>
-              {progress ? 'Adding' : 'Add media'}
+              {progress ? 'Uploading' : 'Upload media'}
             </Text>
           </Pressable>
         </View>
