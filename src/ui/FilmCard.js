@@ -64,7 +64,7 @@ function clock(seconds) {
  * what it is doing, because it takes minutes and a spinner for that long is
  * indistinguishable from something having hung.
  */
-export default function FilmCard({ style, replay, onGenerate, onOpen }) {
+export default function FilmCard({ style, replay, onGenerate, onOpen, locked }) {
   const meta = STYLE_META[style] ?? {};
   // An edit is called what its author called it. Showing the style name made a
   // custom cut announce itself as "Highlights", which is not what they made.
@@ -144,14 +144,26 @@ export default function FilmCard({ style, replay, onGenerate, onOpen }) {
     );
   }
 
+  // Locked still shows what the style is and what it would do — the card is an
+  // advertisement for the thing, so hiding the description would be hiding the
+  // reason to pay. Only the action changes.
   return (
     <Pressable
       onPress={onGenerate}
       style={({ pressed }) => [styles.card, styles.cardIdle, pressed && styles.pressed]}
     >
       <View style={styles.row}>
-        <View style={[styles.iconRound, { backgroundColor: (meta.tint ?? colors.primary) + '1A' }]}>
-          <Feather name="zap" size={16} color={meta.tint ?? colors.primary} />
+        <View
+          style={[
+            styles.iconRound,
+            { backgroundColor: (locked ? colors.primary : meta.tint ?? colors.primary) + '1A' },
+          ]}
+        >
+          <Feather
+            name={locked ? 'lock' : 'zap'}
+            size={16}
+            color={locked ? colors.primary : meta.tint ?? colors.primary}
+          />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.label} numberOfLines={1}>{name}</Text>
@@ -159,9 +171,17 @@ export default function FilmCard({ style, replay, onGenerate, onOpen }) {
             {failed ? 'Failed — tap to try again' : meta.blurb ?? 'Tap to generate'}
           </Text>
         </View>
-        <View style={[styles.makeChip, { backgroundColor: meta.tint ?? colors.primary }]}>
-          <Text style={styles.makeChipText}>Generate</Text>
-        </View>
+
+        {locked ? (
+          <View style={styles.proChip}>
+            <Feather name="star" size={10} color="#fff" />
+            <Text style={styles.makeChipText}>PRO</Text>
+          </View>
+        ) : (
+          <View style={[styles.makeChip, { backgroundColor: meta.tint ?? colors.primary }]}>
+            <Text style={styles.makeChipText}>Generate</Text>
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -195,6 +215,17 @@ const styles = StyleSheet.create({
 
   makeChip: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.pill },
   makeChipText: { ...type.tiny, color: '#fff' },
+  // Always the brand purple, never the style's own tint: Pro is one thing across
+  // the app, and colouring it per style would read as part of the style.
+  proChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
 
   percent: { ...type.label, color: colors.text, fontVariant: ['tabular-nums'] },
   track: {

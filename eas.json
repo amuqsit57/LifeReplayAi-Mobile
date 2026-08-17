@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 22.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "//": "The development profile is the one to demo on. RevenueCat's Test Store deliberately refuses to run in a release build — it alerts and crashes rather than let test purchases grant real entitlements — so a preview or production build cannot show the paywall until real store keys exist. It also keeps __DEV__ true, which is what src/lib/purchases.js requires before it will reach for the test key at all.",
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "//preview": "A self-contained APK with the JS bundled in, for handing to someone without Metro. Subscriptions are OFF in this profile by design: __DEV__ is false and no platform key is configured, so purchases.js configures nothing rather than crashing. Useful for showing the rest of the app, not the paywall.",
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

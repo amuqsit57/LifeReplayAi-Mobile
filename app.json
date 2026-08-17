@@ -23,8 +23,17 @@
     },
     "extra": {
       "//": "Omit a key to disable it rather than setting it to null — Expo resolves null to {} at runtime, which reads as configured. apiUrl pins the FastAPI backend; without it the host is derived from Metro.",
+
+      "//eas": "Written by hand rather than by `eas init --id`, which needs an interactive login. Same result: this is the only thing that command adds.",
+      "eas": {
+        "projectId": "5888956f-0a4e-424c-96db-7ff9142ddd7c"
+      },
+
       "supabaseUrl": "https://uuyvovmrjuoeonzuqclx.supabase.co",
-      "supabaseAnonKey": "sb_publishable_VEUtMEipRxKyXLcJm-LL8w_JbufoTg_"
+      "supabaseAnonKey": "sb_publishable_VEUtMEipRxKyXLcJm-LL8w_JbufoTg_",
+
+      "//revenuecat": "Three separate keys, and which one is used is decided at runtime — see src/lib/purchases.js. The test key talks to RevenueCat's Test Store, which serves products and runs the whole purchase flow without App Store Connect or the Play Console. It must never reach a release build: the SDK deliberately crashes an app that ships with one. Fill revenueCatIos / revenueCatAndroid in when the store listings exist, and they take over automatically.",
+      "revenueCatTest": "test_jRIRsMhsgHYVhUXkrMmluqaEkmQ"
     },
     "plugins": [
       "expo-router",

@@ -19,7 +19,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../src/lib/api';
+import { FREE_FILMS_PER_EVENT, allowance, filmsUsed } from '../../src/lib/limits';
+import { showPaywall } from '../../src/lib/paywall';
 import { useWarmImages } from '../../src/lib/warm';
+import { usePro } from '../../src/store';
 import { createAlbum, eventPeople, getEvent, listAlbums, myProfile } from '../../src/lib/data';
 import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { STYLE_META, colors, radius, shadow, spacing, type } from '../../src/theme';
@@ -128,6 +131,12 @@ export default function EventScreen() {
 
   const list = memories.data ?? [];
   const me = useQuery({ queryKey: ['myProfile'], queryFn: myProfile });
+
+  // Two films per event on the house, any of the four styles, so the app gets to
+  // prove itself on your own photographs before it asks for anything. Counted
+  // from the films that exist rather than from a tally kept here.
+  const isPro = usePro((s) => s.isPro);
+  const films = allowance(filmsUsed(replays.data ?? []), FREE_FILMS_PER_EVENT, isPro);
 
   const peopleById = useMemo(
     () => new Map((people.data ?? []).map((person) => [person.user_id, person])),
@@ -244,6 +253,26 @@ export default function EventScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['replays', id] }),
     onError: (error) => Alert.alert('Could not start', error.message),
   });
+
+  /**
+   * Ask for a film, buying the right to first if necessary.
+   *
+   * The generate happens either way — if they subscribe on the paywall, the
+   * thing they were trying to do carries on rather than dropping them back at
+   * the locked card they just paid to unlock, which reads as the payment having
+   * failed.
+   */
+  async function requestFilm(style) {
+    if (!list.length) return;
+    if (films.exhausted && !(await showPaywall())) return;
+    generate.mutate(style);
+  }
+
+  async function requestEdit() {
+    if (!list.length) return;
+    if (!isPro && !(await showPaywall())) return;
+    startEdit.mutate();
+  }
 
   // A blank edit. Nothing renders until they say so — the draft exists purely to
   // give the plan somewhere to live while it is being written.
@@ -431,7 +460,7 @@ export default function EventScreen() {
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
               setTab('films');
-              if (list.length) startEdit.mutate();
+              requestEdit();
             }}
             disabled={!list.length || startEdit.isPending}
             style={({ pressed }) => [styles.action, styles.actionAlt, pressed && styles.pressed]}
@@ -700,6 +729,28 @@ export default function EventScreen() {
               </Text>
             </View>
 
+            {/* Said before anything is tapped. Finding out you have run out at
+                the moment you ask is the version of this that feels like a trap;
+                a count that has been visible all along is just the deal. */}
+            {films.unlimited ? null : (
+              <Pressable
+                style={[styles.meter, films.exhausted && styles.meterOut]}
+                onPress={showPaywall}
+              >
+                <Feather
+                  name={films.exhausted ? 'lock' : 'film'}
+                  size={14}
+                  color={films.exhausted ? colors.primary : colors.textSoft}
+                />
+                <Text style={styles.meterText}>
+                  {films.exhausted
+                    ? 'Both free films used for this event'
+                    : `${films.left} of ${films.cap} free films left in this event`}
+                </Text>
+                <Text style={styles.meterCta}>{films.exhausted ? 'Go Pro' : 'Pro'}</Text>
+              </Pressable>
+            )}
+
             {Object.keys(STYLE_META).map((style) => {
               const existing = eventFilms.find((r) => r.style === style);
               return (
@@ -707,7 +758,8 @@ export default function EventScreen() {
                   key={style}
                   style={style}
                   replay={existing}
-                  onGenerate={() => list.length && generate.mutate(style)}
+                  locked={!existing && films.exhausted}
+                  onGenerate={() => requestFilm(style)}
                   onOpen={() => router.push(`/replay/${existing.id}`)}
                 />
               );
@@ -831,15 +883,17 @@ export default function EventScreen() {
 
             <Pressable
               style={[styles.startEdit, !list.length && styles.startEditOff]}
-              onPress={() => list.length && startEdit.mutate()}
+              onPress={requestEdit}
               disabled={!list.length || startEdit.isPending}
             >
               {startEdit.isPending ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Feather name="plus" size={17} color={colors.primary} />
+                <Feather name={isPro ? 'plus' : 'lock'} size={17} color={colors.primary} />
               )}
-              <Text style={styles.startEditText}>Start an edit</Text>
+              <Text style={styles.startEditText}>
+                {isPro ? 'Start an edit' : 'Start an edit · Pro'}
+              </Text>
             </Pressable>
           </View>
         ) : null}
@@ -1165,6 +1219,19 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
+
+  meter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+  },
+  // Once it is spent the row stops being information and becomes the offer.
+  meterOut: { backgroundColor: colors.primarySoft },
+  meterText: { ...type.caption, color: colors.textSoft, flex: 1 },
+  meterCta: { ...type.tiny, color: colors.primary },
 
   editsHead: { gap: 4, paddingTop: spacing.lg },
   editsTitle: { ...type.heading, fontSize: 15, lineHeight: 21, color: colors.text },

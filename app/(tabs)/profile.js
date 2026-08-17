@@ -6,6 +6,9 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } 
 
 import { api } from '../../src/lib/api';
 import { feed, listEvents, myProfile, signOut } from '../../src/lib/data';
+import { showCustomerCenter, showPaywall } from '../../src/lib/paywall';
+import { restore } from '../../src/lib/purchases';
+import { usePro } from '../../src/store';
 import { colors, radius, shadow, spacing, type } from '../../src/theme';
 import ErrorState from '../../src/ui/ErrorState';
 import { RoundButton, ScreenHeader } from '../../src/ui/Header';
@@ -29,9 +32,48 @@ function Row({ icon, label, value, onPress, danger, last }) {
   );
 }
 
+/**
+ * What Pro is, or what it would be.
+ *
+ * One card doing both jobs rather than an upsell that disappears once you pay
+ * and a settings row that appears in its place. Somebody who subscribed wants to
+ * find the same thing in the same spot — to check it renewed, or to cancel — and
+ * hiding that is how a subscription becomes a chargeback.
+ */
+function ProCard({ isPro, onUpgrade, onManage }) {
+  return (
+    <Pressable
+      onPress={isPro ? onManage : onUpgrade}
+      style={({ pressed }) => [styles.pro, isPro && styles.proOn, pressed && { opacity: 0.9 }]}
+    >
+      <View style={[styles.proIcon, isPro && { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+        <Feather name={isPro ? 'star' : 'zap'} size={18} color={isPro ? '#fff' : colors.primary} />
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.proTitle, isPro && { color: '#fff' }]}>
+          {isPro ? 'Life Replay Pro' : 'Upgrade to Pro'}
+        </Text>
+        <Text style={[styles.proBody, isPro && { color: 'rgba(255,255,255,0.82)' }]}>
+          {isPro
+            ? 'Every style, and cut your own. Tap to manage.'
+            : 'Unlock every film style and the editor.'}
+        </Text>
+      </View>
+
+      <Feather
+        name="chevron-right"
+        size={18}
+        color={isPro ? 'rgba(255,255,255,0.8)' : colors.textMuted}
+      />
+    </Pressable>
+  );
+}
+
 export default function ProfileScreen() {
   const router = useRouter();
   const [tab, setTab] = useState('films');
+  const isPro = usePro((s) => s.isPro);
 
   const profile = useQuery({ queryKey: ['myProfile'], queryFn: myProfile });
   const posts = useQuery({ queryKey: ['feed'], queryFn: feed });
@@ -92,6 +134,12 @@ export default function ProfileScreen() {
           <View style={styles.statDivider} />
           <Stat value={liked} label="Likes" />
         </View>
+
+        <ProCard
+          isPro={isPro}
+          onUpgrade={showPaywall}
+          onManage={showCustomerCenter}
+        />
 
         <View style={styles.switcher}>
           {[
@@ -168,6 +216,33 @@ export default function ProfileScreen() {
               onPress={() => router.push('/auth/reset')}
             />
             <Row
+              icon={isPro ? 'credit-card' : 'star'}
+              label={isPro ? 'Manage subscription' : 'Life Replay Pro'}
+              value={isPro ? 'Active' : 'Not subscribed'}
+              onPress={isPro ? showCustomerCenter : showPaywall}
+            />
+            {/* Required by App Store review, and the only way somebody who
+                reinstalled gets back a subscription bought anonymously. */}
+            <Row
+              icon="refresh-cw"
+              label="Restore purchases"
+              onPress={async () => {
+                try {
+                  const info = await restore();
+                  Alert.alert(
+                    Object.keys(info?.entitlements?.active ?? {}).length
+                      ? 'Restored'
+                      : 'Nothing to restore',
+                    Object.keys(info?.entitlements?.active ?? {}).length
+                      ? 'Your subscription is back on this phone.'
+                      : 'No previous purchase was found for this account.'
+                  );
+                } catch (problem) {
+                  Alert.alert('Could not restore', problem?.message ?? 'Try again in a moment.');
+                }
+              }}
+            />
+            <Row
               icon="bell"
               label="Notifications"
               value="On"
@@ -242,6 +317,30 @@ const styles = StyleSheet.create({
   statDivider: { width: StyleSheet.hairlineWidth, height: 26, backgroundColor: colors.borderStrong },
   statValue: { ...type.title, color: colors.text, fontVariant: ['tabular-nums'] },
   statLabel: { ...type.caption, color: colors.textMuted },
+
+  pro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.primary + '2E',
+  },
+  // Solid brand purple once it is bought, so the card reads as a thing you own
+  // rather than an offer that never goes away.
+  proOn: { backgroundColor: colors.primary, borderColor: colors.primary, ...shadow.card },
+  proIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proTitle: { ...type.bodyStrong, color: colors.text },
+  proBody: { ...type.caption, color: colors.textSoft },
 
   switcher: {
     flexDirection: 'row',

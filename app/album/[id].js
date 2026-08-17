@@ -16,6 +16,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../src/lib/api';
+import { FREE_FILMS_PER_EVENT, allowance, filmsUsed } from '../../src/lib/limits';
+import { showPaywall } from '../../src/lib/paywall';
+import { usePro } from '../../src/store';
 import { pickMemories, uploadAll } from '../../src/lib/upload';
 import { useWarmImages } from '../../src/lib/warm';
 import {
@@ -173,6 +176,24 @@ export default function AlbumScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['replays', eventId] }),
     onError: (error) => Alert.alert('Could not start', error.message),
   });
+
+  // The allowance belongs to the event, and it is the event's whole list of
+  // replays that is counted — not just this album's. Otherwise every album
+  // would hand out two more free films and the limit would mean nothing.
+  const isPro = usePro((s) => s.isPro);
+  const films = allowance(filmsUsed(replays.data ?? []), FREE_FILMS_PER_EVENT, isPro);
+
+  async function requestFilm(style) {
+    if (!contents.length) return;
+    if (films.exhausted && !(await showPaywall())) return;
+    generate.mutate(style);
+  }
+
+  async function requestEdit() {
+    if (!contents.length) return;
+    if (!isPro && !(await showPaywall())) return;
+    startEdit.mutate();
+  }
 
   const scrap = useMutation({
     mutationFn: () => deleteAlbum(id),
@@ -459,7 +480,8 @@ export default function AlbumScreen() {
                   key={style}
                   style={style}
                   replay={existing}
-                  onGenerate={() => contents.length && generate.mutate(style)}
+                  locked={!existing && films.exhausted}
+                  onGenerate={() => requestFilm(style)}
                   onOpen={() => router.push(`/replay/${existing.id}`)}
                 />
               );
@@ -499,15 +521,17 @@ export default function AlbumScreen() {
 
             <Pressable
               style={[styles.startEdit, !contents.length && { opacity: 0.5 }]}
-              onPress={() => contents.length && startEdit.mutate()}
+              onPress={requestEdit}
               disabled={!contents.length || startEdit.isPending}
             >
               {startEdit.isPending ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Feather name="scissors" size={16} color={colors.primary} />
+                <Feather name={isPro ? 'scissors' : 'lock'} size={16} color={colors.primary} />
               )}
-              <Text style={styles.startEditText}>Cut one yourself</Text>
+              <Text style={styles.startEditText}>
+                {isPro ? 'Cut one yourself' : 'Cut one yourself · Pro'}
+              </Text>
             </Pressable>
           </View>
         )}

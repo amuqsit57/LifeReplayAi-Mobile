@@ -16,7 +16,10 @@ import {
 } from 'react-native';
 
 import { api, uploadToSignedUrl } from '../../lib/api';
+import { FREE_SONGS_TOTAL, allowance, songsUsed } from '../../lib/limits';
+import { showPaywall } from '../../lib/paywall';
 import { MUSIC_MODES } from '../../lib/plan';
+import { usePro } from '../../store';
 import { colors, radius, shadow, spacing, type } from '../../theme';
 
 // Starting points, so nobody faces an empty box. Written as briefs to a composer
@@ -137,9 +140,19 @@ export default function AudioPanel({
   const isOn = (key) => nowPlaying === key && playing;
 
   // ---- composing to order ------------------------------------------------
+  // Composing is the expensive call and the one people would loop through
+  // prompts on, so the allowance is account-wide rather than per event. Counted
+  // from the library itself: uploads and the tracks a render leaves behind are
+  // free, only what the model actually composed is charged for.
+  const isPro = usePro((s) => s.isPro);
+  const songs = allowance(songsUsed(library.data ?? []), FREE_SONGS_TOTAL, isPro);
+
   const compose = async () => {
     const brief = prompt.trim();
     if (brief.length < 3) return setError('Describe the music first.');
+
+    // Asked before the two-minute wait rather than after it.
+    if (songs.exhausted && !(await showPaywall())) return;
 
     setError(null);
     setWorking('compose');
@@ -343,11 +356,28 @@ export default function AudioPanel({
                           </>
                         ) : (
                           <>
-                            <Feather name="zap" size={15} color="#fff" />
-                            <Text style={styles.generateText}>Generate</Text>
+                            <Feather
+                              name={songs.exhausted ? 'lock' : 'zap'}
+                              size={15}
+                              color="#fff"
+                            />
+                            <Text style={styles.generateText}>
+                              {songs.exhausted ? 'Generate · Pro' : 'Generate'}
+                            </Text>
                           </>
                         )}
                       </Pressable>
+
+                      {/* Stated up front. This one takes two minutes, so finding
+                          out afterwards that it was your last would be worse
+                          here than anywhere else in the app. */}
+                      {songs.unlimited ? null : (
+                        <Text style={styles.allowance}>
+                          {songs.exhausted
+                            ? `All ${songs.cap} free tracks used — Pro composes without limit.`
+                            : `${songs.left} of ${songs.cap} free tracks left. Uploading your own is always free.`}
+                        </Text>
+                      )}
 
                       {made ? (
                         <TrackRow
@@ -536,6 +566,7 @@ const styles = StyleSheet.create({
   },
   generateBusy: { backgroundColor: colors.primaryPress },
   generateText: { ...type.label, color: '#fff' },
+  allowance: { ...type.caption, color: colors.textMuted, textAlign: 'center' },
 
   upload: {
     flexDirection: 'row',

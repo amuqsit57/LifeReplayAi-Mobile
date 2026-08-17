@@ -13,7 +13,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { getSession, onAuthChange } from '../src/lib/data';
-import { useAuth } from '../src/store';
+import {
+  currentCustomerInfo,
+  hasPro,
+  identify,
+  onCustomerInfo,
+  startPurchases,
+} from '../src/lib/purchases';
+import { useAuth, usePro } from '../src/store';
 import { colors } from '../src/theme';
 
 export default function RootLayout() {
@@ -36,6 +43,9 @@ export default function RootLayout() {
   ).current;
 
   const setSession = useAuth((s) => s.setSession);
+  const session = useAuth((s) => s.session);
+  const setCustomerInfo = usePro((s) => s.setCustomerInfo);
+  const setUnavailable = usePro((s) => s.setUnavailable);
 
   useEffect(() => {
     // Restore the persisted session first, then follow sign-in/sign-out.
@@ -49,6 +59,38 @@ export default function RootLayout() {
       queryClient.clear();
     });
   }, [queryClient, setSession]);
+
+  // Start the store once, and keep listening. The listener is what makes a
+  // purchase made on the paywall — or a renewal, or a lapse — reach every screen
+  // without any of them asking.
+  useEffect(() => {
+    let stop = () => {};
+    let cancelled = false;
+
+    startPurchases().then((ok) => {
+      if (cancelled) return;
+      if (!ok) return setUnavailable();
+
+      stop = onCustomerInfo((info) => setCustomerInfo(info, hasPro(info)));
+      currentCustomerInfo().then((info) => {
+        if (!cancelled) setCustomerInfo(info, hasPro(info));
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      stop();
+    };
+  }, [setCustomerInfo, setUnavailable]);
+
+  // A subscription belongs to the account, not the handset. Re-identifying on
+  // every sign-in and sign-out is what carries it to a new phone and stops it
+  // being inherited by whoever signs in next on a shared one.
+  useEffect(() => {
+    identify(session).then((info) => {
+      if (info) setCustomerInfo(info, hasPro(info));
+    });
+  }, [session, setCustomerInfo]);
 
   if (!fontsLoaded && !fontError) {
     return (
