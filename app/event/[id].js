@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -139,6 +139,28 @@ export default function EventScreen() {
 
   const list = memories.data ?? [];
   const me = useQuery({ queryKey: ['myProfile'], queryFn: myProfile });
+
+  /**
+   * Tell the other screens when a picture finally has a thumbnail.
+   *
+   * A memory has no thumbnail at the moment it is uploaded — analysis makes one
+   * a little later, in the background. So invalidating the cover caches at the
+   * end of an upload refreshes them a fraction too early, and they cache the
+   * absence for another half hour.
+   *
+   * This watches for thumbnails actually appearing, which is what the polling
+   * on `memories` is already there to notice, and refreshes them then. Without
+   * it a newly filled event kept its blank cover in the events tab until the app
+   * was restarted.
+   */
+  const thumbed = list.filter((memory) => memory.thumbnail_url).length;
+  const lastThumbed = useRef(thumbed);
+  useEffect(() => {
+    if (thumbed === lastThumbed.current) return;
+    lastThumbed.current = thumbed;
+    queryClient.invalidateQueries({ queryKey: ['eventCovers'] });
+    queryClient.invalidateQueries({ queryKey: ['allAlbums'] });
+  }, [thumbed, queryClient]);
 
   // Two films per event on the house, any of the four styles, so the app gets to
   // prove itself on your own photographs before it asks for anything. Counted
@@ -365,6 +387,11 @@ export default function EventScreen() {
     const failed = results.filter((r) => !r.ok);
     api.analyseBatch(id).catch(() => {});
     queryClient.invalidateQueries({ queryKey: ['memories', id] });
+    // The lists that draw this event elsewhere hold their own cached cover, and
+    // uploading does not change the ids they are keyed on — so without this the
+    // events tab kept showing the old cover, or none, for half an hour.
+    queryClient.invalidateQueries({ queryKey: ['eventCovers'] });
+    queryClient.invalidateQueries({ queryKey: ['events'] });
 
     // The moment after an upload is when making a film makes sense to somebody,
     // so the offer goes here rather than as a note on a tab they may never open.

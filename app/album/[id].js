@@ -201,6 +201,11 @@ export default function AlbumScreen() {
     api.analyseBatch(album.data.event_id).catch(() => {});
     queryClient.invalidateQueries({ queryKey: ['albumIds', id] });
     queryClient.invalidateQueries({ queryKey: ['memories', album.data.event_id] });
+    // The albums and events tabs cache a cover per event, keyed on ids that an
+    // upload does not change — so they would hold a stale one for half an hour.
+    queryClient.invalidateQueries({ queryKey: ['eventCovers'] });
+    queryClient.invalidateQueries({ queryKey: ['allAlbums'] });
+    queryClient.invalidateQueries({ queryKey: ['events'] });
   }
 
   const add = useMutation({
