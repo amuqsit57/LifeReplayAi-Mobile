@@ -8,9 +8,12 @@
     "userInterfaceStyle": "light",
     "scheme": "lifereplay",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lifereplay.app"
     },
     "android": {
+      "//package": "Permanent. Play Store identifies an app by this string for its whole life — it cannot be changed after the first upload, and changing it now would mean a different app rather than a new version.",
+      "package": "com.lifereplay.app",
       "adaptiveIcon": {
         "backgroundColor": "#1A1626",
         "foregroundImage": "./assets/android-icon-foreground.png",
